@@ -13,6 +13,8 @@ function cloudUrl(): string {
 }
 
 const CLOUD_URL = cloudUrl();
+// für e2e/cloud.spec.ts (test.skip ohne URL)
+process.env['E2E_CLOUD_URL'] = CLOUD_URL;
 const CLOUD = process.env['E2E_CLOUD'] === '1';
 
 const device = { ...devices['Pixel 7'], browserName: 'chromium' as const };
@@ -27,7 +29,7 @@ export default defineConfig({
   projects: CLOUD
     ? [{ name: 'cloud', testMatch: /cloud\.spec\.ts/, use: { ...device, baseURL: 'http://localhost:4173' } }]
     : [{ name: 'chromium-pixel7', testIgnore: /cloud\.spec\.ts/, use: { ...device, baseURL: 'http://localhost:4175' } }],
-  ...(CLOUD ? { timeout: 120_000 } : {}),
+  ...(CLOUD ? { timeout: 300_000 } : {}),
   webServer: CLOUD
     ? {
       command: 'npm run build && npm run preview',

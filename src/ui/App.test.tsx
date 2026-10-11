@@ -30,6 +30,15 @@ describe('App', () => {
     expect(await db.trips.count()).toBe(1);
   });
 
+  it('aktiviert ein Logbuch, das ohne aktiven Törn per Sync ankommt (Onboarding → Shell)', async () => {
+    render(<App />);
+    expect(await screen.findByRole('dialog', { name: 'Neuer Törn' })).toBeInTheDocument();
+    // wie ein Cloud-Sync nach Login/Einladung: Trip erscheint direkt in der DB, ohne activeTripId
+    await db.trips.add({ id: 'synced', name: 'Aus der Cloud', boat: { name: 'Möwe' }, createdAt: 1, updatedAt: 1, updatedBy: 'x' });
+    expect(await screen.findByRole('navigation', { name: 'Hauptnavigation' })).toBeInTheDocument();
+    expect(await screen.findByText('Aus der Cloud', { exact: false })).toBeInTheDocument();
+  });
+
   it('wechselt Tabs und schaltet das Theme um', async () => {
     await seedTrip('Testtörn');
     const user = userEvent.setup();

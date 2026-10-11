@@ -511,6 +511,31 @@ Annahme: Alle Geräte haben die App; Skipper A hat bereits ein lokales Logbuch.
 3. Phase 2: Realm-Teilen, Einladungsflow, Flottillen-Einladung, E2E-Tests.
 4. Phase 3 (optional): SW-Hintergrundsync via `injectManifest`; Crew-Tabelle; Track-Chunks; Pro-Plan buchen vor dem Törn.
 
+### 9.7 Spike-Ergebnisse (2026-10-11, echte DB `z8c8mdzxf`, dexie-cloud-addon 4.4.15, Demo-Nutzer)
+
+Durchgeführt mit 2–4 Browser-Kontexten (Playwright gegen `vite dev`, Demo-Login `grant_type: 'demo'`), Skripte nicht im Repo; reproduzierbarer Teil steht in `e2e/cloud.spec.ts`.
+
+| Frage (9.5) | Ergebnis |
+|---|---|
+| 1. Wird der Realm-Owner automatisch Member? | **Ja.** Der Server legt beim ersten Sync des Realms `mmb-owner-<realmId>` an (`userId` = Owner, `accepted` gesetzt, **ohne** `roles`, ohne E-Mail). Rechte kommen über `realm.owner` (`manage: *`). Die App legt daher keinen eigenen Skipper-Eintrag an (wäre ein Duplikat); `listMembers` zeigt den Owner als „Skipper“. Ein zweites Gerät des Owners bekommt den Realm ohne weiteres Zutun. |
+| 2. Gleiche Primärschlüssel privat vs. Boots-Realm | **Primärschlüssel sind serverweit eindeutig je Tabelle.** Lädt ein Nutzer eine per Datei importierte Kopie eines bereits geteilten Logbuchs (gleiche IDs) in seinen privaten Realm hoch, lehnt der Server ab (`duplicate key value violates unique constraint "objects_pkey"`) und rollt lokal zurück: **die importierte Kopie verschwindet vom Gerät**. Das Original im Boots-Realm bleibt unberührt. Konsequenz: Datei-Import nur für Logbücher, die nicht in der Cloud sind; wer per Datei importiert hat, sollte sich vor dem Beitritt einladen lassen statt zu importieren. |
+| 3. Leerer String im Compound-Key | Entfällt: `dayReports` hat jetzt eine String-`id` (`dayReportId(tripId, date, authorId)`, ohne leere Teile). |
+| 4. Blob-Offloading auf dem gehosteten Server | **Funktioniert** mit 4.4.15 ohne `canary`: Foto-Blob (PNG) kommt auf zweitem Gerät/anderem Nutzer als `Blob` mit korrekter Größe und MIME an (eager). |
+| 5. Offline-`update` auf serverseitig gelöschtes Objekt | **Löschen gewinnt.** Bob ändert offline einen Eintrag, Alice (Owner) löscht ihn hart; nach Reconnect ist er auf beiden Geräten weg, Bobs Änderung verworfen. Unser Soft-Delete (`deletedAt`) bleibt der Normalfall; hartes Löschen nur „Logbuch für alle löschen“. |
+| 6. Lizenz `client_credentials`-Nutzer | Nicht geprüft (nicht benötigt): E2E nutzt Demo-Nutzer (`e2e/demoUsers.json`, Lizenz `demo`, keine Seats). |
+| 7. SW `injectManifest` | Nicht geprüft; Phase 1 läuft ohne Service Worker (`tryUseServiceWorker: false`). |
+| 8. `deviceId` nach Logout | Logout leert alle Tabellen inkl. `settings`; `getDeviceId` stellt die ID aus localStorage wieder her (im Browser geprüft: gleiche ID, 0 Trips nach Logout). |
+
+Weitere Befunde (wichtig für die Umsetzung):
+
+- **Array-Operation + andere Tabelle in einer Transaktion verliert Daten.** `db.photos.add(...)` und `db.entries.update(id, { photoIds: add([...]) })` in **derselben** Transaktion: das Foto ist nach dem Sync lokal und auf dem Server weg (keine Ablehnung, kein Fehler). Mit ganzem Array (`photoIds: [...]`) oder in **getrennten** Transaktionen bleibt es erhalten. Umsetzung: Foto-Zeilen und `photoIds`-Änderungen laufen in zwei Transaktionen (Repo-Kommentar in `addPhotosToEntry`). Ursache serverseitig vermutet [unverifiziert].
+- **Login während des Addon-Starts schließt die DB.** `db.cloud.login()` direkt nach dem Laden (DB noch in `on.ready`) führt zu „Need to reopen db“ und einer dauerhaft geschlossenen Verbindung (`DatabaseClosedError`). `login()` wartet jetzt zuerst auf `db.open()`.
+- **Rechte nur mit angenommener Einladung.** Der Server wertet Rollen erst nach `accepted`; die lokale Prüfung (`domain/access.ts`) zählt daher – strenger als das Addon – nur angenommene Mitgliedschaften. Nach „Annehmen“ lädt die App die Annahme hoch (push + pull), bevor das Logbuch aktiviert wird.
+- **Seltene Ablehnung direkt nach dem Beitritt [offen].** In etwa 1 von 20 E2E-Läufen lehnte der Server die ersten Schreibvorgänge eines frisch beigetretenen Crew-Mitglieds mit `PermissionsDeniedError … not authorized to add entries` ab, obwohl die Annahme bereits hochgeladen war; abgelehnte Änderungen werden lokal **zurückgerollt** (Eintrag verschwindet). In 36 gezielten Schreibversuchen (0,4–8 s nach Annahme) trat es nicht auf. Ursache unklar (Server-Cache?). Bis zur Klärung: nach dem Beitritt kurz warten bzw. prüfen, ob der erste Eintrag beim Skipper ankommt; bei Dexie nachfragen.
+- Abgelehnte Änderungen erscheinen **nicht** in `syncState` (bleibt `connected/in-sync`); sichtbar nur in der Sync-Antwort (`rejections`). Die Cloud-E2E loggt sie („Sync-Ablehnung“).
+- Readonly-Mitglied: Schreibversuch am Repo vorbei (`db.entries.add` direkt) wird vom Server abgelehnt und lokal zurückgerollt; das Repo blockiert vorher schon (`ReadOnlyTripError`).
+- Einladung per `invite: false` an `@demo.local`: erscheint beim Demo-Nutzer in `db.cloud.invites`; Annehmen per `accept()` funktioniert.
+
 ## 10. Quellenverzeichnis
 
 - Doku (abgerufen 2026-10-11): `https://dexie.org/docs/cloud/` Unterseiten `dexie-cloud-addon`, `db.cloud.configure()`, `DexieCloudOptions`, `best-practices`, `consistency`, `access-control`, `Realm`, `Role`, `Member`, `DBPermissionSet`, `db.members`, `db.realms`, `db.roles`, `db.cloud.permissions()`, `db.cloud.invites`, `db.cloud.login()`, `db.cloud.logout()`, `db.cloud.currentUser`, `db.cloud.syncState`, `SyncState`, `db.cloud.webSocketStatus`, `db.cloud.sync()`, `authentication`, `add-demo-users`, `cli`, `limits`, `rest-api`, `blob-offloading`, `gdpr-compliance`, `custom-emails`, `quickstart`; Preise: `https://dexie.org/cloud/pricing`.

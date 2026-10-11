@@ -18,8 +18,18 @@ npx dexie-cloud import roles.json                 # Rollen skipper / crew / read
 Optional für Cloud-E2E-Tests (Demo-Nutzer belegen keine Plätze, Login ohne Mail):
 
 ```sh
-npx dexie-cloud import e2e/demoUsers.json         # alice@demo.local, bob@demo.local, carol@demo.local
+npx dexie-cloud import e2e/demoUsers.json         # alice@, bob@, carol@, dave@demo.local
 ```
+
+## Tests
+
+- `npm test`, `npm run e2e`: immer lokaler Modus (Vitest setzt `VITE_DEXIE_CLOUD_URL` leer; die lokale E2E baut
+  mit leerer URL nach `dist-local` und läuft auf Port 4175).
+- `npm run e2e:cloud`: baut mit der URL aus `.env.local` (Port 4173, muss in der Whitelist stehen) und führt
+  `e2e/cloud.spec.ts` aus (Alice teilt, Bob schreibt mit, Carol liest nur, Foto-Sync). Ohne URL wird übersprungen.
+  Der Test löscht sein Logbuch am Ende „für alle“. Hängen gebliebene Test-Realms: `npx dexie-cloud clear-realm <realmId> --yes`
+  (`E2E_KEEP=1` lässt den Realm eines fehlgeschlagenen Laufs zur Analyse stehen).
+- Entwicklungsserver (`npm run dev`): `window.__logbook` = `{ db, repo, cloud }` für manuelle Versuche (nur DEV-Build).
 
 `dexie-cloud.key` nie committen, nie in Client-Code. Die App braucht nur die (öffentliche) Datenbank-URL.
 

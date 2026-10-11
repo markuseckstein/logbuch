@@ -24,6 +24,19 @@ const usePending = () =>
     () => pending,
   );
 
+/** Wartet, bis die Annahme beim Server ist (offline: bis die Verbindung wieder da ist). */
+async function acceptanceUploaded(): Promise<void> {
+  for (;;) {
+    try {
+      await db.cloud.sync({ wait: true, purpose: 'push' });
+      await db.cloud.sync({ wait: true, purpose: 'pull' });
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
+}
+
 /** „Jonas lädt dich in das Logbuch der Seeschwalbe ein“ */
 export function inviteText(inv: Pick<Invite, 'invitedBy' | 'realm' | 'roles'>): string {
   const who = inv.invitedBy?.name?.trim() || inv.invitedBy?.email || 'Jemand';
@@ -43,10 +56,12 @@ export function InviteBanner() {
     try {
       if (accept) {
         await inv.accept();
+        toast('Einladung angenommen – das Logbuch wird geladen …', 4200);
+        // Spike: geht die Annahme im selben Sync wie die ersten Einträge hoch, prüft der Server die Einträge
+        // vor der Annahme und lehnt sie ab (lokal zurückgerollt). Daher erst die Annahme hochladen.
+        await acceptanceUploaded();
         const tripId = tripIdOfRealm(inv.realmId);
         if (tripId) setPending({ tripId, crew: !inv.roles?.includes('readonly') });
-        toast('Einladung angenommen – das Logbuch wird geladen …', 4200);
-        void db.cloud.sync({ wait: false, purpose: 'pull' }).catch(() => undefined);
       } else {
         await inv.reject();
         toast('Einladung abgelehnt');

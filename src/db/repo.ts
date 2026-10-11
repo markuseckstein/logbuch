@@ -96,6 +96,7 @@ async function permissionsIn(db: LogbookDB, realmId: string, userId: string): Pr
     realm,
     selfMembers: selfMembers.map((m) => ({
       realmId: m.realmId, ...(m.userId ? { userId: m.userId } : {}), ...(m.roles ? { roles: m.roles } : {}),
+      ...(m.accepted ? { accepted: m.accepted } : {}), ...(m.rejected ? { rejected: m.rejected } : {}),
       ...(m.permissions ? { permissions: m.permissions as PermissionSet } : {}),
     })),
     globalRoles,
@@ -469,21 +470,31 @@ export async function addPhotoToEntry(db: LogbookDB, entryId: ID, input: PhotoIn
   return photo!;
 }
 
-/** Adds several photos atomically (all or none); `photoIds` grows via Dexie's sync-consistent `add()`. */
+/*
+ * Dexie Cloud (Spike 2026-10-11): an array operation (`add()`/`remove()`) in the same transaction as writes
+ * to another table makes the server silently drop the other writes (photo rows vanished, no rejection).
+ * Therefore photo rows and `photoIds` changes run in two transactions; at worst a photo row stays orphaned.
+ */
+
+/** Adds several photos (rows all or none); then `photoIds` grows via Dexie's sync-consistent `add()`. */
 export async function addPhotosToEntry(db: LogbookDB, entryId: ID, inputs: readonly PhotoInput[]): Promise<Photo[]> {
   const device = await getDeviceId(db);
-  return rw(db, [db.entries, db.photos], async () => {
+  const photos = await rw(db, [db.entries, db.photos], async () => {
     const entry = await db.entries.get(entryId);
     if (!entry) throw new Error(`Entry not found: ${entryId}`);
     const trip = await tripForWrite(db, entry.tripId);
     if (entry.photoIds.length + inputs.length > MAX_PHOTOS_PER_ENTRY) throw new MaxPhotosError(MAX_PHOTOS_PER_ENTRY);
-    const photos = newPhotos(trip, inputs);
-    await db.photos.bulkAdd(photos);
-    await db.entries.update(entryId, {
-      photoIds: add(photos.map((p) => p.id)), updatedAt: nextAt(entry.updatedAt), updatedBy: device,
-    });
-    return photos;
+    const created = newPhotos(trip, inputs);
+    await db.photos.bulkAdd(created);
+    return created;
   });
+  await db.transaction('rw', db.entries, async () => {
+    const entry = await db.entries.get(entryId);
+    await db.entries.update(entryId, {
+      photoIds: add(photos.map((p) => p.id)), updatedAt: nextAt(entry?.updatedAt ?? 0), updatedBy: device,
+    });
+  });
+  return photos;
 }
 
 async function sectionsOfDay(db: LogbookDB, tripId: ID, date: string): Promise<DayReport[]> {
@@ -499,40 +510,52 @@ export async function addPhotosToDayReport(
   db: LogbookDB, tripId: ID, date: string, inputs: readonly PhotoInput[], authorId?: ID,
 ): Promise<Photo[]> {
   const device = await getDeviceId(db);
-  return rw(db, [db.dayReports, db.photos, db.crewMembers], async () => {
+  const { photos, id, existing } = await rw(db, [db.dayReports, db.photos, db.crewMembers], async () => {
     const trip = await tripForWrite(db, tripId);
     const author = await resolveAuthor(db, tripId, authorId);
     const dayCount = (await sectionsOfDay(db, tripId, date)).reduce((n, r) => n + r.photoIds.length, 0);
     if (dayCount + inputs.length > MAX_PHOTOS_PER_DAY_REPORT) throw new MaxPhotosError(MAX_PHOTOS_PER_DAY_REPORT);
-    const id = dayReportId(tripId, date, author);
-    const report = await db.dayReports.get(id);
-    const photos = newPhotos(trip, inputs);
-    await db.photos.bulkAdd(photos);
-    const ids = photos.map((p) => p.id);
-    if (report) {
-      await db.dayReports.update(id, {
-        photoIds: add(ids), deletedAt: undefined, updatedAt: nextAt(report.updatedAt), updatedBy: device,
-      });
-    } else {
+    const reportId = dayReportId(tripId, date, author);
+    const report = await db.dayReports.get(reportId);
+    const created = newPhotos(trip, inputs);
+    await db.photos.bulkAdd(created);
+    if (!report) {
+      // new section: plain array (no array operation), may share the transaction with the photo rows
       await db.dayReports.add({
-        id, tripId, date, authorId: author, text: '', photoIds: ids, updatedAt: Date.now(), updatedBy: device, ...realmOf(trip),
+        id: reportId, tripId, date, authorId: author, text: '', photoIds: created.map((p) => p.id),
+        updatedAt: Date.now(), updatedBy: device, ...realmOf(trip),
       });
     }
-    return photos;
+    return { photos: created, id: reportId, existing: report };
   });
+  if (existing) {
+    await db.transaction('rw', db.dayReports, async () => {
+      await db.dayReports.update(id, {
+        photoIds: add(photos.map((p) => p.id)), deletedAt: undefined, updatedAt: nextAt(existing.updatedAt), updatedBy: device,
+      });
+    });
+  }
+  return photos;
 }
 
 export async function removePhotoFromDayReport(
   db: LogbookDB, tripId: ID, date: string, photoId: ID, authorId?: ID,
 ): Promise<void> {
   const device = await getDeviceId(db);
-  await rw(db, [db.dayReports, db.photos, db.crewMembers], async () => {
+  await rw(db, [db.dayReports, db.crewMembers], async () => {
     await assertWritable(db, tripId);
     const id = dayReportId(tripId, date, await resolveAuthor(db, tripId, authorId));
     const report = await db.dayReports.get(id);
     if (!report) throw new Error(`Day report not found: ${date}`);
-    await db.photos.bulkDelete(await deletablePhotoIds(db, [photoId]));
     await db.dayReports.update(id, { photoIds: remove([photoId]), updatedAt: nextAt(report.updatedAt), updatedBy: device });
+  });
+  await deletePhotoRows(db, [photoId]);
+}
+
+/** Separate transaction (see note above): removes photo rows this user may delete. */
+async function deletePhotoRows(db: LogbookDB, ids: readonly ID[]): Promise<void> {
+  await db.transaction('rw', db.photos, async () => {
+    await db.photos.bulkDelete(await deletablePhotoIds(db, ids));
   });
 }
 
@@ -552,13 +575,13 @@ export async function dayPhotoHashes(db: LogbookDB, tripId: ID, date: string): P
 
 export async function removePhotoFromEntry(db: LogbookDB, entryId: ID, photoId: ID): Promise<void> {
   const device = await getDeviceId(db);
-  await rw(db, [db.entries, db.photos], async () => {
+  await rw(db, [db.entries], async () => {
     const entry = await db.entries.get(entryId);
     if (!entry) throw new Error(`Entry not found: ${entryId}`);
     await assertWritable(db, entry.tripId);
-    await db.photos.bulkDelete(await deletablePhotoIds(db, [photoId]));
     await db.entries.update(entryId, { photoIds: remove([photoId]), updatedAt: nextAt(entry.updatedAt), updatedBy: device });
   });
+  await deletePhotoRows(db, [photoId]);
 }
 
 export async function setBoatPhoto(db: LogbookDB, tripId: ID, input: PhotoInput): Promise<Photo> {

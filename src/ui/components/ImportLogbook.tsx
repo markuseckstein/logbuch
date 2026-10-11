@@ -8,6 +8,7 @@ import { Icon } from '../icons';
 import { useToast } from '../toast';
 import { requestAuthorPrompt } from '../authorPrompt';
 import { Dialog } from './Dialog';
+import { useCloudUser } from '../cloudHooks';
 
 /** „Logbuch ‹Boot›: 5 neu · 2 geändert · 1 gelöscht · 3 Fotos“ */
 export function mergeMessage(boat: string, r: Pick<MergeSummary, 'added' | 'updated' | 'deleted' | 'photosAdded'>): string {
@@ -34,6 +35,7 @@ export function ImportLogbook({ trip }: { trip?: Trip }) {
   const [error, setError] = useState<string>();
   const [unknown, setUnknown] = useState<TripBundle>();
   const [offer, setOffer] = useState<JoinOffer>();
+  const signedIn = useCloudUser()?.isLoggedIn === true;
   const finishImport = async (bundle: TripBundle, ownership: 'own' | 'foreign'): Promise<void> => {
     setBusy(true);
     try {
@@ -119,6 +121,12 @@ export function ImportLogbook({ trip }: { trip?: Trip }) {
             Dieses Logbuch ist auf diesem Gerät noch nicht vorhanden. Gehört es zu deinem Boot und schreibst du hier
             mit – oder willst du es nur ansehen?
           </p>
+          {signedIn ? (
+            <p className="muted">
+              Du bist mit der Cloud angemeldet. Ist dieses Logbuch dort schon geteilt, lass dich lieber einladen: eine
+              importierte Kopie würde beim Abgleich mit der Cloud-Fassung kollidieren und wieder entfernt.
+            </p>
+          ) : null}
           <div className="share-choice">
             <button className="btn primary block" type="button" onClick={() => chooseOwnership('own')}>
               Mein Boot – ich schreibe mit

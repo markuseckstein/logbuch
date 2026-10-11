@@ -40,7 +40,7 @@ async function asMember(realmId: string, role: 'crew' | 'readonly' | 'skipper', 
     { realmId: 'rlm-public', name: 'readonly', permissions: {} },
   ] as never);
   await db.realms.update(realmId, { owner: 'alice' });
-  await db.members.put({ id: `mmb-${userId}`, realmId, userId, email: `${userId}@demo.local`, roles: [role] } as never);
+  await db.members.put({ id: `mmb-${userId}`, realmId, userId, email: `${userId}@demo.local`, roles: [role], accepted: new Date() } as never);
   db.cloudUser = () => ({ userId, email: `${userId}@demo.local` });
 }
 

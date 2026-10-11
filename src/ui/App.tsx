@@ -167,16 +167,16 @@ function Root() {
     void requestPersistentStorage();
   }, []);
 
-  // Kein aktiver Törn, aber Törns vorhanden (z. B. nach Löschen): ersten aktivieren.
+  const trips = useLiveQuery(() => db.trips.count(), []);
+
+  // Kein aktiver Törn, aber Törns vorhanden (nach Löschen oder per Cloud-Sync angekommen): ersten aktivieren.
   useEffect(() => {
-    if (trip !== null) return;
+    if (trip !== null || !trips) return;
     void (async () => {
       const [first] = await listTrips(db);
-      if (first && !(await getSettings(db)).activeTripId) await setActiveTrip(db, first.id);
+      if (first && !(await db.trips.get((await getSettings(db)).activeTripId ?? ''))) await setActiveTrip(db, first.id);
     })();
-  }, [trip]);
-
-  const trips = useLiveQuery(() => db.trips.count(), []);
+  }, [trip, trips]);
   const writable = useWritableTripIds();
 
   if (trip === undefined || trips === undefined || settings === undefined || writable === undefined) return null;

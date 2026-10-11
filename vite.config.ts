@@ -50,5 +50,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    // Unit-Tests immer im lokalen Modus (ohne Dexie-Cloud-Addon), auch wenn .env.local eine Cloud-URL setzt
+    env: { VITE_DEXIE_CLOUD_URL: '' },
   },
 });

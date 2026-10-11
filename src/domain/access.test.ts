@@ -36,15 +36,23 @@ describe('realmPermissions', () => {
   it('crew role can write entries but not manage', () => {
     const p = realmPermissions({
       realm, userId: 'bob', globalRoles: roles,
-      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['crew'] }],
+      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['crew'], accepted: 1 }],
     });
     expect(canWriteRealm(p)).toBe(true);
     expect(canManageRealm(p)).toBe(false);
   });
+  it('only accepted memberships count (server rejects writes before the acceptance arrived)', () => {
+    const input = (m: object) => realmPermissions({
+      realm, userId: 'bob', globalRoles: roles, selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['crew'], ...m }],
+    });
+    expect(canWriteRealm(input({ accepted: undefined }))).toBe(false);
+    expect(canWriteRealm(input({ accepted: new Date(), rejected: new Date() }))).toBe(false);
+    expect(canWriteRealm(input({ accepted: new Date() }))).toBe(true);
+  });
   it('readonly role (zero permissions) cannot write', () => {
     const p = realmPermissions({
       realm, userId: 'carol', globalRoles: roles,
-      selfMembers: [{ realmId: 'rlm~t', userId: 'carol', roles: ['readonly'] }],
+      selfMembers: [{ realmId: 'rlm~t', userId: 'carol', roles: ['readonly'], accepted: 1 }],
     });
     expect(canWriteRealm(p)).toBe(false);
   });
@@ -65,7 +73,7 @@ describe('realmPermissions', () => {
   it('merges roles with direct member permissions; unknown roles are ignored', () => {
     const p = realmPermissions({
       realm, userId: 'bob', globalRoles: roles,
-      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['readonly', 'ghost'], permissions: { add: '*' } }],
+      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['readonly', 'ghost'], permissions: { add: '*' }, accepted: 1 }],
     });
     expect(canWriteRealm(p)).toBe(true);
   });

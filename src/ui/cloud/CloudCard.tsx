@@ -72,6 +72,9 @@ function useNow(intervalMs = 30_000): number {
 function MembersPanel({ trip }: { trip: Trip }) {
   const toast = useToast();
   const members = useMembers(trip.id);
+  const me = useCloudUser();
+  const nameOf = (m: { name?: string; email?: string; self: boolean }): string =>
+    m.name || m.email || (m.self ? (me?.email ?? 'du') : 'Skipper');
   const manage = useCanManage(trip.id);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -101,7 +104,7 @@ function MembersPanel({ trip }: { trip: Trip }) {
         {members.map((m) => (
           <li key={m.id}>
             <span className="who">
-              <b>{m.name || m.email}</b>
+              <b>{nameOf(m)}</b>
               {m.name && m.email ? <span className="dmeta"> {m.email}</span> : null}
               {m.self ? <span className="dmeta"> (du)</span> : null}
             </span>
@@ -111,10 +114,10 @@ function MembersPanel({ trip }: { trip: Trip }) {
               <button
                 className="btn"
                 type="button"
-                aria-label={`${m.name || m.email} entfernen`}
+                aria-label={`${nameOf(m)} entfernen`}
                 onClick={() =>
                   void removeMember(db, m.id).then(
-                    () => toast(`${m.name || m.email} entfernt`),
+                    () => toast(`${nameOf(m)} entfernt`),
                     () => toast('Mitglied konnte nicht entfernt werden'),
                   )
                 }

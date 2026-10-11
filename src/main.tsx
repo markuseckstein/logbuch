@@ -13,6 +13,13 @@ import { App } from './ui/App';
 
 void deleteLegacyDb();
 
+// Nur im Entwicklungsserver: Zugriff für manuelle Spikes/Debugging (nie im Produktions-Build).
+if (import.meta.env.DEV) {
+  void Promise.all([import('./db/db'), import('./db/repo'), import('./db/cloud')]).then(([d, repo, cloud]) => {
+    Object.assign(window, { __logbook: { db: d.db, repo, cloud } });
+  });
+}
+
 const root = document.getElementById('root');
 if (!root) throw new Error('Root-Element fehlt');
 createRoot(root).render(

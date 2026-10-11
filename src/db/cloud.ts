@@ -52,6 +52,8 @@ export function isDemoEmail(email: string): boolean {
 /** Startet die Anmeldung; mit `customLoginGui` fragt das Addon den Code über `db.cloud.userInteraction` ab. */
 export async function login(db: LogbookDB, email: string): Promise<void> {
   const e = normalizeEmail(email);
+  // Spike: ein Login während der Startphase des Addons (db.on.ready) schließt die Datenbank dauerhaft.
+  await db.open();
   await db.cloud.login({ email: e, grant_type: isDemoEmail(e) ? 'demo' : 'otp' });
 }
 
@@ -78,23 +80,15 @@ function memberIdFields(db: LogbookDB): { id?: string } {
 
 /**
  * „Logbuch in die Cloud bringen“: Realm des Boots anlegen (`rlm~<tripId>`), Trip samt Crew, Einträgen,
- * Fotos, Berichten und Tracks hineinverschieben und mich als Skipper eintragen. Idempotent.
+ * Fotos, Berichten und Tracks hineinverschieben. Idempotent. Kein eigener Mitglieds-Eintrag: der Server
+ * legt für den Realm-Owner selbst `mmb-owner-<realmId>` an (Spike 2026-10-11); der Owner hat `manage: *`.
  */
 export async function shareTripToCloud(db: LogbookDB, tripId: ID): Promise<string> {
-  const user = requireUser(db);
+  requireUser(db);
   const trip = await db.trips.get(tripId);
   if (!trip) throw new Error(`Trip not found: ${tripId}`);
   const realmId = tiedRealmId(tripId);
   await moveTripToRealm(db, tripId, realmId, { name: trip.boat.name.trim() || trip.name, represents: 'ein Bordbuch' });
-  // Eigene Mitgliedschaft (Skipper) in eigener Transaktion: lehnt der Server sie ab, bleibt der Umzug bestehen.
-  await db.transaction('rw', db.members, async () => {
-    const mine = await db.members.where('[userId+realmId]').equals([user.userId, realmId]).count();
-    if (mine > 0) return;
-    await db.members.add({
-      ...memberIdFields(db), realmId, userId: user.userId, ...(user.email ? { email: user.email } : {}),
-      roles: ['skipper'], accepted: new Date(),
-    } as DBRealmMember);
-  });
   return realmId;
 }
 
@@ -142,8 +136,11 @@ export async function listMembers(db: LogbookDB, tripId: ID): Promise<MemberInfo
   const trip = await db.trips.get(tripId);
   if (!trip || !isSharedRealm(trip.realmId)) return [];
   const user = db.cloudUser();
+  const realm = await db.realms.get(trip.realmId!);
+  const rolesOf = (m: DBRealmMember): string[] =>
+    m.roles?.length ? m.roles : m.userId && m.userId === realm?.owner ? ['skipper'] : [];
   const rows = await db.members.where('realmId').equals(trip.realmId!).toArray();
-  const rank = (m: DBRealmMember): number => (m.roles?.includes('skipper') ? 0 : m.roles?.includes('crew') ? 1 : 2);
+  const rank = (m: DBRealmMember): number => (rolesOf(m).includes('skipper') ? 0 : rolesOf(m).includes('crew') ? 1 : 2);
   return rows
     .filter((m): m is DBRealmMember & { id: string } => typeof m.id === 'string')
     .sort((a, b) => rank(a) - rank(b) || (a.email ?? '').localeCompare(b.email ?? ''))
@@ -151,7 +148,7 @@ export async function listMembers(db: LogbookDB, tripId: ID): Promise<MemberInfo
       id: m.id,
       ...(m.email ? { email: m.email } : {}),
       ...(m.name ? { name: m.name } : {}),
-      roles: m.roles ?? [],
+      roles: rolesOf(m),
       status: memberStatus(m),
       self: !!user && (m.userId === user.userId || (!!user.email && m.email === user.email.toLowerCase())),
     }));

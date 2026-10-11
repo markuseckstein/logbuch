@@ -22,6 +22,9 @@ export interface MemberLike {
   userId?: string;
   roles?: string[];
   permissions?: PermissionSet;
+  /** Annahme der Einladung (Datum); nur angenommene Mitgliedschaften geben Rechte. */
+  accepted?: unknown;
+  rejected?: unknown;
 }
 
 export interface RealmAccessInput {
@@ -79,7 +82,10 @@ function mergeSets(sets: readonly PermissionSet[]): PermissionSet {
 export function realmPermissions({ realm, selfMembers, globalRoles, userId }: RealmAccessInput): PermissionSet {
   if (!realm) return {};
   if (realm.owner === userId) return { manage: '*' };
-  const mine = selfMembers.filter((m) => m.realmId === realm.realmId && (m.userId === undefined || m.userId === userId));
+  // Strenger als das Addon: der Server wertet Rechte erst nach angenommener Einladung (Spike 2026-10-11).
+  const mine = selfMembers.filter(
+    (m) => m.realmId === realm.realmId && (m.userId === undefined || m.userId === userId) && !!m.accepted && !m.rejected,
+  );
   const sets: PermissionSet[] = [];
   for (const m of mine) {
     if (m.permissions) sets.push(m.permissions);
