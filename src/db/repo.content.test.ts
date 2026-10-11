@@ -3,15 +3,17 @@ import type { LogbookDB } from './db';
 import {
   addPhotoToEntry, addTrack, appendTrackPoints, createEntry, createTrip, deleteEntry, deleteTrack,
   getDayReport, getPhoto, listDayReports, listEntries, listTracks, MaxPhotosError,
-  removePhotoFromEntry, setBoatPhoto, setEntryPosition, updateEntry, upsertDayReport, getTrip,
+  removePhotoFromEntry, setBoatPhoto, setEntryPosition, updateEntry, upsertDayReport,
 } from './repo';
-import { dispose, freshDb } from './test-helpers';
+import { dispose, firstBoat, freshDb, tripInput } from './test-helpers';
 
 let db: LogbookDB;
 let tripId: string;
+let boatId: string;
 beforeEach(async () => {
   db = freshDb();
-  tripId = (await createTrip(db, { name: 'T', boat: { name: 'B' }, crew: [] })).id;
+  tripId = (await createTrip(db, tripInput('T'))).id;
+  boatId = await firstBoat(db, tripId);
 });
 afterEach(async () => { await dispose(db); });
 
@@ -19,22 +21,22 @@ const photo = (s = 'x') => ({ blob: new Blob([s], { type: 'image/jpeg' }), mime:
 
 describe('entries', () => {
   it('creates a note entry with empty photoIds', async () => {
-    const e = await createEntry(db, tripId, { time: 1000, tzOffsetMin: 120, position: { lat: 1, lon: 2 } });
+    const e = await createEntry(db, tripId, { boatId, time: 1000, tzOffsetMin: 120, position: { lat: 1, lon: 2 } });
     expect(e).toMatchObject({ tripId, type: 'note', photoIds: [], time: 1000, tzOffsetMin: 120, position: { lat: 1, lon: 2 } });
     expect(e.createdAt).toBe(e.updatedAt);
   });
 
   it('lists chronologically and only for the given trip', async () => {
-    const other = await createTrip(db, { name: 'O', boat: { name: 'B' }, crew: [] });
-    const c = await createEntry(db, tripId, { time: 300, tzOffsetMin: 0 });
-    const a = await createEntry(db, tripId, { time: 100, tzOffsetMin: 0 });
-    const b = await createEntry(db, tripId, { time: 200, tzOffsetMin: 0 });
-    await createEntry(db, other.id, { time: 150, tzOffsetMin: 0 });
+    const other = await createTrip(db, tripInput('O'));
+    const c = await createEntry(db, tripId, { boatId, time: 300, tzOffsetMin: 0 });
+    const a = await createEntry(db, tripId, { boatId, time: 100, tzOffsetMin: 0 });
+    const b = await createEntry(db, tripId, { boatId, time: 200, tzOffsetMin: 0 });
+    await createEntry(db, other.id, { boatId: await firstBoat(db, other.id), time: 150, tzOffsetMin: 0 });
     expect((await listEntries(db, tripId)).map((e) => e.id)).toEqual([a.id, b.id, c.id]);
   });
 
   it('updateEntry patches fields and sets updatedAt', async () => {
-    const e = await createEntry(db, tripId, { time: 1, tzOffsetMin: 0 });
+    const e = await createEntry(db, tripId, { boatId, time: 1, tzOffsetMin: 0 });
     await new Promise((r) => setTimeout(r, 5));
     const u = await updateEntry(db, e.id, { text: 'Hallo', type: 'harbour', windBft: 4 });
     expect(u).toMatchObject({ text: 'Hallo', type: 'harbour', windBft: 4, createdAt: e.createdAt });
@@ -47,7 +49,7 @@ describe('entries', () => {
   });
 
   it('setEntryPosition sets and clears the position', async () => {
-    const e = await createEntry(db, tripId, { time: 1, tzOffsetMin: 0 });
+    const e = await createEntry(db, tripId, { boatId, time: 1, tzOffsetMin: 0 });
     const withPos = await setEntryPosition(db, e.id, { lat: 54, lon: 10, accuracyM: 5 });
     expect(withPos.position).toEqual({ lat: 54, lon: 10, accuracyM: 5 });
     const cleared = await setEntryPosition(db, e.id, undefined);
@@ -55,8 +57,8 @@ describe('entries', () => {
   });
 
   it('deleteEntry removes the entry and its photos only', async () => {
-    const e = await createEntry(db, tripId, { time: 1, tzOffsetMin: 0 });
-    const keep = await createEntry(db, tripId, { time: 2, tzOffsetMin: 0 });
+    const e = await createEntry(db, tripId, { boatId, time: 1, tzOffsetMin: 0 });
+    const keep = await createEntry(db, tripId, { boatId, time: 2, tzOffsetMin: 0 });
     const p = await addPhotoToEntry(db, e.id, photo());
     const kp = await addPhotoToEntry(db, keep.id, photo());
     await deleteEntry(db, e.id);
@@ -68,7 +70,7 @@ describe('entries', () => {
 
 describe('photos', () => {
   it('adds a photo and links it to the entry', async () => {
-    const e = await createEntry(db, tripId, { time: 1, tzOffsetMin: 0 });
+    const e = await createEntry(db, tripId, { boatId, time: 1, tzOffsetMin: 0 });
     const p = await addPhotoToEntry(db, e.id, photo());
     expect(p).toMatchObject({ tripId, mime: 'image/jpeg', width: 4, height: 3 });
     expect((await listEntries(db, tripId))[0]?.photoIds).toEqual([p.id]);
@@ -80,7 +82,7 @@ describe('photos', () => {
   });
 
   it('rejects a sixth photo with MaxPhotosError', async () => {
-    const e = await createEntry(db, tripId, { time: 1, tzOffsetMin: 0 });
+    const e = await createEntry(db, tripId, { boatId, time: 1, tzOffsetMin: 0 });
     for (let i = 0; i < 5; i++) await addPhotoToEntry(db, e.id, photo());
     await expect(addPhotoToEntry(db, e.id, photo())).rejects.toBeInstanceOf(MaxPhotosError);
     expect(await db.photos.count()).toBe(5);
@@ -88,7 +90,7 @@ describe('photos', () => {
   });
 
   it('removePhotoFromEntry deletes photo and unlinks it, allowing a new one', async () => {
-    const e = await createEntry(db, tripId, { time: 1, tzOffsetMin: 0 });
+    const e = await createEntry(db, tripId, { boatId, time: 1, tzOffsetMin: 0 });
     const ps = [];
     for (let i = 0; i < 5; i++) ps.push(await addPhotoToEntry(db, e.id, photo()));
     await removePhotoFromEntry(db, e.id, ps[1]!.id);
@@ -97,11 +99,11 @@ describe('photos', () => {
     await expect(addPhotoToEntry(db, e.id, photo())).resolves.toBeDefined();
   });
 
-  it('setBoatPhoto sets boat.photoId and replaces the previous photo', async () => {
-    const first = await setBoatPhoto(db, tripId, photo('a'));
-    expect((await getTrip(db, tripId))?.boat.photoId).toBe(first.id);
-    const second = await setBoatPhoto(db, tripId, photo('b'));
-    expect((await getTrip(db, tripId))?.boat.photoId).toBe(second.id);
+  it('setBoatPhoto sets photoId of the boat and replaces the previous photo', async () => {
+    const first = await setBoatPhoto(db, boatId, photo('a'));
+    expect((await db.boats.get(boatId))?.photoId).toBe(first.id);
+    const second = await setBoatPhoto(db, boatId, photo('b'));
+    expect((await db.boats.get(boatId))?.photoId).toBe(second.id);
     expect(await getPhoto(db, first.id)).toBeUndefined();
     expect(await getPhoto(db, second.id)).toBeDefined();
   });
@@ -124,14 +126,14 @@ describe('day reports', () => {
 
 describe('tracks', () => {
   it('adds, lists and deletes tracks', async () => {
-    const t = await addTrack(db, tripId, { name: 'GPX', source: 'gpx', points: [{ lat: 1, lon: 2 }] });
+    const t = await addTrack(db, tripId, { boatId, name: 'GPX', source: 'gpx', points: [{ lat: 1, lon: 2 }] });
     expect(await listTracks(db, tripId)).toEqual([t]);
     await deleteTrack(db, t.id);
     expect(await listTracks(db, tripId)).toEqual([]);
   });
 
   it('appendTrackPoints extends a live track in order', async () => {
-    const t = await addTrack(db, tripId, { name: 'Live', source: 'live', points: [] });
+    const t = await addTrack(db, tripId, { boatId, name: 'Live', source: 'live', points: [] });
     await appendTrackPoints(db, t.id, [{ lat: 1, lon: 1 }]);
     await appendTrackPoints(db, t.id, [{ lat: 2, lon: 2 }, { lat: 3, lon: 3 }]);
     expect((await listTracks(db, tripId))[0]?.points.map((p) => p.lat)).toEqual([1, 2, 3]);

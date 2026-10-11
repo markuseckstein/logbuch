@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tiedRealmId } from '../domain/access';
 import type { LogbookDB } from './db';
 import {
-  CloudNotSignedInError, cloudStatus, inviteMember, isDemoEmail, leaveTrip, listMembers, login, logout, memberStatus,
-  removeMember, shareTripToCloud, watchSyncRejections,
+  CloudNotSignedInError, adoptOwnTrips, cloudStatus, inviteToTrip, isDemoEmail, leaveTrip, listPeople, login, logout,
+  memberStatus, removePerson, resendInvite, shareTripToCloud, watchSyncRejections,
 } from './cloud';
 import { listRescued, resubmitRescued } from './syncRejections';
-import { createEntry, createTrip, getDeviceId, getSettings, loadTripData } from './repo';
-import { dispose, freshDb } from './test-helpers';
+import { DuplicateEmailError, createEntry, createTrip, getDeviceId, getSettings, listCrew, loadTripData } from './repo';
+import { boatIds, dispose, firstBoat, freshDb, tripInput } from './test-helpers';
 
 let db: LogbookDB;
 const cloud = { login: vi.fn(async () => undefined), logout: vi.fn(async () => undefined), sync: vi.fn(async () => undefined) };
@@ -73,74 +73,116 @@ describe('logout', () => {
 
 describe('shareTripToCloud', () => {
   it('requires a signed-in user', async () => {
-    const trip = await createTrip(db, { name: 'T', boat: { name: 'B' }, crew: [] });
+    const trip = await createTrip(db, tripInput('T'));
     await expect(shareTripToCloud(db, trip.id)).rejects.toBeInstanceOf(CloudNotSignedInError);
   });
-  it('moves the trip into its tied realm and names the realm after the boat (no own member row: the server adds the owner)', async () => {
+  it('moves a local trip into its tied realm named after the trip (no own member row: the server adds the owner)', async () => {
+    const trip = await createTrip(db, tripInput('Sommer', ['Seeschwalbe']));
+    await createEntry(db, trip.id, { boatId: await firstBoat(db, trip.id), time: 1, tzOffsetMin: 0 });
     signIn();
-    const trip = await createTrip(db, { name: 'T', boat: { name: 'Seeschwalbe' }, crew: [] });
-    await createEntry(db, trip.id, { time: 1, tzOffsetMin: 0 });
     const realmId = await shareTripToCloud(db, trip.id);
     expect(realmId).toBe(tiedRealmId(trip.id));
     const b = await loadTripData(db, trip.id);
-    expect([b.trip, ...b.entries].every((r) => r.realmId === realmId)).toBe(true);
-    expect(await db.realms.get(realmId)).toMatchObject({ name: 'Seeschwalbe' });
+    expect([b.trip, ...b.boats, ...b.entries].every((r) => r.realmId === realmId)).toBe(true);
+    expect(await db.realms.get(realmId)).toMatchObject({ name: 'Sommer' });
     expect(await db.members.count()).toBe(0);
-  });
-  it('lists the realm owner (server-created member without roles) as skipper', async () => {
-    signIn();
-    const trip = await createTrip(db, { name: 'T', boat: { name: 'B' }, crew: [] });
-    const realmId = await shareTripToCloud(db, trip.id);
-    await db.realms.update(realmId, { owner: 'alice' });
-    await db.members.add({ id: `mmb-owner-${realmId}`, realmId, userId: 'alice', accepted: new Date() } as never);
-    expect(await listMembers(db, trip.id)).toMatchObject([{ roles: ['skipper'], status: 'accepted', self: true }]);
   });
 });
 
-describe('members', () => {
+describe('adoptOwnTrips (after login)', () => {
+  it('shares local trips, links my person with the account and sends invitations noted before the login', async () => {
+    const trip = await createTrip(db, { ...tripInput('T', ['A', 'B']), founder: { name: 'Alice' } });
+    const [, b] = await boatIds(db, trip.id);
+    await inviteToTrip(db, trip.id, { email: 'bob@demo.local', suggestedBoatId: b });
+    expect(await db.members.count()).toBe(0); // not signed in: only noted
+    expect((await listPeople(db, trip.id)).map((p) => [p.name, p.status, p.admin])).toEqual([
+      ['Alice', 'pending', true], ['Bob', 'pending', false],
+    ]);
+    signIn();
+    expect(await adoptOwnTrips(db)).toBe(1);
+    await ownRealm(trip.id);
+    const realmId = tiedRealmId(trip.id);
+    expect((await db.trips.get(trip.id))!.realmId).toBe(realmId);
+    expect((await listCrew(db, trip.id))[0]).toMatchObject({ name: 'Alice', email: 'alice@demo.local' });
+    const rows = (await db.members.where('realmId').equals(realmId).toArray()).filter((m) => m.email);
+    expect(rows.map((m) => [m.email, m.roles, m.permissions])).toEqual([
+      ['bob@demo.local', ['member'], { add: ['entries', 'photos', 'dayReports', 'tracks', 'trackChunks'] }],
+    ]);
+    expect(await adoptOwnTrips(db)).toBe(0); // idempotent
+    expect(await db.members.where('realmId').equals(realmId).count()).toBe(2);
+  });
+});
+
+/** As the server would: the realm owner becomes a member and owns the trip. */
+async function ownRealm(tripId: string, owner = 'alice') {
+  const realmId = tiedRealmId(tripId);
+  await db.realms.update(realmId, { owner });
+  await db.trips.update(tripId, { owner });
+  await db.members.put({ id: `mmb-owner-${realmId}`, realmId, userId: owner, accepted: new Date() } as never);
+}
+
+describe('people and invitations', () => {
   async function shared() {
     signIn();
-    const trip = await createTrip(db, { name: 'T', boat: { name: 'B' }, crew: [] });
-    const realmId = await shareTripToCloud(db, trip.id);
-    // wie der Server: Realm-Owner wird Mitglied
-    await db.realms.update(realmId, { owner: 'alice' });
-    await db.members.add({ id: `mmb-owner-${realmId}`, realmId, userId: 'alice', email: 'alice@demo.local', accepted: new Date() } as never);
+    const trip = await createTrip(db, { ...tripInput('T', ['A', 'B']), founder: { name: 'Alice' } });
+    await ownRealm(trip.id);
     return trip;
   }
-  it('invites crew (writes along) and other boats (read only) into the realm of the trip', async () => {
+  it('invites with person + realm member (role member, explicit rights) in one go; demo users get no mail', async () => {
     const trip = await shared();
-    await inviteMember(db, trip.id, { email: 'Bob@Demo.Local', role: 'crew', name: 'Bob' });
-    await inviteMember(db, trip.id, { email: 'carol@example.de', role: 'readonly' });
-    const members = await listMembers(db, trip.id);
-    expect(members.map((m) => [m.email, m.roles, m.status])).toEqual([
-      ['alice@demo.local', ['skipper'], 'accepted'],
-      ['bob@demo.local', ['crew'], 'invited'],
-      ['carol@example.de', ['readonly'], 'invited'],
+    const [, b] = await boatIds(db, trip.id);
+    await inviteToTrip(db, trip.id, { email: 'Bob@Demo.Local', suggestedBoatId: b });
+    await inviteToTrip(db, trip.id, { email: 'carol.k@example.de', name: 'Carol' });
+    const people = await listPeople(db, trip.id);
+    expect(people.map((p) => [p.name, p.email, p.status, p.admin, p.suggestedBoatId])).toEqual([
+      ['Alice', 'alice@demo.local', 'accepted', true, (await boatIds(db, trip.id))[0]],
+      ['Bob', 'bob@demo.local', 'invited', false, b],
+      ['Carol', 'carol.k@example.de', 'invited', false, undefined],
     ]);
+    expect(people[0]!.self).toBe(true);
     const rows = await db.members.where('realmId').equals(tiedRealmId(trip.id)).toArray();
-    // real addresses get the invitation mail, demo users do not
-    expect(rows.find((m) => m.email === 'carol@example.de')!.invite).toBe(true);
-    expect(rows.find((m) => m.email === 'bob@demo.local')!.invite).toBe(false);
+    expect(rows.find((m) => m.email === 'carol.k@example.de')!.invite).toBe(true);
+    expect(rows.find((m) => m.email === 'bob@demo.local')).toMatchObject({ invite: false, roles: ['member'], name: 'Bob' });
   });
-  it('rejects inviting into a trip that is not in the cloud', async () => {
-    signIn();
-    const trip = await createTrip(db, { name: 'T', boat: { name: 'B' }, crew: [] });
-    await expect(inviteMember(db, trip.id, { email: 'b@x.de', role: 'crew' })).rejects.toThrow();
-  });
-  it('removeMember deletes the membership', async () => {
+  it('a failing person write rolls back the realm member too (one transaction)', async () => {
     const trip = await shared();
-    await inviteMember(db, trip.id, { email: 'bob@demo.local', role: 'crew' });
-    const bob = (await listMembers(db, trip.id)).find((m) => m.email === 'bob@demo.local')!;
-    await removeMember(db, bob.id);
-    expect((await listMembers(db, trip.id)).map((m) => m.email)).toEqual(['alice@demo.local']);
+    await inviteToTrip(db, trip.id, { email: 'bob@demo.local' });
+    await expect(inviteToTrip(db, trip.id, { email: 'bob@demo.local' })).rejects.toBeInstanceOf(DuplicateEmailError);
+    expect(await db.members.where('email').equals('bob@demo.local').count()).toBe(1);
+  });
+  it('status follows the realm member (accepted / rejected)', async () => {
+    const trip = await shared();
+    await inviteToTrip(db, trip.id, { email: 'bob@demo.local' });
+    await db.members.where('email').equals('bob@demo.local').modify({ accepted: new Date() });
+    expect((await listPeople(db, trip.id))[1]!.status).toBe('accepted');
+    await db.members.where('email').equals('bob@demo.local').modify({ rejected: new Date() });
+    expect((await listPeople(db, trip.id))[1]!.status).toBe('rejected');
+  });
+  it('removePerson tombstones the person and deletes the membership', async () => {
+    const trip = await shared();
+    const bob = await inviteToTrip(db, trip.id, { email: 'bob@demo.local' });
+    await removePerson(db, bob.id);
+    expect((await listPeople(db, trip.id)).map((p) => p.name)).toEqual(['Alice']);
+    expect(await db.members.where('email').equals('bob@demo.local').count()).toBe(0);
+  });
+  it('resendInvite flags the invitation again (real addresses) or recreates a missing member', async () => {
+    const trip = await shared();
+    const carol = await inviteToTrip(db, trip.id, { email: 'carol@example.de' });
+    await db.members.where('email').equals('carol@example.de').modify({ invite: false });
+    await resendInvite(db, carol.id);
+    expect((await db.members.where('email').equals('carol@example.de').first())!.invite).toBe(true);
+    await db.members.where('email').equals('carol@example.de').delete();
+    await resendInvite(db, carol.id);
+    expect(await db.members.where('email').equals('carol@example.de').count()).toBe(1);
   });
   it('leaveTrip removes my own membership only', async () => {
     const trip = await shared();
-    await inviteMember(db, trip.id, { email: 'bob@demo.local', role: 'crew' });
+    await inviteToTrip(db, trip.id, { email: 'bob@demo.local' });
     await db.members.filter((m) => m.email === 'bob@demo.local').modify({ userId: 'bob' });
     signIn('bob', 'bob@demo.local');
     await leaveTrip(db, trip.id);
-    expect((await listMembers(db, trip.id)).map((m) => m.email)).toEqual(['alice@demo.local']);
+    expect(await db.members.where('email').equals('bob@demo.local').count()).toBe(0);
+    expect(await db.members.count()).toBe(1);
   });
 });
 
@@ -170,8 +212,8 @@ describe('watchSyncRejections', () => {
   });
 
   it('records rejections of /sync responses and restores the rejected entry once the trip is writable', async () => {
-    const trip = await createTrip(db, { name: 'T', boat: { name: 'B' }, crew: [] });
-    const e = await createEntry(db, trip.id, { time: 1, tzOffsetMin: 0 });
+    const trip = await createTrip(db, tripInput('T'));
+    const e = await createEntry(db, trip.id, { boatId: await firstBoat(db, trip.id), time: 1, tzOffsetMin: 0 });
     await db.entries.update(e.id, { text: 'weg?' });
     const original = globalThis.fetch;
     const body = JSON.stringify({ changes: [], rejections: [{ name: 'PermissionsDeniedError', message: 'not authorized to add entries', txid: 't' }] });

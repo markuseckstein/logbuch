@@ -2,14 +2,13 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Invite } from 'dexie-cloud-addon';
 import { db } from '../../db/db';
-import { getAuthor, listCrew, setActiveTrip } from '../../db/repo';
-import { activeCrew, tripIdOfRealm, type ID } from '../../domain';
-import { requestAuthorPrompt } from '../authorPrompt';
+import { setActiveTrip } from '../../db/repo';
+import { tripIdOfRealm, type ID } from '../../domain';
 import { useInvites } from '../cloudHooks';
 import { useToast } from '../toast';
 
 // Nach „Annehmen“: Logbuch aktivieren, sobald es per Sync angekommen ist.
-let pending: { tripId: ID; crew: boolean } | undefined;
+let pending: { tripId: ID } | undefined;
 const listeners = new Set<() => void>();
 const setPending = (p: typeof pending): void => {
   pending = p;
@@ -37,12 +36,11 @@ async function acceptanceUploaded(): Promise<void> {
   }
 }
 
-/** „Jonas lädt dich in das Logbuch der Seeschwalbe ein“ */
-export function inviteText(inv: Pick<Invite, 'invitedBy' | 'realm' | 'roles'>): string {
+/** „Jonas lädt dich in den Törn „Ostsee 2027“ ein“ */
+export function inviteText(inv: Pick<Invite, 'invitedBy' | 'realm'>): string {
   const who = inv.invitedBy?.name?.trim() || inv.invitedBy?.email || 'Jemand';
-  const boat = inv.realm?.name?.trim() || 'eines Boots';
-  const ro = inv.roles?.includes('readonly') ? ' (nur lesen)' : '';
-  return `${who} lädt dich in das Logbuch der ${boat} ein${ro}`;
+  const trip = inv.realm?.name?.trim();
+  return trip ? `${who} lädt dich in den Törn „${trip}“ ein` : `${who} lädt dich in einen Törn ein`;
 }
 
 /** Banner mit offenen Einladungen (Annehmen / Ablehnen). */
@@ -56,12 +54,12 @@ export function InviteBanner() {
     try {
       if (accept) {
         await inv.accept();
-        toast('Einladung angenommen – das Logbuch wird geladen …', 4200);
+        toast('Einladung angenommen – der Törn wird geladen …', 4200);
         // Erst die Annahme hochladen und den Realm vom Server bestätigen lassen (Rechte wirken erst dann, siehe
         // domain/access). Falls der Server erste Einträge trotzdem ablehnt, rettet sie db/syncRejections.
         await acceptanceUploaded();
         const tripId = tripIdOfRealm(inv.realmId);
-        if (tripId) setPending({ tripId, crew: !inv.roles?.includes('readonly') });
+        if (tripId) setPending({ tripId });
       } else {
         await inv.reject();
         toast('Einladung abgelehnt');
@@ -91,19 +89,14 @@ export function InviteBanner() {
   );
 }
 
-/** Aktiviert ein angenommenes Logbuch, sobald es da ist, und fragt als Crew „Ich bin …“ (falls nicht per E-Mail klar). */
+/** Aktiviert einen angenommenen Törn, sobald er da ist (der Boot-Schalter steht dann auf dem vorgeschlagenen Boot). */
 export function JoinWatcher() {
   const p = usePending();
   const arrived = useLiveQuery(async () => (p ? ((await db.trips.get(p.tripId)) ?? null) : null), [p?.tripId]);
   useEffect(() => {
     if (!p || !arrived) return;
     setPending(undefined);
-    void (async () => {
-      await setActiveTrip(db, arrived.id);
-      if (!p.crew) return;
-      const crew = activeCrew(await listCrew(db, arrived.id));
-      if (crew.length > 0 && !(await getAuthor(db, arrived.id))) requestAuthorPrompt(arrived.id);
-    })();
+    void setActiveTrip(db, arrived.id);
   }, [p, arrived]);
   return null;
 }

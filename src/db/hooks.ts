@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import type { CrewMember, DayReport, ID, LogEntry, Track, Trip } from '../domain/types';
+import { activeBoats } from '../domain/boats';
+import type { Boat, CrewMember, DayReport, ID, LogEntry, Track, Trip } from '../domain/types';
 import { db } from './db';
-import { getSettings, listCrew, listDayReports, listEntries, listTracks } from './repo';
+import { getSettings, listBoats, listCrew, listDayReports, listEntries, listTracks } from './repo';
 
 /** The active trip; `undefined` while loading, `null` if none is selected. */
 export function useActiveTrip(): Trip | null | undefined {
@@ -23,6 +24,18 @@ export function useDayReports(tripId: ID | undefined): DayReport[] | undefined {
 
 export function useTracks(tripId: ID | undefined): Track[] | undefined {
   return useLiveQuery(() => (tripId ? listTracks(db, tripId) : []), [tripId]);
+}
+
+/** Boats of the trip without removed ones, in creation order; undefined while loading. */
+export function useBoats(tripId: ID | undefined): Boat[] | undefined {
+  // keyed by trip: useLiveQuery keeps the previous result while the query for a new trip runs
+  const r = useLiveQuery(async () => ({ tripId, boats: tripId ? activeBoats(await listBoats(db, tripId)) : [] }), [tripId]);
+  return r && r.tripId === tripId ? r.boats : undefined;
+}
+
+/** All boats incl. removed ones (names of old entries stay resolvable). */
+export function useAllBoats(tripId: ID | undefined): Boat[] {
+  return useLiveQuery(() => (tripId ? listBoats(db, tripId) : []), [tripId]) ?? [];
 }
 
 /** All crew members of the trip incl. removed ones (tombstones keep their names for author labels). */

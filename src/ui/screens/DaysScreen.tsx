@@ -1,12 +1,19 @@
 import { useMemo, useState } from 'react';
 import { db } from '../../db/db';
-import { MAX_PHOTOS_PER_DAY_REPORT, removePhotoFromDayReport, upsertDayReport } from '../../db/repo';
-import { useTripCrew } from '../../db/hooks';
-import { formatDateLong, type DayReport, type Trip } from '../../domain';
+import {
+  MAX_PHOTOS_PER_DAY_REPORT, deleteDayReport, removePhotoFromDayReport, upsertDayReport,
+} from '../../db/repo';
+import { useTracks, useTripCrew } from '../../db/hooks';
+import { canEditRecord, formatDateLong, formatTime, type DayReport, type ID, type Trip } from '../../domain';
 import { useApp } from '../AppContext';
-import { useAuthorId, useReadOnly, useTripDays } from '../hooks';
+import { BoatBadge, useBoatSelection } from '../boats';
+import { useMyCrewId, useTripAccess } from '../cloudHooks';
+import { useReadOnly, useTripDays } from '../hooks';
 import { Icon } from '../icons';
-import { authorName, num1, sectionPhotoIds, writeErrorMessage, type DayInfo } from '../lib';
+import {
+  authorName, boatLayers, currentTzOffsetMin, groupTrackPoints, initials, num1, sectionPhotoIds, selectionDayStats,
+  writeErrorMessage, type DayInfo,
+} from '../lib';
 import { useEnsureAuthor } from '../useEnsureAuthor';
 import { usePhotoImport } from '../photoImport';
 import { useToast } from '../toast';
@@ -47,49 +54,134 @@ function DayCard({ day, onOpen }: { day: DayInfo; onOpen: () => void }) {
   );
 }
 
-export function ReportEditor({
-  tripId, day, section, ensureAuthor, label,
-}: { tripId: string; day: DayInfo; section: DayReport | undefined; ensureAuthor: () => Promise<boolean>; label: string }) {
+interface SectionProps {
+  tripId: ID;
+  day: DayInfo;
+  /** Abschnitt (fehlt beim noch nicht geschriebenen eigenen Abschnitt). */
+  section: DayReport | undefined;
+  authorId: ID;
+  name: string;
+  mine: boolean;
+  admin: boolean;
+  editable: boolean;
+  ensureAuthor: () => Promise<boolean>;
+}
+
+/** Ein Abschnitt des Tagesberichts: Name + Uhrzeit, Text, Fotos; eigener (Admin: jeder) bearbeitbar. */
+function ReportSection({ tripId, day, section, authorId, name, mine, admin, editable, ensureAuthor }: SectionProps) {
   const toast = useToast();
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [title, setTitle] = useState(section?.title ?? '');
   const [text, setText] = useState(section?.text ?? '');
+  const startEdit = (): void => {
+    setTitle(section?.title ?? '');
+    setText(section?.text ?? '');
+    setEditing(true);
+  };
   const save = async (): Promise<void> => {
-    const t = title.trim();
+    if (!text.trim() && !title.trim()) {
+      toast('Bitte einen kurzen Text eingeben');
+      return;
+    }
     try {
-      if (!(await ensureAuthor())) return;
-      await upsertDayReport(db, tripId, day.date, t ? { title: t, text } : { text });
-      toast(`Tagesbericht Tag ${day.no} gespeichert`);
+      if (mine && !(await ensureAuthor())) return;
+      const t = title.trim();
+      await upsertDayReport(db, tripId, day.date, t ? { title: t, text } : { text }, mine ? undefined : authorId);
+      setEditing(false);
+      toast(mine ? 'Dein Abschnitt ist gespeichert' : `Abschnitt von ${name} gespeichert (Admin)`);
     } catch (e) {
       toast(writeErrorMessage(e, 'Tagesbericht konnte nicht gespeichert werden'));
     }
   };
+  const remove = async (): Promise<void> => {
+    try {
+      await deleteDayReport(db, tripId, day.date, mine ? undefined : authorId);
+      setConfirming(false);
+      setEditing(false);
+      toast('Abschnitt gelöscht');
+    } catch (e) {
+      toast(writeErrorMessage(e, 'Abschnitt konnte nicht gelöscht werden'));
+    }
+  };
+  const time = section ? formatTime(section.updatedAt, currentTzOffsetMin()) : undefined;
+  const cls = ['rep', mine ? 'mine' : '', section ? '' : 'new'].filter(Boolean).join(' ');
   return (
-    <section className="card" aria-label="Tagesbericht">
-      <div className="legend">{label}</div>
-      <label className="f">
-        <span>Titel (optional)</span>
-        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
-      </label>
-      <label className="f">
-        <span>Reisebericht</span>
-        <textarea className="report-text" value={text} onChange={(e) => setText(e.target.value)} />
-      </label>
-      <button className="btn primary block" type="button" onClick={() => void save()}>
-        Tagesbericht speichern
-      </button>
-    </section>
-  );
-}
-
-/** Abschnitt eines anderen Autors (oder jeder Abschnitt in einem fremden Logbuch), nur lesbar. */
-function SectionCard({ section, name }: { section: DayReport; name: string }) {
-  return (
-    <section className="card section-card" aria-label={`Tagesbericht von ${name}`}>
-      <h3>{name}</h3>
-      {section.title?.trim() ? <b>{section.title.trim()}</b> : null}
-      {section.text.trim() ? <p className="section-text">{section.text}</p> : null}
-      <PhotoGrid photoIds={section.photoIds} />
-    </section>
+    <article className={cls} aria-label={`Tagesbericht von ${name}`}>
+      <div className="rep-h">
+        <i className="av sm" aria-hidden="true">{initials(name)}</i>
+        <b>
+          {name}
+          {mine ? <span className="who me"> (du)</span> : null}
+        </b>
+        {time ? <span className="num">{time} Uhr</span> : null}
+      </div>
+      {editing ? (
+        <>
+          <label className="f">
+            <span>Titel (optional)</span>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <label className="f">
+            <span>{mine ? 'Dein Abschnitt' : `Abschnitt von ${name}`}</span>
+            <textarea
+              className="report-text"
+              placeholder="Kurze Zusammenfassung des Tages …"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </label>
+          <div className="rep-act">
+            <button className="btn primary sm" type="button" onClick={() => void save()}>
+              Speichern
+            </button>
+            <button className="btn sm" type="button" onClick={() => setEditing(false)}>
+              Abbrechen
+            </button>
+            {section ? (
+              <button className="btn danger sm" type="button" onClick={() => setConfirming(true)}>
+                Löschen
+              </button>
+            ) : null}
+          </div>
+          {confirming ? (
+            <div className="confirm" role="alertdialog" aria-label="Löschen bestätigen" style={{ marginTop: 10 }}>
+              <p>Abschnitt wirklich löschen?</p>
+              <button className="btn sm" type="button" autoFocus onClick={() => setConfirming(false)}>
+                Abbrechen
+              </button>
+              <button className="btn danger sm" type="button" onClick={() => void remove()}>
+                Endgültig löschen
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : section ? (
+        <>
+          {section.title?.trim() ? <p><b>{section.title.trim()}</b></p> : null}
+          {section.text.trim() ? <p>{section.text}</p> : null}
+          <PhotoGrid photoIds={section.photoIds} />
+          {editable ? (
+            <div className="rep-act">
+              <button className="btn sm" type="button" onClick={startEdit}>
+                <Icon name="edit" size={18} />
+                Bearbeiten{!mine && admin ? ' (Admin)' : ''}
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <p className="muted">Noch kein Abschnitt von dir für diesen Tag.</p>
+          <div className="rep-act">
+            <button className="btn sm" type="button" onClick={startEdit}>
+              <Icon name="plus" size={18} />
+              Meinen Abschnitt schreiben
+            </button>
+          </div>
+        </>
+      )}
+    </article>
   );
 }
 
@@ -112,12 +204,12 @@ function DayPhotos({
   };
   return (
     <section className="card" aria-label="Fotos des Tages">
-      <div className="legend">Fotos des Tages</div>
+      <div className="legend">Meine Fotos des Tages</div>
       <PhotoPicker
         maxCount={MAX_PHOTOS_PER_DAY_REPORT}
         photoIds={photoIds}
         totalCount={total}
-        countText={`${total} / ${MAX_PHOTOS_PER_DAY_REPORT} heute`}
+        countText={`${total} / ${MAX_PHOTOS_PER_DAY_REPORT} an diesem Tag`}
         onAdd={onAdd}
         onRemove={onRemove}
         progress={progress}
@@ -129,13 +221,25 @@ function DayPhotos({
 function DayView({ trip, day, onBack }: { trip: Trip; day: DayInfo; onBack: () => void }) {
   const { openEntry } = useApp();
   const readOnly = useReadOnly(trip.id);
-  const authorId = useAuthorId(trip.id) ?? '';
+  const access = useTripAccess(trip.id);
+  const me = useMyCrewId(trip.id) ?? '';
   const crew = useTripCrew(trip.id);
+  const allTracks = useTracks(trip.id);
+  const { boats, shownIds } = useBoatSelection();
+  const multi = shownIds.length > 1;
+  const shown = boats.filter((b) => shownIds.includes(b.id));
   const { ensure, dialog } = useEnsureAuthor(trip);
-  const routes = useMemo(() => [{ id: day.date, points: day.route }], [day]);
-  const nameOf = (id: string): string => authorName(crew, id) ?? (id ? 'Unbekannt' : 'Ohne Autor');
-  const own = readOnly ? undefined : day.sections.find((s) => s.authorId === authorId);
-  const others = day.sections.filter((s) => (readOnly || s !== own) && (s.text.trim() || s.title?.trim() || s.photoIds.length));
+  const tracks = useMemo(() => (allTracks ?? []).filter((t) => shownIds.includes(t.boatId)), [allTracks, shownIds]);
+  const layers = useMemo(
+    () => boatLayers(trip, shown, day.entries, tracks, { dates: [day.date], labels: multi }),
+    [trip, shown, day, tracks, multi],
+  );
+  const tz = currentTzOffsetMin();
+  const trackOf = (id: ID) => groupTrackPoints(tracks.filter((t) => t.boatId === id), tz).byDate[day.date];
+  const { stats, writers } = selectionDayStats(day.entries, trackOf, shownIds);
+  const nameOf = (id: string): string => authorName(crew, id) ?? (id ? 'Ehemaliges Mitglied' : 'Ohne Namen');
+  const sections = [...day.sections].sort((a, b) => a.updatedAt - b.updatedAt);
+  const own = sections.find((s) => s.authorId === me);
   const allIds = sectionPhotoIds(day.sections);
   return (
     <main className="screen" aria-labelledby="screen-title">
@@ -152,26 +256,62 @@ function DayView({ trip, day, onBack }: { trip: Trip; day: DayInfo; onBack: () =
       <ChartMap
         compact
         label={`Karte Tag ${day.no}`}
-        routes={routes}
-        entries={day.entries}
+        layers={layers}
         onOpenEntry={(id) => openEntry(id)}
-        fitKey={`${day.date}:${day.entries.length}:${day.route.length}`}
+        fitKey={`${day.date}:${shownIds.join(',')}:${day.entries.length}`}
       />
-      <StatsBar stats={day.stats} />
-      {readOnly ? null : (
-        <ReportEditor
-          key={`${trip.id}-${day.date}-${authorId}`}
-          tripId={trip.id}
-          day={day}
-          section={own}
-          ensureAuthor={ensure}
-          label={crew.length > 1 && authorId ? `Tagesbericht · ${nameOf(authorId)}` : 'Tagesbericht'}
-        />
-      )}
-      {others.map((s) => (
-        <SectionCard key={s.authorId} section={s} name={nameOf(s.authorId)} />
-      ))}
-      {readOnly && others.length === 0 ? <p className="muted">Kein Tagesbericht für diesen Tag.</p> : null}
+      <StatsBar stats={stats} writers={writers} />
+      {multi ? (
+        <table className="dtbl" aria-label="Boote an diesem Tag">
+          <tbody>
+            {shown.map((b) => {
+              const s = selectionDayStats(day.entries, trackOf, [b.id]).stats;
+              return (
+                <tr key={b.id}>
+                  <td>
+                    <BoatBadge boat={b} />
+                  </td>
+                  <td>
+                    {num1(s.distanceNm)} sm · {s.entryCount} Einträge
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : null}
+      <div className="legend">Tagesbericht</div>
+      <p className="muted">Jede Person schreibt ihren eigenen kurzen Abschnitt. Die Abschnitte stehen untereinander.</p>
+      <div>
+        {sections.map((s) => (
+          <ReportSection
+            key={`${s.authorId}-${s.updatedAt}`}
+            tripId={trip.id}
+            day={day}
+            section={s}
+            authorId={s.authorId}
+            name={nameOf(s.authorId)}
+            mine={s.authorId === me}
+            admin={access.admin}
+            editable={!readOnly && canEditRecord(s, access)}
+            ensureAuthor={ensure}
+          />
+        ))}
+        {!own && !readOnly ? (
+          <ReportSection
+            tripId={trip.id}
+            day={day}
+            section={undefined}
+            authorId={me}
+            name={me ? nameOf(me) : 'Du'}
+            mine
+            admin={access.admin}
+            editable
+            ensureAuthor={ensure}
+          />
+        ) : null}
+        {readOnly && sections.length === 0 ? <p className="muted">Kein Tagesbericht für diesen Tag.</p> : null}
+      </div>
       {readOnly ? null : (
         <DayPhotos tripId={trip.id} day={day} own={own} total={allIds.length} allIds={allIds} ensureAuthor={ensure} />
       )}
@@ -180,14 +320,15 @@ function DayView({ trip, day, onBack }: { trip: Trip; day: DayInfo; onBack: () =
       {day.entries.length === 0 ? (
         <p className="muted">An diesem Tag gibt es noch keine Einträge.</p>
       ) : (
-        <Timeline entries={day.entries} onOpen={(id) => openEntry(id)} />
+        <Timeline entries={day.entries} onOpen={(id) => openEntry(id)} showBoat={multi} />
       )}
     </main>
   );
 }
 
 export function DaysScreen({ trip }: { trip: Trip }) {
-  const data = useTripDays(trip);
+  const { shownIds } = useBoatSelection();
+  const data = useTripDays(trip, shownIds);
   const [selected, setSelected] = useState<string>();
   if (!data) return null;
   const day = data.days.find((d) => d.date === selected);

@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { db } from '../../db/db';
 import { dayReportId } from '../../domain';
-import { addPhotosToDayReport, addPhotosToEntry, saveCrew, setAuthor, setTripOwnership, upsertDayReport } from '../../db/repo';
+import { addCrewMember, addPhotosToDayReport, addPhotosToEntry, getAuthor, setAuthor, setBoatSelection, upsertDayReport } from '../../db/repo';
 import { hashBlob } from '../../device';
-import { seedEntry, seedTrip, renderUi, makeActions, useCleanDb } from '../test-utils';
+import { asCloudMember, seedBoats, seedEntry, seedTrip, renderUi, makeActions, useCleanDb } from '../test-utils';
 import { DaysScreen } from './DaysScreen';
 
 vi.mock('../components/ChartMap', () => ({ ChartMap: () => null }));
@@ -26,11 +26,12 @@ describe('DaysScreen', () => {
     renderUi(<DaysScreen trip={trip} />);
 
     await user.click(await screen.findByRole('button', { name: /Tag 1, .* öffnen/ }));
+    await user.click(screen.getByRole('button', { name: 'Meinen Abschnitt schreiben' }));
     await user.type(screen.getByLabelText('Titel (optional)'), 'Kiel nach Eckernförde');
-    await user.type(screen.getByLabelText('Reisebericht'), 'Schöner Segeltag.');
-    await user.click(screen.getByRole('button', { name: 'Tagesbericht speichern' }));
+    await user.type(screen.getByLabelText('Dein Abschnitt'), 'Schöner Segeltag.');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Tagesbericht Tag 1 gespeichert'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Dein Abschnitt ist gespeichert'));
     const reports = await db.dayReports.toArray();
     expect(reports).toHaveLength(1);
     expect(reports[0]).toMatchObject({
@@ -48,7 +49,7 @@ describe('DaysScreen', () => {
     const user = userEvent.setup();
     renderUi(<DaysScreen trip={trip} />, actions);
     await user.click(await screen.findByRole('button', { name: /Tag 1/ }));
-    await user.click(screen.getByRole('button', { name: /Eintrag \d\d:\d\d Eintrag öffnen/ }));
+    await user.click(screen.getByRole('button', { name: /Eintrag \d\d:\d\d Eintrag.* öffnen/ }));
     expect(actions.openEntry).toHaveBeenCalledWith(entry.id);
   });
 
@@ -61,7 +62,7 @@ describe('DaysScreen', () => {
     const user = userEvent.setup();
     renderUi(<DaysScreen trip={trip} />);
     await user.click(await screen.findByRole('button', { name: /Tag 1, .* öffnen/ }));
-    expect(await screen.findByText('0 / 15 heute')).toBeInTheDocument();
+    expect(await screen.findByText('0 / 15 an diesem Tag')).toBeInTheDocument();
 
     await user.upload(screen.getByLabelText('Galerie'), [img('a'), img('b'), img('c'), img('b2', 'b')]);
     await waitFor(() =>
@@ -69,64 +70,94 @@ describe('DaysScreen', () => {
         '2 Fotos hinzugefügt · 2 übersprungen (schon an diesem Tag vorhanden)',
       ),
     );
-    expect(await screen.findByText('2 / 15 heute')).toBeInTheDocument();
+    expect(await screen.findByText('2 / 15 an diesem Tag')).toBeInTheDocument();
     expect((await db.dayReports.toArray())[0]?.photoIds).toHaveLength(2);
 
     await user.click(screen.getByRole('button', { name: 'Foto 1 entfernen' }));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Foto entfernt'));
-    expect(await screen.findByText('1 / 15 heute')).toBeInTheDocument();
+    expect(await screen.findByText('1 / 15 an diesem Tag')).toBeInTheDocument();
   });
 
   async function twoAuthors() {
     const trip = await seedTrip();
-    await saveCrew(db, trip.id, [{ id: 'c1', name: 'Anna', role: 'skipper' }, { id: 'c2', name: 'Ben', role: 'crew' }]);
+    const anna = (await getAuthor(db, trip.id))!;
+    const ben = await addCrewMember(db, trip.id, { name: 'Ben', email: 'bob@demo.local' });
     await seedEntry(trip.id);
     const png = { blob: new Blob(['p']), mime: 'image/jpeg', width: 1, height: 1 };
-    await setAuthor(db, trip.id, 'c2');
+    await setAuthor(db, trip.id, ben.id);
     await upsertDayReport(db, trip.id, '2026-08-10', { title: 'Bens Sicht', text: 'Flaute am Nachmittag.' });
     await addPhotosToDayReport(db, trip.id, '2026-08-10', [png, { ...png, hash: 'h2' }]);
-    await setAuthor(db, trip.id, 'c1');
+    await setAuthor(db, trip.id, anna);
+    await new Promise((r) => setTimeout(r, 5));
     await upsertDayReport(db, trip.id, '2026-08-10', { text: 'Annas Bericht.' });
-    return (await db.trips.get(trip.id))!;
+    return { trip: (await db.trips.get(trip.id))!, anna, ben: ben.id };
   }
 
-  it('zeigt Tagesberichte mehrerer Autoren: fremder Abschnitt gelesen, eigener editierbar, Foto-Zähler über alle', async () => {
-    const trip = await twoAuthors();
+  it('zeigt alle Abschnitte untereinander mit Name und Uhrzeit; eigener bearbeitbar, Admin darf alle', async () => {
+    const { trip, anna, ben } = await twoAuthors();
     const user = userEvent.setup();
     renderUi(<DaysScreen trip={trip} />);
     await user.click(await screen.findByRole('button', { name: /Tag 1, .* öffnen/ }));
 
-    const bens = await screen.findByRole('region', { name: 'Tagesbericht von Ben' });
-    expect(within(bens).getByRole('heading', { name: 'Ben' })).toBeInTheDocument();
+    const bens = await screen.findByRole('article', { name: 'Tagesbericht von Ben' });
     expect(bens).toHaveTextContent('Bens Sicht');
     expect(bens).toHaveTextContent('Flaute am Nachmittag.');
-    expect(await within(bens).findAllByRole('img')).toHaveLength(2);
-    expect(screen.getByLabelText('Reisebericht')).toHaveValue('Annas Bericht.');
-    expect(await screen.findByText('2 / 15 heute')).toBeInTheDocument();
+    expect(bens).toHaveTextContent(/\d\d:\d\d Uhr/);
+    await waitFor(() => expect(within(bens).getAllByRole('img')).toHaveLength(2));
+    const annas = screen.getByRole('article', { name: 'Tagesbericht von Anna' });
+    expect(annas).toHaveTextContent('(du)');
+    expect(await screen.findByText('2 / 15 an diesem Tag')).toBeInTheDocument();
+    // lokal ist man Admin: fremder Abschnitt mit „(Admin)“
+    expect(within(bens).getByRole('button', { name: 'Bearbeiten (Admin)' })).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText('Reisebericht'));
-    await user.type(screen.getByLabelText('Reisebericht'), 'Neu.');
-    await user.click(screen.getByRole('button', { name: 'Tagesbericht speichern' }));
-    await waitFor(async () => expect((await db.dayReports.get(dayReportId(trip.id, '2026-08-10', 'c1')))?.text).toBe('Neu.'));
-    expect((await db.dayReports.get(dayReportId(trip.id, '2026-08-10', 'c2')))?.text).toBe('Flaute am Nachmittag.');
+    await user.click(within(annas).getByRole('button', { name: 'Bearbeiten' }));
+    await user.clear(within(annas).getByLabelText('Dein Abschnitt'));
+    await user.type(within(annas).getByLabelText('Dein Abschnitt'), 'Neu.');
+    await user.click(within(annas).getByRole('button', { name: 'Speichern' }));
+    await waitFor(async () => expect((await db.dayReports.get(dayReportId(trip.id, '2026-08-10', anna)))?.text).toBe('Neu.'));
+    expect((await db.dayReports.get(dayReportId(trip.id, '2026-08-10', ben)))?.text).toBe('Flaute am Nachmittag.');
   });
 
   it('zeigt die Tageslisten-Vorschau des ersten Abschnitts mit Text', async () => {
-    const trip = await twoAuthors();
+    const { trip } = await twoAuthors();
     renderUi(<DaysScreen trip={trip} />);
-    expect(await screen.findByText('Annas Bericht.')).toBeInTheDocument();
+    expect(await screen.findByText('Flaute am Nachmittag.')).toBeInTheDocument();
   });
 
-  it('zeigt im fremden Logbuch alle Abschnitte read-only ohne Editor und Foto-Buttons', async () => {
-    const trip = await twoAuthors();
-    await setTripOwnership(db, trip.id, 'foreign');
+  it('Mitglied: fremde Abschnitte nur lesen, eigener bearbeitbar', async () => {
+    const { trip } = await twoAuthors();
+    const restore = await asCloudMember(trip.id);
+    try {
+      const user = userEvent.setup();
+      renderUi(<DaysScreen trip={trip} />);
+      await user.click(await screen.findByRole('button', { name: /Tag 1, .* öffnen/ }));
+      const annas = await screen.findByRole('article', { name: 'Tagesbericht von Anna' });
+      await waitFor(() => expect(within(annas).queryByRole('button', { name: /Bearbeiten/ })).not.toBeInTheDocument());
+      // Bens Abschnitt gehört (simuliert) alice → auch nicht bearbeitbar; eigener noch nicht geschrieben
+      expect(screen.getByRole('article', { name: 'Tagesbericht von Ben' })).toHaveTextContent('(du)');
+    } finally {
+      restore();
+    }
+  });
+
+  it('folgt dem Boot-Schalter: bei „Alle“ Tabelle je Boot', async () => {
+    const trip = await seedTrip('F', ['Seeschwalbe', 'Möwe']);
+    const [a, b] = await seedBoats(trip.id);
+    await seedEntry(trip.id, Date.UTC(2026, 7, 10, 10), a!.id);
+    await seedEntry(trip.id, Date.UTC(2026, 7, 10, 11), b!.id);
+    await setBoatSelection(db, trip.id, b!.id);
     const user = userEvent.setup();
+    const { unmount } = renderUi(<DaysScreen trip={trip} />);
+    await user.click(await screen.findByRole('button', { name: /Tag 1, .* öffnen/ }));
+    expect(await screen.findAllByRole('button', { name: /Eintrag \d\d:\d\d Eintrag, Möwe/ })).toHaveLength(1);
+    expect(screen.queryByRole('table', { name: 'Boote an diesem Tag' })).not.toBeInTheDocument();
+    unmount();
+    await setBoatSelection(db, trip.id, 'all');
     renderUi(<DaysScreen trip={trip} />);
     await user.click(await screen.findByRole('button', { name: /Tag 1, .* öffnen/ }));
-    expect(await screen.findByRole('region', { name: 'Tagesbericht von Ben' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Tagesbericht von Anna' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByLabelText('Reisebericht')).not.toBeInTheDocument());
-    expect(screen.queryByLabelText('Galerie')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /entfernen/ })).not.toBeInTheDocument();
+    const table = await screen.findByRole('table', { name: 'Boote an diesem Tag' });
+    expect(table).toHaveTextContent('Seeschwalbe');
+    expect(table).toHaveTextContent('Möwe');
+    expect(screen.getAllByRole('button', { name: /Eintrag \d\d:\d\d Eintrag, / })).toHaveLength(2);
   });
 });

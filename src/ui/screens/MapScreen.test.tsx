@@ -1,10 +1,10 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { pickFile } from '../../device';
 import { db } from '../../db/db';
-import { createTrip, listTracks, setFlotilla } from '../../db/repo';
-import { renderUi, seedTrip, useCleanDb } from '../test-utils';
+import { listTracks, setBoatSelection } from '../../db/repo';
+import { renderUi, seedBoats, seedEntry, seedTrip, useCleanDb } from '../test-utils';
 import { MapScreen } from './MapScreen';
 
 vi.mock('../components/ChartMap', () => ({ ChartMap: () => null }));
@@ -32,7 +32,7 @@ describe('MapScreen – GPX', () => {
     const [track] = await listTracks(db, trip.id);
     expect(track).toMatchObject({ tripId: trip.id, name: 'Kiel-Eckernförde', source: 'gpx' });
     expect(track?.points).toHaveLength(2);
-    expect(await screen.findByRole('list', { name: 'Tracks' })).toHaveTextContent(/GPX · 2 Punkte · 10\.08\./);
+    expect(await screen.findByRole('list', { name: 'Tracks' })).toHaveTextContent(/Seeschwalbe · GPX · 2 Punkte · 10\.08\./);
     // Track-Punkte mit Zeit erzeugen einen Törntag -> Filter-Chip
     expect(screen.getByRole('button', { name: 'Tag 1' })).toBeInTheDocument();
 
@@ -51,23 +51,37 @@ describe('MapScreen – GPX', () => {
     expect(await db.tracks.count()).toBe(0);
   });
 
-  it('zeigt den Schalter „Flottille anzeigen“ nur bei einer Flottille mit mindestens zwei Booten', async () => {
-    const trip = await seedTrip();
+  it('importiert GPX bei „Alle“ erst nach der Bootswahl', async () => {
+    vi.mocked(pickFile).mockResolvedValue(new File([GPX], 'fahrt.gpx', { type: 'application/gpx+xml' }));
+    const trip = await seedTrip('F', ['Seeschwalbe', 'Möwe']);
+    const [, moewe] = await seedBoats(trip.id);
+    await setBoatSelection(db, trip.id, 'all');
     const user = userEvent.setup();
-    const view = renderUi(<MapScreen trip={trip} />);
-    await screen.findByRole('button', { name: 'GPX importieren' });
-    expect(screen.queryByRole('switch', { name: /Flottille anzeigen/ })).not.toBeInTheDocument();
+    renderUi(<MapScreen trip={trip} />);
+    await user.click(await screen.findByRole('button', { name: 'GPX importieren' }));
+    const dialog = await screen.findByRole('dialog', { name: 'GPX importieren' });
+    await user.click(within(dialog).getByRole('radio', { name: 'Möwe' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Datei wählen' }));
+    await waitFor(async () => expect((await db.tracks.toArray())[0]?.boatId).toBe(moewe!.id));
+  });
 
-    const flotilla = { id: 'f1', name: 'Flotte' };
-    const mine = await setFlotilla(db, trip.id, flotilla);
-    view.rerender(<MapScreen trip={mine} />);
-    expect(screen.queryByRole('switch', { name: /Flottille anzeigen/ })).not.toBeInTheDocument(); // nur ein Boot
-
-    await createTrip(db, { name: 'Zweites Boot', boat: { name: 'Möwe' }, crew: [], flotilla });
-    const toggle = await screen.findByRole('switch', { name: /Flottille anzeigen/ });
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  it('Legende: alle Boote mit Statistik, Ein-/Ausblenden', async () => {
+    const trip = await seedTrip('F', ['Seeschwalbe', 'Möwe']);
+    const [a, b] = await seedBoats(trip.id);
+    await seedEntry(trip.id, Date.UTC(2026, 7, 10, 10), a!.id);
+    await seedEntry(trip.id, Date.UTC(2026, 7, 10, 11), b!.id);
+    await seedEntry(trip.id, Date.UTC(2026, 7, 10, 12), b!.id);
+    const user = userEvent.setup();
+    renderUi(<MapScreen trip={trip} />);
+    const legend = await screen.findByRole('region', { name: 'Legende' });
+    expect(legend).toHaveTextContent('Seeschwalbe');
+    expect(legend).toHaveTextContent('Möwe');
+    expect(legend).toHaveTextContent('2 Einträge');
+    expect(screen.getByText(/3 Einträge · 2 von 2 Booten sichtbar/)).toBeInTheDocument();
+    const toggle = within(legend).getByRole('button', { name: 'Möwe ausblenden' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-checked', 'true');
-    expect(await screen.findByRole('list', { name: 'Legende' })).toHaveTextContent('Möwe');
+    expect(within(legend).getByRole('button', { name: 'Möwe einblenden' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText(/1 Einträge · 1 von 2 Booten sichtbar/)).toBeInTheDocument();
   });
 });

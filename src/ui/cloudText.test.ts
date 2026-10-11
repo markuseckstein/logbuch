@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertText, rejectedText, roleLabel, statusLabel } from './cloudText';
+import { alertText, rejectedText, statusLabel } from './cloudText';
 
 describe('statusLabel', () => {
   const now = Date.UTC(2026, 7, 10, 12, 0);
@@ -28,15 +28,6 @@ describe('alertText', () => {
   it('falls back to the resolved English message', () => {
     expect(alertText({ type: 'error', messageCode: 'GENERIC_ERROR', message: 'Boom {x}', messageParams: { x: '1' } }))
       .toBe('Fehler: Boom 1');
-  });
-});
-
-describe('roleLabel', () => {
-  it('names the roles of roles.json', () => {
-    expect(roleLabel(['skipper'])).toBe('Skipper');
-    expect(roleLabel(['crew'])).toBe('Crew (schreibt mit)');
-    expect(roleLabel(['readonly'])).toBe('Anderes Boot (nur lesen)');
-    expect(roleLabel([])).toBe('Mitglied');
   });
 });
 

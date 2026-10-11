@@ -8,7 +8,7 @@ const v = (updatedAt: number, updatedBy = 'A', deletedAt?: number) => ({
 });
 
 function entry(id: string, version = v(1), extra: Partial<LogEntry> = {}): LogEntry {
-  return { id, tripId: 't', time: 0, tzOffsetMin: 0, type: 'note', photoIds: [], createdAt: 1, ...version, ...extra };
+  return { id, tripId: 't', boatId: 'b', time: 0, tzOffsetMin: 0, type: 'note', photoIds: [], createdAt: 1, ...version, ...extra };
 }
 
 function report(date: string, authorId: string, version = v(1), extra: Partial<DayReport> = {}): DayReport {
@@ -16,7 +16,7 @@ function report(date: string, authorId: string, version = v(1), extra: Partial<D
 }
 
 function trip(version = v(1), extra: Partial<Trip> = {}): Trip {
-  return { id: 't', name: 'T', boat: { name: 'B' }, createdAt: 1, ...version, ...extra };
+  return { id: 't', name: 'T', createdAt: 1, ...version, ...extra };
 }
 
 describe('isNewer', () => {
@@ -124,11 +124,11 @@ describe('mergeTrip', () => {
     expect(merged.updatedAt).toBe(2);
     expect(mergeTrip(trip(v(2), { name: 'mine' }), trip(v(1), { name: 'x' })).name).toBe('mine');
   });
-  it('merges flotilla via LWW, including leaving it', () => {
-    const joined = mergeTrip(trip(v(1)), trip(v(2), { flotilla: { id: 'f', name: 'F' } }));
-    expect(joined.flotilla).toEqual({ id: 'f', name: 'F' });
-    const left = mergeTrip(joined, trip(v(3)));
-    expect(left.flotilla).toBeUndefined();
+  it('merges the cover via LWW, including removing it', () => {
+    const set = mergeTrip(trip(v(1)), trip(v(2), { coverPhotoId: 'p', coverFocus: { x: 1, y: 2 } }));
+    expect(set).toMatchObject({ coverPhotoId: 'p', coverFocus: { x: 1, y: 2 } });
+    const removed = mergeTrip(set, trip(v(3)));
+    expect(removed.coverPhotoId).toBeUndefined();
   });
   it('keeps the earliest createdAt', () => {
     expect(mergeTrip(trip(v(1), { createdAt: 9 }), trip(v(2), { createdAt: 4 })).createdAt).toBe(4);

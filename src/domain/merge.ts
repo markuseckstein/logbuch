@@ -65,7 +65,7 @@ export function withoutCloudFields<T extends CloudFields>(rec: T): Omit<T, 'real
 }
 
 /**
- * Merges two versions of the same trip: trip fields (incl. flotilla) from the newer version (LWW),
+ * Merges two versions of the same trip: trip fields (incl. cover) from the newer version (LWW),
  * earliest createdAt. Cloud fields (realmId/owner) stay those of the local copy. Commutative and idempotent.
  */
 export function mergeTrip(local: Trip, incoming: Trip): Trip {

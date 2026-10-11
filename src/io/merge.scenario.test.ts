@@ -4,7 +4,7 @@ import {
   addPhotosToEntry, addPhotosToDayReport, createEntry, createTrip, deleteEntry, listDayReports, listEntries,
   loadTripData, mergeBundle, setAuthor, updateEntry, upsertDayReport,
 } from '../db/repo';
-import { dispose, freshDb } from '../db/test-helpers';
+import { dispose, firstBoat, freshDb, tripInput } from '../db/test-helpers';
 import { exportZip } from './exportZip';
 import { importZip } from './importZip';
 
@@ -27,7 +27,7 @@ async function loadForExport(db: LogbookDB, tripId: string) {
 /** Sends the logbook of `from` to `to` through the real export/import file format. */
 async function send(from: LogbookDB, to: LogbookDB, tripId: string, includePhotos = true) {
   const bundle = await importZip(await exportZip(await loadForExport(from, tripId), { includePhotos }));
-  return mergeBundle(to, bundle, { ownership: 'own' });
+  return mergeBundle(to, bundle);
 }
 
 async function snapshot(db: LogbookDB, tripId: string) {
@@ -35,11 +35,16 @@ async function snapshot(db: LogbookDB, tripId: string) {
   return { ...d, photos: d.photos.map((p) => ({ ...p, blob: undefined })) };
 }
 
+let boatId: string;
+
 async function twoBoatsSetup() {
-  const trip = await createTrip(a, { name: 'Boot', boat: { name: 'B' }, crew: [{ id: 'c1', name: 'Ann' }, { id: 'c2', name: 'Ben' }] });
-  const e1 = await createEntry(a, trip.id, { time: T0, tzOffsetMin: 0 });
+  const trip = await createTrip(a, tripInput('Boot', ['B', 'C']));
+  boatId = await firstBoat(a, trip.id);
+  const crew = (id: string, name: string) => ({ id, tripId: trip.id, name, createdAt: 1, updatedAt: 1, updatedBy: 'x' });
+  await a.crewMembers.bulkAdd([crew('c1', 'Ann'), crew('c2', 'Ben')]);
+  const e1 = await createEntry(a, trip.id, { boatId, time: T0, tzOffsetMin: 0 });
   await updateEntry(a, e1.id, { text: 'Start' });
-  const e2 = await createEntry(a, trip.id, { time: T0 + 1000, tzOffsetMin: 0 });
+  const e2 = await createEntry(a, trip.id, { boatId, time: T0 + 1000, tzOffsetMin: 0 });
   await send(a, b, trip.id);
   await setAuthor(a, trip.id, 'c1');
   await setAuthor(b, trip.id, 'c2');
@@ -50,17 +55,17 @@ describe('two devices edit offline, then exchange files', () => {
   it('both databases end in an identical state', async () => {
     const { trip, e1, e2 } = await twoBoatsSetup();
     // --- offline on A
-    const a1 = await createEntry(a, trip.id, { time: T0 + 2000, tzOffsetMin: 0 });
+    const a1 = await createEntry(a, trip.id, { boatId, time: T0 + 2000, tzOffsetMin: 0 });
     await updateEntry(a, e1.id, { text: 'Start (A geändert)' });
     await updateEntry(a, e2.id, { text: 'Hafen (A)' });
     await upsertDayReport(a, trip.id, DAY, { text: 'Bericht von Ann' });
     await addPhotosToDayReport(a, trip.id, DAY, [photo(1, 'same-photo')]);
     await pause();
     // --- offline on B (later): deletes e1, adds own entry, own report section, same photo (other file id)
-    const b1 = await createEntry(b, trip.id, { time: T0 + 3000, tzOffsetMin: 0 });
+    const b1 = await createEntry(b, trip.id, { boatId, time: T0 + 3000, tzOffsetMin: 0 });
     await deleteEntry(b, e1.id);
     await upsertDayReport(b, trip.id, DAY, { text: 'Bericht von Ben' });
-    const eb = await createEntry(b, trip.id, { time: T0 + 4000, tzOffsetMin: 0 });
+    const eb = await createEntry(b, trip.id, { boatId, time: T0 + 4000, tzOffsetMin: 0 });
     await addPhotosToEntry(b, eb.id, [photo(2, 'same-photo')]);
 
     const fromA = await send(a, b, trip.id);
@@ -85,8 +90,8 @@ describe('two devices edit offline, then exchange files', () => {
 
   it('exchanging the same files again changes nothing (idempotent)', async () => {
     const { trip } = await twoBoatsSetup();
-    await createEntry(a, trip.id, { time: T0 + 2000, tzOffsetMin: 0 });
-    await createEntry(b, trip.id, { time: T0 + 3000, tzOffsetMin: 0 });
+    await createEntry(a, trip.id, { boatId, time: T0 + 2000, tzOffsetMin: 0 });
+    await createEntry(b, trip.id, { boatId, time: T0 + 3000, tzOffsetMin: 0 });
     await send(a, b, trip.id);
     await send(b, a, trip.id);
     const before = await snapshot(a, trip.id);
@@ -100,7 +105,7 @@ describe('two devices edit offline, then exchange files', () => {
   it('is order independent: a third device gets the same state from either order', async () => {
     const { trip } = await twoBoatsSetup();
     await updateEntry(a, (await listEntries(a, trip.id))[0]!.id, { text: 'A' });
-    await createEntry(b, trip.id, { time: T0 + 3000, tzOffsetMin: 0 });
+    await createEntry(b, trip.id, { boatId, time: T0 + 3000, tzOffsetMin: 0 });
     const c1 = freshDb();
     const c2 = freshDb();
     try {
@@ -114,7 +119,7 @@ describe('two devices edit offline, then exchange files', () => {
 
   it('an export without photos keeps references; a later full export delivers the images', async () => {
     const { trip } = await twoBoatsSetup();
-    const eb = await createEntry(b, trip.id, { time: T0 + 4000, tzOffsetMin: 0 });
+    const eb = await createEntry(b, trip.id, { boatId, time: T0 + 4000, tzOffsetMin: 0 });
     const [p] = await addPhotosToEntry(b, eb.id, [photo(7)]);
     await send(b, a, trip.id, false);
     expect((await listEntries(a, trip.id)).find((e) => e.id === eb.id)!.photoIds).toEqual([p!.id]);

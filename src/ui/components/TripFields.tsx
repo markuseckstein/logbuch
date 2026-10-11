@@ -1,5 +1,4 @@
 import type { Boat, Trip } from '../../domain';
-import { parseDecimal } from '../lib';
 
 export interface TripDraft {
   name: string;
@@ -27,7 +26,7 @@ export const tripDraftOf = (t: Trip): TripDraft => ({
   area: t.area ?? '',
 });
 
-export const boatDraftOf = (b: Boat): BoatDraft => ({
+export const boatDraftOf = (b: Pick<Boat, 'name' | 'model' | 'lengthM' | 'homePort' | 'callSign' | 'mmsi'>): BoatDraft => ({
   name: b.name,
   model: b.model ?? '',
   lengthM: b.lengthM === undefined ? '' : String(b.lengthM),
@@ -44,22 +43,6 @@ export const tripPatchOf = (d: TripDraft) => ({
   endDate: opt(d.endDate),
   area: opt(d.area),
 });
-
-export const boatOf = (d: BoatDraft, photoId?: string): Boat => {
-  const boat: Boat = { name: d.name.trim() };
-  const model = opt(d.model);
-  const len = parseDecimal(d.lengthM);
-  const home = opt(d.homePort);
-  const call = opt(d.callSign);
-  const mmsi = opt(d.mmsi);
-  if (model) boat.model = model;
-  if (len !== undefined && len > 0) boat.lengthM = len;
-  if (home) boat.homePort = home;
-  if (call) boat.callSign = call;
-  if (mmsi) boat.mmsi = mmsi;
-  if (photoId) boat.photoId = photoId;
-  return boat;
-};
 
 /** Gibt eine Fehlermeldung zurück, wenn der Entwurf nicht gespeichert werden darf. */
 export function validateTrip(d: TripDraft): string | undefined {

@@ -2,7 +2,9 @@
 :root{
   --bg:#f5f6f2; --surface:#ffffff; --surface-2:#e9f1f4; --water-deep:#ffffff; --water-mid:#e4f0f5; --water-shallow:#c9e1ec;
   --land:#ecdcae; --land-edge:#8f7840; --ink:#0d2848; --ink-2:#4b5f76; --line:#c5d2db; --grid:#a8739f;
-  --magenta:#b0106a; --fleet:#0b6b8a; --on-magenta:#ffffff; --danger:#a3201a; --toast-bg:#0d2848; --toast-ink:#ffffff;
+  --magenta:#b0106a; --fleet:#0b6b8a;
+  --b1:#0a66a8; --b2:#c4560a; --b3:#23823f; --b4:#7a3fb0; --ok:#1d6b3a; --ok-bg:#dff0e3; --warn:#7a5000; --warn-bg:#f8ecc9;
+  --on-magenta:#ffffff; --danger:#a3201a; --toast-bg:#0d2848; --toast-ink:#ffffff;
   --scrim:rgba(13,40,72,.5); --shadow:0 -6px 24px rgba(13,40,72,.22);
   --font-mono:"IBM Plex Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
   --font-sans:"Source Sans 3","Segoe UI","Helvetica Neue",Arial,sans-serif;
@@ -13,7 +15,9 @@
   :root:not([data-theme="light"]){
     --bg:#120e0c; --surface:#1d1613; --surface-2:#271d18; --water-deep:#15110f; --water-mid:#1b1e1c; --water-shallow:#242d2b;
     --land:#3b2e1c; --land-edge:#7a6236; --ink:#e3c28f; --ink-2:#a58d6b; --line:#3d3029; --grid:#7a5069;
-    --magenta:#e07a98; --fleet:#6fc3d8; --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
+    --magenta:#e07a98; --fleet:#6fc3d8;
+    --b1:#6cbcf0; --b2:#f2a15a; --b3:#7fd490; --b4:#c39af0; --ok:#8fd9a3; --ok-bg:#1e2c22; --warn:#e8c16a; --warn-bg:#33291a;
+    --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
     --scrim:rgba(0,0,0,.7); --shadow:0 -6px 24px rgba(0,0,0,.6);
     color-scheme:dark;
     --tile-filter:brightness(.62) contrast(1.05) saturate(.6);
@@ -22,7 +26,9 @@
 :root[data-theme="dark"]{
   --bg:#120e0c; --surface:#1d1613; --surface-2:#271d18; --water-deep:#15110f; --water-mid:#1b1e1c; --water-shallow:#242d2b;
   --land:#3b2e1c; --land-edge:#7a6236; --ink:#e3c28f; --ink-2:#a58d6b; --line:#3d3029; --grid:#7a5069;
-  --magenta:#e07a98; --fleet:#6fc3d8; --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
+  --magenta:#e07a98; --fleet:#6fc3d8;
+    --b1:#6cbcf0; --b2:#f2a15a; --b3:#7fd490; --b4:#c39af0; --ok:#8fd9a3; --ok-bg:#1e2c22; --warn:#e8c16a; --warn-bg:#33291a;
+    --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
   --scrim:rgba(0,0,0,.7); --shadow:0 -6px 24px rgba(0,0,0,.6);
   color-scheme:dark;
   --tile-filter:brightness(.62) contrast(1.05) saturate(.6);

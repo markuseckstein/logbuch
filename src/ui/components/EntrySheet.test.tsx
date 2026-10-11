@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { db } from '../../db/db';
 import { addPhotosToDayReport } from '../../db/repo';
-import { renderUi, seedEntry, seedTrip, useCleanDb } from '../test-utils';
+import { asCloudMember, renderUi, seedBoats, seedEntry, seedTrip, useCleanDb } from '../test-utils';
 import { EntrySheet } from './EntrySheet';
 
 vi.mock('../../device', async (importActual) => ({
@@ -148,5 +148,48 @@ describe('EntrySheet', () => {
       await user.click(await screen.findByRole('button', { name: 'Foto 1 entfernen' }));
       await waitFor(async () => expect((await db.entries.get(entry.id))?.photoIds).toEqual([]));
     });
+  });
+
+  it('Boot-Chips: eigener Eintrag wechselt das Boot', async () => {
+    const trip = await seedTrip('F', ['Seeschwalbe', 'Möwe']);
+    const [, moewe] = await seedBoats(trip.id);
+    const entry = await seedEntry(trip.id);
+    const user = userEvent.setup();
+    renderUi(<EntrySheet entryId={entry.id} onClose={vi.fn()} />);
+    const group = await screen.findByRole('radiogroup', { name: 'Boot' });
+    expect(group).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'Möwe' }));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(async () => expect((await db.entries.get(entry.id))?.boatId).toBe(moewe!.id));
+  });
+
+  it('fremder Eintrag (Mitglied): Banner „Nur ansehen“ mit Autor und Boot, kein Speichern/Löschen', async () => {
+    const trip = await seedTrip('F', ['Seeschwalbe']);
+    const entry = await seedEntry(trip.id);
+    const restore = await asCloudMember(trip.id);
+    try {
+      renderUi(<EntrySheet entryId={entry.id} onClose={vi.fn()} />);
+      await waitFor(() => expect(screen.getByRole('note')).toHaveTextContent('Nur ansehen'), { timeout: 3000 });
+      const note = screen.getByRole('note');
+      expect(note).toHaveTextContent('Eintrag von Anna · Seeschwalbe');
+      expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('Admin bearbeitet fremden Eintrag: Banner „Admin-Bearbeitung“', async () => {
+    const trip = await seedTrip('F', ['Seeschwalbe']);
+    const entry = await seedEntry(trip.id);
+    const restore = await asCloudMember(trip.id, 'alice');
+    await db.entries.update(entry.id, { owner: 'bob', authorId: 'someone-else' });
+    try {
+      renderUi(<EntrySheet entryId={entry.id} onClose={vi.fn()} />);
+      await waitFor(() => expect(screen.getByRole('note')).toHaveTextContent('Admin-Bearbeitung'), { timeout: 3000 });
+      expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    } finally {
+      restore();
+    }
   });
 });

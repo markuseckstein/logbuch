@@ -5,6 +5,7 @@ import type { DayReport, LogEntry, Trip } from './types';
 const entry = (time: number, tzOffsetMin = 120, id = String(time)): LogEntry => ({
   id,
   tripId: 't',
+  boatId: 'b',
   time,
   tzOffsetMin,
   type: 'note',
@@ -17,7 +18,6 @@ const report = (date: string): DayReport => ({ id: date, tripId: 't', date, text
 const trip = (extra: Partial<Trip> = {}): Trip => ({
   id: 't',
   name: 'T',
-  boat: { name: 'B' },
 
   createdAt: 0,
   updatedAt: 0,

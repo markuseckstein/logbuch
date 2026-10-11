@@ -8,6 +8,7 @@ export * from './labels';
 export * from './photos';
 export * from './merge';
 export * from './access';
+export * from './boats';
 export * from './tracks';
 export * from './ids';
 export * from './syncRejections';

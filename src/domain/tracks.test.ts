@@ -7,7 +7,7 @@ const chunk = (id: string, trackId: string, seq: number, points: TrackPoint[], e
   id, tripId: 't', trackId, seq, points, updatedAt: 1, updatedBy: 'A', ...extra,
 });
 const rec = (id: string, extra: Partial<TrackRecord> = {}): TrackRecord => ({
-  id, tripId: 't', name: id, source: 'live', createdAt: 1, updatedAt: 1, updatedBy: 'A', ...extra,
+  id, tripId: 't', boatId: 'b', name: id, source: 'live', createdAt: 1, updatedAt: 1, updatedBy: 'A', ...extra,
 });
 
 describe('chunkPoints', () => {

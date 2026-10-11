@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tiedRealmId } from '../domain/access';
 import type { LogbookDB } from './db';
-import { createEntry, createTrip, moveTripToRealm, setTripOwnership, updateEntry } from './repo';
+import { createEntry, createTrip, moveTripToRealm, updateEntry } from './repo';
 import {
   discardRescued, listRescued, recordSyncExchange, resubmitRescued, wrapSyncFetch,
 } from './syncRejections';
-import { dispose, freshDb } from './test-helpers';
+import { dispose, firstBoat, freshDb, tripInput } from './test-helpers';
 
 let db: LogbookDB;
 beforeEach(() => { db = freshDb(); });
@@ -17,9 +17,24 @@ const req = (table: string, muts: object[]) => JSON.stringify({ changes: [{ tabl
 const res = (rejections: object[]) => JSON.stringify({ changes: [], rejections });
 
 async function tripWithEntry() {
-  const trip = await createTrip(db, { name: 'T', boat: { name: 'B' }, crew: [] });
-  const e = await updateEntry(db, (await createEntry(db, trip.id, { time: 1, tzOffsetMin: 0 })).id, { text: 'Bob übernimmt' });
+  const trip = await createTrip(db, tripInput('T'));
+  const boatId = await firstBoat(db, trip.id);
+  const e = await updateEntry(db, (await createEntry(db, trip.id, { boatId, time: 1, tzOffsetMin: 0 })).id, { text: 'Bob übernimmt' });
   return { trip, e };
+}
+
+/** Bob as member of alice's shared trip; writable only once the server confirmed the realm. */
+async function asMember(tripId: string, confirmed: boolean) {
+  const realmId = tiedRealmId(tripId);
+  if (!(await db.realms.get(realmId))) {
+    await moveTripToRealm(db, tripId, realmId, { name: 'T', represents: 'x' });
+    await db.realms.update(realmId, { owner: 'alice' });
+    await db.trips.update(tripId, { owner: 'alice' });
+    await db.members.put({ id: 'm', realmId, userId: 'bob', roles: ['member'], permissions: { add: ['entries'] }, accepted: new Date() } as never);
+    db.cloudUser = () => ({ userId: 'bob' });
+  }
+  db.serverRealms = () => (confirmed ? ['bob', realmId] : ['bob']);
+  return realmId;
 }
 
 describe('recordSyncExchange', () => {
@@ -56,7 +71,7 @@ describe('recordSyncExchange', () => {
     const { trip, e } = await tripWithEntry();
     await recordSyncExchange(db, req('entries', [{ type: 'insert', keys: [e.id], txid: 't1' }]), res([{ message: DENIED, txid: 't1' }]), 0);
     await db.entries.delete(e.id);
-    await setTripOwnership(db, trip.id, 'own');
+    await asMember(trip.id, true);
     expect(await resubmitRescued(db, { now: 10_000 })).toBe(1);
     // still waiting for the server: not confirmed yet
     expect((await listRescued(db))[0]).toMatchObject({ state: 'resent' });
@@ -76,24 +91,18 @@ describe('resubmitRescued', () => {
 
   it('restores a rolled-back entry as soon as the trip is writable again', async () => {
     const { trip, e } = await rejectedEntry();
-    await setTripOwnership(db, trip.id, 'foreign');
+    await asMember(trip.id, false);
     expect(await resubmitRescued(db, { now: 60_000 })).toBe(0);
     expect(await db.entries.get(e.id)).toBeUndefined();
-    await setTripOwnership(db, trip.id, 'own');
+    await asMember(trip.id, true);
     expect(await resubmitRescued(db, { now: 60_000 })).toBe(1);
     expect(await db.entries.get(e.id)).toMatchObject({ id: e.id, text: 'Bob übernimmt' });
   });
   it('waits for the shared realm to be confirmed by the server (membership rights in effect)', async () => {
     const { trip, e } = await rejectedEntry();
-    const realmId = tiedRealmId(trip.id);
-    await moveTripToRealm(db, trip.id, realmId, { name: 'B', represents: 'x' });
-    await db.realms.update(realmId, { owner: 'alice' });
-    await db.roles.put({ realmId: 'rlm-public', name: 'crew', permissions: { add: ['entries'] } } as never);
-    await db.members.put({ id: 'm', realmId, userId: 'bob', roles: ['crew'], accepted: new Date() } as never);
-    db.cloudUser = () => ({ userId: 'bob' });
-    db.serverRealms = () => ['bob'];
+    const realmId = await asMember(trip.id, false);
     expect(await resubmitRescued(db, { now: 60_000 })).toBe(0);
-    db.serverRealms = () => ['bob', realmId];
+    await asMember(trip.id, true);
     expect(await resubmitRescued(db, { now: 60_000 })).toBe(1);
     expect(await db.entries.get(e.id)).toMatchObject({ realmId });
   });

@@ -2,8 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useDayReports, useEntries, useTracks } from '../db/hooks';
-import { getSettings, listEntries, listFlotillaTrips, listTracks, listTrips } from '../db/repo';
-import { localDate, type LatLon, type LogEntry, type Settings, type Track, type Trip } from '../domain';
+import { getSettings, listTrips } from '../db/repo';
+import { localDate, type ID, type LatLon, type LogEntry, type Settings, type Track, type Trip } from '../domain';
 import { buildDays, currentTzOffsetMin, groupTrackPoints, type DayInfo } from './lib';
 import { useWritableTripIds } from './cloudHooks';
 
@@ -39,21 +39,40 @@ export interface TripDaysData {
   entries: LogEntry[];
 }
 
-/** Alle Tage des Törns inkl. Track-Zuordnung; undefined, solange Daten laden. */
-export function useTripDays(trip: Trip): TripDaysData | undefined {
+/**
+ * Alle Tage des Törns inkl. Track-Zuordnung, beschränkt auf die Boote `boatIds` (Boot-Schalter); die Tagesliste
+ * selbst gilt für den ganzen Törn. undefined, solange Daten laden.
+ */
+export function useTripDays(trip: Trip, boatIds?: readonly ID[]): TripDaysData | undefined {
   const entries = useEntries(trip.id);
   const reports = useDayReports(trip.id);
   const tracks = useTracks(trip.id);
+  const key = boatIds?.join(',');
   return useMemo(() => {
     if (!entries || !reports || !tracks) return undefined;
-    const grouping = groupTrackPoints(tracks, currentTzOffsetMin());
-    return { days: buildDays(trip, entries, reports, grouping), untimed: grouping.untimed, tracks, entries };
-  }, [trip, entries, reports, tracks]);
+    const ids = key === undefined ? undefined : new Set(key.split(','));
+    const es = ids ? entries.filter((e) => ids.has(e.boatId)) : entries;
+    const ts = ids ? tracks.filter((t) => ids.has(t.boatId)) : tracks;
+    const grouping = groupTrackPoints(ts, currentTzOffsetMin());
+    const allDates = buildDays(trip, entries, reports, groupTrackPoints(tracks, currentTzOffsetMin())).map((d) => d.date);
+    const days = buildDays(trip, es, reports, grouping, allDates);
+    const boatIds = [...new Set([...es.map((e) => e.boatId), ...ts.map((t) => t.boatId)])];
+    if (boatIds.length > 1) {
+      // Strecke je Boot summieren (keine Route quer über mehrere Boote)
+      const perBoat = boatIds.map((id) => buildDays(
+        trip, es.filter((e) => e.boatId === id), [], groupTrackPoints(ts.filter((t) => t.boatId === id), currentTzOffsetMin()), allDates,
+      ));
+      days.forEach((d, i) => {
+        d.stats = { ...d.stats, distanceNm: perBoat.reduce((a, b) => a + (b[i]?.stats.distanceNm ?? 0), 0), underwayMin: 0 };
+      });
+    }
+    return { days, untimed: grouping.untimed, tracks: ts, entries: es };
+  }, [trip, entries, reports, tracks, key]);
 }
 
 /**
- * Fremdes (nicht beschreibbares) Logbuch? Lokal: nicht in `writableTripIds`; in der Cloud geteilt:
- * Server-Rechte (Crew schreibt, andere Boote lesen). Solange geladen wird: false.
+ * Noch nicht beschreibbar? Nur in geteilten Törns, solange die Mitgliedschaft nicht vom Server bestätigt ist.
+ * Solange geladen wird: false.
  */
 export function useReadOnly(tripId: string | undefined): boolean {
   const writable = useWritableTripIds();
@@ -65,33 +84,4 @@ export function useReadOnly(tripId: string | undefined): boolean {
 export function useAuthorId(tripId: string | undefined): string | undefined {
   const settings = useSettings();
   return tripId ? settings?.authorByTrip[tripId] : undefined;
-}
-
-/** Die anderen Boote (Trips) der Flottille des Trips; leer ohne Flottille. */
-export function useFleetTrips(trip: Trip): Trip[] {
-  const flotillaId = trip.flotilla?.id;
-  const trips = useLiveQuery(() => (flotillaId ? listFlotillaTrips(db, flotillaId) : []), [flotillaId]);
-  return useMemo(() => (trips ?? []).filter((t) => t.id !== trip.id), [trips, trip.id]);
-}
-
-export interface FleetBoat {
-  trip: Trip;
-  entries: LogEntry[];
-  tracks: Track[];
-}
-
-/** Einträge und Tracks der anderen Boote; nur geladen, solange `enabled`. */
-export function useFleetBoats(others: readonly Trip[], enabled: boolean): FleetBoat[] {
-  const ids = others.map((t) => t.id).join(',');
-  return (
-    useLiveQuery(
-      async () => {
-        if (!enabled) return [];
-        const out: FleetBoat[] = [];
-        for (const t of others) out.push({ trip: t, entries: await listEntries(db, t.id), tracks: await listTracks(db, t.id) });
-        return out;
-      },
-      [enabled, ids, others],
-    ) ?? []
-  );
 }

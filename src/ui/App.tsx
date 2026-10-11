@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
-import { useActiveTrip, useDayReports, useEntries } from '../db/hooks';
+import { useActiveTrip, useBoats, useDayReports, useEntries, useTripCrew } from '../db/hooks';
 import { getSettings, listTrips, setActiveTrip, setTheme } from '../db/repo';
 import { requestPersistentStorage } from '../db/storage';
 import { dayNumber, tripDays, type Settings, type Trip } from '../domain';
@@ -22,7 +22,9 @@ import { CloudLoginHost } from './cloud/LoginHost';
 import { InviteBanner, JoinWatcher } from './cloud/InviteBanner';
 import { RejectedChangesBanner, RejectionWatcher } from './cloud/RejectedChangesBanner';
 import { SyncIndicator } from './cloud/SyncIndicator';
-import { WritableTripsContext, useWritableTripIds } from './cloudHooks';
+import { WritableTripsContext, useMyCrewId, useWritableTripIds } from './cloudHooks';
+import { BoatSelectionContext, BoatSwitch, useBoatSelectionState } from './boats';
+import { CloudAdopter } from './cloud/CloudAdopter';
 
 const TABS: readonly { id: TabId; label: string; icon: IconName }[] = [
   { id: 'today', label: 'Heute', icon: 'tab-heute' },
@@ -72,7 +74,7 @@ function Topbar({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTo
   const days = tripDays(trip, entries ?? [], reports ?? []);
   const n = dayNumber(trip, today, days);
   return (
-    <header className="topbar">
+    <header className="topbar with-seg">
       <div className="brand">
         <b>Logbuch</b>
         <span>{n >= 1 ? `${trip.name} · Tag ${n}` : trip.name}</span>
@@ -87,6 +89,7 @@ function Topbar({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTo
       >
         <Icon name={dark ? 'sonne' : 'moon'} />
       </button>
+      <BoatSwitch />
     </header>
   );
 }
@@ -108,18 +111,25 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
   const closeSheet = useCallback(() => setSheet(null), []);
   const live = useLiveRouteState(trip.id);
   const readOnly = useReadOnly(trip.id);
+  const settings = useSettings();
+  const boats = useBoats(trip.id);
+  const crew = useTripCrew(trip.id);
+  const myId = useMyCrewId(trip.id);
+  const selection = useBoatSelectionState(trip.id, boats ?? [], settings, crew.find((c) => c.id === myId));
+  if (!boats) return null;
 
   return (
     <AppContext.Provider value={actions}>
+      <BoatSelectionContext.Provider value={selection}>
       <LiveRouteContext.Provider value={live}>
         <div id="app">
           <Topbar trip={trip} dark={dark} onToggleTheme={onToggleTheme} />
           <InviteBanner />
           <RejectedChangesBanner />
           {readOnly ? (
-            <div className="banner">
+            <div className="banner" role="status">
               <Icon name="sichtung" size={20} />
-              Logbuch der {trip.boat.name.trim() || trip.name} · nur lesen
+              Mitgliedschaft wird bestätigt – Schreiben ist gleich möglich
             </div>
           ) : null}
           {tab === 'today' ? <TodayScreen trip={trip} reports={reports ?? []} /> : null}
@@ -156,6 +166,7 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
           />
         ) : null}
       </LiveRouteContext.Provider>
+      </BoatSelectionContext.Provider>
     </AppContext.Provider>
   );
 }
@@ -201,6 +212,7 @@ export function App() {
       <Root />
       <JoinWatcher />
       <RejectionWatcher />
+      <CloudAdopter />
       <CloudLoginHost />
       <UpdatePrompt />
     </ToastProvider>

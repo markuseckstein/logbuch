@@ -1,4 +1,4 @@
-import type { LogEntry, Track, TrackPoint, Trip } from '../domain/types';
+import type { Boat, LogEntry, Track, TrackPoint, Trip } from '../domain/types';
 import { ENTRY_TYPE_LABELS } from '../domain/labels';
 
 export class GpxParseError extends Error {
@@ -8,9 +8,10 @@ export class GpxParseError extends Error {
   }
 }
 
-/** What the GPX writer needs: tracks with their assembled points. */
+/** What the GPX writer needs: boats, entries and tracks with their assembled points (no tombstones). */
 export interface GpxInput {
   trip: Trip;
+  boats: readonly Boat[];
   entries: readonly LogEntry[];
   tracks: readonly Track[];
 }
@@ -134,41 +135,47 @@ function ptXml(tag: string, p: TrackPoint, indent: string): string {
   return `${indent}<${tag} lat="${p.lat}" lon="${p.lon}">${inner}</${tag}>`;
 }
 
+/**
+ * GPX 1.1: entries as waypoints („‹Boot› · ‹Typ› HH:MM“), one `<trk>` per boat named after the boat. A boat's
+ * tracks become its segments; without tracks its route comes from the entry positions. Boats without data are
+ * left out.
+ */
 export function writeGpx(bundle: GpxInput): string {
   const lines: string[] = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<gpx version="1.1" creator="Logbuch" xmlns="http://www.topografix.com/GPX/1/1">',
     `  <metadata><name>${esc(bundle.trip.name)}</name></metadata>`,
   ];
-
+  const boatName = new Map(bundle.boats.map((b) => [b.id, b.name]));
   const positioned = bundle.entries
     .filter((e) => e.position)
     .sort((a, b) => a.time - b.time);
 
   for (const e of positioned) {
     const pos = e.position!;
+    const boat = boatName.get(e.boatId);
+    const label = `${ENTRY_TYPE_LABELS[e.type]} ${localClock(e.time, e.tzOffsetMin)}`;
     lines.push(`  <wpt lat="${pos.lat}" lon="${pos.lon}">`);
     lines.push(`    <time>${iso(e.time)}</time>`);
-    lines.push(`    <name>${esc(`${ENTRY_TYPE_LABELS[e.type]} ${localClock(e.time, e.tzOffsetMin)}`)}</name>`);
+    lines.push(`    <name>${esc(boat ? `${boat} · ${label}` : label)}</name>`);
     if (e.text) lines.push(`    <desc>${esc(e.text)}</desc>`);
     lines.push('  </wpt>');
   }
 
-  const tracks =
-    bundle.tracks.length > 0
-      ? bundle.tracks.map((t) => ({ name: t.name, points: t.points }))
-      : positioned.length > 0
-        ? [
-            {
-              name: 'Route aus Logeinträgen',
-              points: positioned.map((e) => ({ lat: e.position!.lat, lon: e.position!.lon, time: e.time })),
-            },
-          ]
-        : [];
-  for (const t of tracks) {
-    lines.push('  <trk>', `    <name>${esc(t.name)}</name>`, '    <trkseg>');
-    for (const p of t.points) lines.push(ptXml('trkpt', p, '      '));
-    lines.push('    </trkseg>', '  </trk>');
+  for (const boat of bundle.boats) {
+    const tracks = bundle.tracks.filter((t) => t.boatId === boat.id && t.points.length > 0);
+    const own = positioned.filter((e) => e.boatId === boat.id);
+    const segments: TrackPoint[][] = tracks.length > 0
+      ? tracks.map((t) => t.points)
+      : own.length > 0 ? [own.map((e) => ({ lat: e.position!.lat, lon: e.position!.lon, time: e.time }))] : [];
+    if (segments.length === 0) continue;
+    lines.push('  <trk>', `    <name>${esc(boat.name)}</name>`);
+    for (const seg of segments) {
+      lines.push('    <trkseg>');
+      for (const p of seg) lines.push(ptXml('trkpt', p, '      '));
+      lines.push('    </trkseg>');
+    }
+    lines.push('  </trk>');
   }
   lines.push('</gpx>', '');
   return lines.join('\n');

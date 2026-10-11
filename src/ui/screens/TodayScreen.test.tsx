@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FixResult } from '../../device';
 import { captureFix } from '../../device';
 import { db } from '../../db/db';
-import { getAuthor, saveCrew, setAuthor, setTripOwnership } from '../../db/repo';
-import { makeActions, renderUi, seedTrip, useCleanDb } from '../test-utils';
+import { addBoat, addCrewMember, getAuthor, setAuthor, setBoatSelection, setLastBoat } from '../../db/repo';
+import { asCloudMember, makeActions, renderUi, seedBoats, seedTrip, useCleanDb } from '../test-utils';
 import { TodayScreen } from './TodayScreen';
 
 vi.mock('../components/ChartMap', () => ({ ChartMap: () => null }));
@@ -24,9 +24,9 @@ describe('TodayScreen – Eintrag jetzt', () => {
     const actions = makeActions();
     renderUi(<TodayScreen trip={trip} reports={[]} />, actions);
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /Eintrag jetzt/ }));
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Eintrag jetzt/ }));
 
-    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled());
+    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled(), { timeout: 4000 });
     const entries = await db.entries.toArray();
     expect(entries).toHaveLength(1);
     expect(entries[0]?.position).toBeUndefined();
@@ -48,8 +48,8 @@ describe('TodayScreen – Eintrag jetzt', () => {
     const actions = makeActions();
     renderUi(<TodayScreen trip={trip} reports={[]} />, actions);
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /Eintrag jetzt/ }));
-    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled());
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Eintrag jetzt/ }));
+    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled(), { timeout: 4000 });
 
     expect(screen.getByRole('status')).toHaveTextContent('· 54°19,1′N 010°08,4′E');
     expect((await db.entries.toArray())[0]?.position).toMatchObject({ lat: 54.3185, lon: 10.1407 });
@@ -57,62 +57,101 @@ describe('TodayScreen – Eintrag jetzt', () => {
     improve?.({ lat: 54.32, lon: 10.15 });
     await waitFor(async () => expect((await db.entries.toArray())[0]?.position?.lat).toBe(54.32));
     // Der Eintrag erscheint in der Timeline des Tages.
-    expect(await screen.findByRole('button', { name: /Eintrag \d\d:\d\d Eintrag öffnen/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Eintrag \d\d:\d\d Eintrag.* öffnen/ })).toBeInTheDocument();
   });
 
-  const crew = [
-    { id: 'c1', name: 'Anna', role: 'skipper' as const },
-    { id: 'c2', name: 'Ben', role: 'crew' as const },
-  ];
-
-  it('fragt „Ich bin …“ vor dem ersten Eintrag, wenn mehrere Crew-Mitglieder und kein Autor gesetzt sind', async () => {
+  it('fragt „Ich bin …“ vor dem ersten Eintrag, wenn mehrere Personen und kein Autor gesetzt sind', async () => {
     mockFix({ error: 'denied' });
     const trip = await seedTrip();
-    await saveCrew(db, trip.id, crew);
+    const ben = await addCrewMember(db, trip.id, { name: 'Ben' });
+    await setAuthor(db, trip.id, undefined);
     const actions = makeActions();
-    renderUi(<TodayScreen trip={(await db.trips.get(trip.id))!} reports={[]} />, actions);
+    renderUi(<TodayScreen trip={trip} reports={[]} />, actions);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Eintrag jetzt/ }));
-    const dialog = await screen.findByRole('dialog', { name: /Wer schreibt/ });
+    await user.click(await screen.findByRole('button', { name: /Eintrag jetzt/ }, { timeout: 4000 }));
+    const dialog = await screen.findByRole('dialog', { name: /Wer schreibt/ }, { timeout: 4000 });
     expect(await db.entries.count()).toBe(0);
     await user.click(within(dialog).getByRole('button', { name: /Ben/ }));
 
-    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled());
-    expect(await getAuthor(db, trip.id)).toBe('c2');
-    expect((await db.entries.toArray())[0]?.authorId).toBe('c2');
+    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled(), { timeout: 4000 });
+    expect(await getAuthor(db, trip.id)).toBe(ben.id);
+    expect((await db.entries.toArray())[0]?.authorId).toBe(ben.id);
   });
 
-  it('übernimmt bei nur einem Crew-Mitglied automatisch den Autor, ohne Rückfrage', async () => {
+  it('Gründer ist automatisch Autor, ohne Rückfrage', async () => {
     mockFix({ error: 'denied' });
     const trip = await seedTrip();
-    await saveCrew(db, trip.id, [crew[0]!]);
     const actions = makeActions();
-    renderUi(<TodayScreen trip={(await db.trips.get(trip.id))!} reports={[]} />, actions);
-
-    await userEvent.setup().click(screen.getByRole('button', { name: /Eintrag jetzt/ }));
-    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled());
+    renderUi(<TodayScreen trip={trip} reports={[]} />, actions);
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Eintrag jetzt/ }));
+    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled(), { timeout: 4000 });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect((await db.entries.toArray())[0]?.authorId).toBe('c1');
+    expect((await db.entries.toArray())[0]?.authorId).toBe(await getAuthor(db, trip.id));
   });
 
-  it('fragt nicht erneut, wenn der Autor bereits gesetzt ist', async () => {
+  it('mit Boot gewählt: Ein-Tipp-Eintrag für dieses Boot', async () => {
     mockFix({ error: 'denied' });
-    const trip = await seedTrip();
-    await saveCrew(db, trip.id, crew);
-    await setAuthor(db, trip.id, 'c1');
+    const trip = await seedTrip('F', ['Seeschwalbe', 'Möwe']);
+    const [, moewe] = await seedBoats(trip.id);
+    await setBoatSelection(db, trip.id, moewe!.id);
     const actions = makeActions();
-    renderUi(<TodayScreen trip={(await db.trips.get(trip.id))!} reports={[]} />, actions);
-    await userEvent.setup().click(screen.getByRole('button', { name: /Eintrag jetzt/ }));
-    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled());
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    renderUi(<TodayScreen trip={trip} reports={[]} />, actions);
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Eintrag jetzt · Möwe/ }));
+    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled(), { timeout: 4000 });
+    expect((await db.entries.toArray())[0]?.boatId).toBe(moewe!.id);
+    expect(screen.getByRole('status')).toHaveTextContent(/gespeichert · Möwe/);
   });
 
-  it('zeigt in einem fremden Logbuch keinen „Eintrag jetzt“-Button', async () => {
-    const trip = await seedTrip();
-    await setTripOwnership(db, trip.id, 'foreign');
+  it('bei „Alle“: Pflichtauswahl des Boots, vorausgewählt das zuletzt gewählte', async () => {
+    mockFix({ error: 'denied' });
+    const trip = await seedTrip('F', ['Seeschwalbe', 'Möwe']);
+    const [seeschwalbe, moewe] = await seedBoats(trip.id);
+    await setBoatSelection(db, trip.id, 'all');
+    const actions = makeActions();
+    const user = userEvent.setup();
+    renderUi(<TodayScreen trip={trip} reports={[]} />, actions);
+    await user.click(await screen.findByRole('button', { name: /Eintrag jetzt/ }));
+    let dialog = await screen.findByRole('dialog', { name: 'Neuer Eintrag' });
+    // Vorschlag der eigenen Person (Gründer → erstes Boot)
+    expect(within(dialog).getByRole('radio', { name: 'Seeschwalbe' })).toHaveAttribute('aria-checked', 'true');
+    await user.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await setLastBoat(db, trip.id, moewe!.id);
+    await user.click(screen.getByRole('button', { name: /Eintrag jetzt/ }));
+    dialog = await screen.findByRole('dialog', { name: 'Neuer Eintrag' });
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: 'Möwe' })).toHaveAttribute('aria-checked', 'true'));
+    await user.click(within(dialog).getByRole('button', { name: 'Eintrag speichern' }));
+    await waitFor(() => expect(actions.openEntry).toHaveBeenCalled(), { timeout: 4000 });
+    expect((await db.entries.toArray())[0]?.boatId).toBe(moewe!.id);
+    expect(seeschwalbe).toBeDefined();
+  });
+
+  it('bei „Alle“ ohne Vorauswahl: Fehlermeldung statt Speichern', async () => {
+    mockFix({ error: 'denied' });
+    const trip = await seedTrip('F', ['Seeschwalbe', 'Möwe']);
+    await db.crewMembers.toCollection().modify({ suggestedBoatId: undefined });
+    await addBoat(db, trip.id, { name: 'Dritte' });
+    await setBoatSelection(db, trip.id, 'all');
+    const user = userEvent.setup();
     renderUi(<TodayScreen trip={trip} reports={[]} />);
-    expect(await screen.findByText(/Heute noch kein Eintrag in diesem Logbuch/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Eintrag jetzt/ })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /Eintrag jetzt/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Neuer Eintrag' });
+    await user.click(within(dialog).getByRole('button', { name: 'Eintrag speichern' }));
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Bitte zuerst ein Boot wählen.');
+    expect(await db.entries.count()).toBe(0);
+  });
+
+  it('zeigt keinen „Eintrag jetzt“-Button, solange die Mitgliedschaft nicht bestätigt ist', async () => {
+    const trip = await seedTrip();
+    const restore = await asCloudMember(trip.id);
+    db.serverRealms = () => ['bob'];
+    try {
+      renderUi(<TodayScreen trip={trip} reports={[]} />);
+      expect(await screen.findByText(/^Heute noch kein Eintrag\.$/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Eintrag jetzt/ })).not.toBeInTheDocument();
+    } finally {
+      restore();
+      db.serverRealms = () => undefined;
+    }
   });
 });

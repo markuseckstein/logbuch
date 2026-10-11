@@ -10,10 +10,14 @@ export interface LiveRoute {
   active: boolean;
   /** Startzeit (epoch ms) der laufenden Aufzeichnung. */
   startedAt?: number;
-  toggle: () => void;
+  /** Boot der laufenden Aufzeichnung. */
+  boatId?: ID;
+  /** Startet die Aufzeichnung für das Boot. */
+  start: (boatId: ID) => void;
+  stop: () => void;
 }
 
-const idle: LiveRoute = { active: false, toggle: () => undefined };
+const idle: LiveRoute = { active: false, start: () => undefined, stop: () => undefined };
 export const LiveRouteContext = createContext<LiveRoute>(idle);
 export const useLiveRoute = (): LiveRoute => useContext(LiveRouteContext);
 
@@ -34,6 +38,7 @@ interface Session {
 export function useLiveRouteState(tripId: ID): LiveRoute {
   const toast = useToast();
   const [startedAt, setStartedAt] = useState<number>();
+  const [boatId, setBoatId] = useState<ID>();
   const session = useRef<Session | null>(null);
   const starting = useRef(false);
 
@@ -41,6 +46,7 @@ export function useLiveRouteState(tripId: ID): LiveRoute {
     const s = session.current;
     session.current = null;
     setStartedAt(undefined);
+    setBoatId(undefined);
     if (!s) return;
     s.stop();
     s.release?.();
@@ -49,14 +55,14 @@ export function useLiveRouteState(tripId: ID): LiveRoute {
     if (track && track.points.length === 0) await deleteTrack(db, s.trackId);
   }, []);
 
-  const start = useCallback(async (): Promise<void> => {
+  const start = useCallback(async (forBoat: ID): Promise<void> => {
     if (starting.current || session.current) return;
     starting.current = true;
     try {
       const release = await keepScreenOn();
       if (!release) toast('Bildschirm kann nicht wachgehalten werden – Display bitte nicht sperren');
       const now = Date.now();
-      const track = await addTrack(db, tripId, { name: liveName(now), source: 'live', points: [] });
+      const track = await addTrack(db, tripId, { boatId: forBoat, name: liveName(now), source: 'live', points: [] });
       const s: Session = { trackId: track.id, release, queue: Promise.resolve(), stop: () => undefined };
       s.stop = startLiveTracking({
         onPoint: (p: TrackPoint) => {
@@ -66,6 +72,7 @@ export function useLiveRouteState(tripId: ID): LiveRoute {
       });
       session.current = s;
       setStartedAt(now);
+      setBoatId(forBoat);
     } catch {
       toast('Live-Route konnte nicht gestartet werden');
     } finally {
@@ -82,12 +89,14 @@ export function useLiveRouteState(tripId: ID): LiveRoute {
   );
 
   const active = startedAt !== undefined;
-  const toggle = useCallback((): void => {
-    void (active ? stop() : start());
-  }, [active, start, stop]);
-
   return useMemo(
-    () => (startedAt === undefined ? { active, toggle } : { active, startedAt, toggle }),
-    [active, startedAt, toggle],
+    () => ({
+      active,
+      ...(startedAt !== undefined ? { startedAt } : {}),
+      ...(boatId !== undefined ? { boatId } : {}),
+      start: (id: ID) => void start(id),
+      stop: () => void stop(),
+    }),
+    [active, startedAt, boatId, start, stop],
   );
 }

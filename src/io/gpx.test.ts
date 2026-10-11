@@ -70,20 +70,24 @@ describe('parseGpx', () => {
 
 function bundle(withTracks: boolean): GpxInput {
   return {
-    trip: { id: 't', name: 'Törn <Ost> & "Co"', boat: { name: 'B' }, createdAt: 0, updatedAt: 0, updatedBy: 'd' },
+    trip: { id: 't', name: 'Törn <Ost> & "Co"', createdAt: 0, updatedAt: 0, updatedBy: 'd' },
+    boats: [
+      { id: 'b1', tripId: 't', name: 'Möwe', colorIndex: 1, createdAt: 0, updatedAt: 0, updatedBy: 'd' },
+      { id: 'b2', tripId: 't', name: 'Leer', colorIndex: 2, createdAt: 1, updatedAt: 0, updatedBy: 'd' },
+    ],
     entries: [
       {
-        id: 'e1', tripId: 't', time: Date.UTC(2026, 7, 10, 12, 32), tzOffsetMin: 120,
+        id: 'e1', tripId: 't', boatId: 'b1', time: Date.UTC(2026, 7, 10, 12, 32), tzOffsetMin: 120,
         position: { lat: 54.1, lon: 10.2 }, type: 'harbour', text: 'a < b & "c"', photoIds: [], createdAt: 0, updatedAt: 0, updatedBy: 'd',
       },
-      { id: 'e2', tripId: 't', time: Date.UTC(2026, 7, 10, 13), tzOffsetMin: 120, type: 'note', photoIds: [], createdAt: 0, updatedAt: 0, updatedBy: 'd' },
+      { id: 'e2', tripId: 't', boatId: 'b1', time: Date.UTC(2026, 7, 10, 13), tzOffsetMin: 120, type: 'note', photoIds: [], createdAt: 0, updatedAt: 0, updatedBy: 'd' },
       {
-        id: 'e3', tripId: 't', time: Date.UTC(2026, 7, 10, 14), tzOffsetMin: 120,
+        id: 'e3', tripId: 't', boatId: 'b1', time: Date.UTC(2026, 7, 10, 14), tzOffsetMin: 120,
         position: { lat: 54.2, lon: 10.3 }, type: 'departure', photoIds: [], createdAt: 0, updatedAt: 0, updatedBy: 'd',
       },
     ],
     tracks: withTracks
-      ? [{ id: 'k', tripId: 't', name: 'Live & <1>', source: 'live', createdAt: 0, updatedAt: 0, updatedBy: 'd',
+      ? [{ id: 'k', tripId: 't', boatId: 'b1', name: 'Live & <1>', source: 'live', createdAt: 0, updatedAt: 0, updatedBy: 'd',
           points: [{ lat: 54, lon: 10, time: 1000, ele: 2 }, { lat: 54.1, lon: 10.1 }] }]
       : [],
   };
@@ -98,21 +102,30 @@ describe('writeGpx', () => {
     expect(xml).toContain('<desc>a &lt; b &amp; "c"</desc>');
   });
 
-  it('roundtrips tracks and waypoints', () => {
+  it('one track per boat (named after the boat), waypoints with boat name; boats without data are left out', () => {
     const r = parseGpx(writeGpx(bundle(true)));
     expect(r.tracks).toEqual([
-      { name: 'Live & <1>', points: [{ lat: 54, lon: 10, time: 1000, ele: 2 }, { lat: 54.1, lon: 10.1 }] },
+      { name: 'Möwe', points: [{ lat: 54, lon: 10, time: 1000, ele: 2 }, { lat: 54.1, lon: 10.1 }] },
     ]);
     expect(r.waypoints).toHaveLength(2);
     expect(r.waypoints[0]).toMatchObject({ lat: 54.1, lon: 10.2, time: Date.UTC(2026, 7, 10, 12, 32) });
-    expect(r.waypoints[0]!.name).toMatch(/Hafen.*14:32/);
+    expect(r.waypoints[0]!.name).toBe('Möwe · Hafen 14:32');
   });
 
-  it('derives a route track from entry positions when there are no tracks', () => {
+  it('several tracks of a boat become segments of its one track', () => {
+    const b = bundle(true);
+    const t2 = { ...b.tracks[0]!, id: 'k2', name: 'zwei', points: [{ lat: 55, lon: 11 }] };
+    const xml = writeGpx({ ...b, tracks: [...b.tracks, t2] });
+    expect(xml.match(/<trk>/g)).toHaveLength(1);
+    expect(xml.match(/<trkseg>/g)).toHaveLength(2);
+    expect(parseGpx(xml).tracks[0]!.points).toHaveLength(3);
+  });
+
+  it('derives the route of a boat from its entry positions when it has no tracks', () => {
     const r = parseGpx(writeGpx(bundle(false)));
     expect(r.tracks).toEqual([
       {
-        name: 'Route aus Logeinträgen',
+        name: 'Möwe',
         points: [
           { lat: 54.1, lon: 10.2, time: Date.UTC(2026, 7, 10, 12, 32) },
           { lat: 54.2, lon: 10.3, time: Date.UTC(2026, 7, 10, 14) },

@@ -23,10 +23,11 @@ describe('importZip', () => {
     expect('timeIso' in out.entries[0]!).toBe(false);
   });
 
-  it('roundtrips v2 data incl. tombstones, authors and flotilla', async () => {
+  it('roundtrips boats, cover, tombstones and authors', async () => {
     const src = sampleBundle();
     const out = await importZip(await exportZip(src));
-    expect(out.trip.flotilla).toEqual(src.trip.flotilla);
+    expect(out.boats).toEqual(src.boats);
+    expect(out.trip.coverFocus).toEqual({ x: 30, y: 60 });
     expect(out.entries.find((e) => e.id === 'e3')!.deletedAt).toBe(12);
     expect(out.dayReports.map((r) => r.authorId)).toEqual(['c1', '']);
     expect(out.missingPhotos).toEqual([]);
@@ -36,7 +37,7 @@ describe('importZip', () => {
     const src = sampleBundle();
     const out = await importZip(await exportZip(src, { includePhotos: false }));
     expect(out.photos).toEqual([]);
-    expect(out.missingPhotos!.map((p) => p.id)).toEqual(['p1', 'p3', 'p2']);
+    expect(out.missingPhotos!.map((p) => p.id)).toEqual(['p1', 'p3', 'p2', 'p4']);
     expect(out.missingPhotos![0]).toEqual({ id: 'p1', tripId: 'trip-1', mime: 'image/jpeg', width: 4, height: 3, hash: 'hash-p1', createdAt: 7 });
     expect(out.entries[0]!.photoIds).toEqual(['p1', 'p2']);
   });
@@ -65,8 +66,15 @@ describe('importZip', () => {
   it('rejects wrong format or version with a German message', async () => {
     const mk = (o: object) => new Blob([zipSync({ 'logbook.json': strToU8(JSON.stringify(o)) }) as Uint8Array<ArrayBuffer>]);
     await expect(importZip(mk({ format: 'x', version: 1 }))).rejects.toThrow(/Logbuch/);
+    await expect(importZip(mk({ format: 'segel-logbuch', version: 3 }))).rejects.toThrow(/Version 3/);
     await expect(importZip(mk({ format: 'segel-logbuch', version: 2 }))).rejects.toThrow(/Version 2/);
     await expect(importZip(mk({ format: 'segel-logbuch', version: 1 }))).rejects.toThrow(/Version 1/);
+  });
+
+  it('rejects a v4 file without boats', async () => {
+    const mk = (o: object) => new Blob([zipSync({ 'logbook.json': strToU8(JSON.stringify(o)) }) as Uint8Array<ArrayBuffer>]);
+    const base = { format: 'segel-logbuch', version: 4, trip: { id: 't' }, crew: [], entries: [], dayReports: [], tracks: [], trackChunks: [], photos: [] };
+    await expect(importZip(mk(base))).rejects.toThrow(/unvollständig/);
   });
 
   it('rejects a missing image file', async () => {

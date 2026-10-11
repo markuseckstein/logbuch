@@ -2,8 +2,8 @@ import { createContext, useContext } from 'react';
 import { useLiveQuery, useObservable } from 'dexie-react-hooks';
 import type { DXCUserInteraction, Invite, SyncState, UserLogin } from 'dexie-cloud-addon';
 import { db } from '../db/db';
-import { cloudStatus, listMembers, type CloudStatus, type MemberInfo } from '../db/cloud';
-import { canManageTrip, listWritableTripIds } from '../db/repo';
+import { cloudStatus, listPeople, type CloudStatus, type PersonInfo } from '../db/cloud';
+import { getAuthor, listWritableTripIds, tripAccess, type TripAccess } from '../db/repo';
 import type { ID } from '../domain';
 
 interface Interop<T> {
@@ -63,7 +63,7 @@ function useServerRealmsKey(): string {
 /** Von `Root` bereitgestellt (wie die Einstellungen): sofort verfügbar, kein Flackern beim Tab-Wechsel. */
 export const WritableTripsContext = createContext<ID[] | undefined>(undefined);
 
-/** Beschreibbare Trips: lokal `writableTripIds`, geteilte Cloud-Logbücher nach Server-Rechten. */
+/** Beschreibbare Törns: lokal alle, geteilte nach Server-Rechten (Mitgliedschaft vom Server bestätigt). */
 export function useWritableTripIds(): ID[] | undefined {
   const provided = useContext(WritableTripsContext);
   const userId = useCloudUser()?.userId;
@@ -72,15 +72,34 @@ export function useWritableTripIds(): ID[] | undefined {
   return provided ?? own;
 }
 
-export function useCanManage(tripId: ID): boolean {
+const LOADING_ACCESS: TripAccess = { admin: false, canWrite: false };
+
+/** Rechte im Törn; undefined, solange sie geladen werden. */
+export function useTripAccessState(tripId: ID): TripAccess | undefined {
   const userId = useCloudUser()?.userId;
   const realms = useServerRealmsKey();
-  return useLiveQuery(() => canManageTrip(db, tripId), [tripId, userId, realms]) ?? false;
+  return useLiveQuery(() => tripAccess(db, tripId), [tripId, userId, realms]);
 }
 
-export function useMembers(tripId: ID): MemberInfo[] {
+/** Rechte im Törn (Admin, Schreiben, angemeldeter Nutzer); während des Ladens: nichts erlaubt. */
+export function useTripAccess(tripId: ID): TripAccess {
+  return useTripAccessState(tripId) ?? LOADING_ACCESS;
+}
+
+export function useCanManage(tripId: ID): boolean {
+  return useTripAccess(tripId).admin;
+}
+
+/** Personen des Törns mit Einladungsstand. */
+export function usePeople(tripId: ID): PersonInfo[] {
   const userId = useCloudUser()?.userId;
-  return useLiveQuery(() => listMembers(db, tripId), [tripId, userId]) ?? [];
+  return useLiveQuery(() => listPeople(db, tripId), [tripId, userId]) ?? [];
+}
+
+/** Id der eigenen Person (Autor) im Törn. */
+export function useMyCrewId(tripId: ID): ID | undefined {
+  const user = useCloudUser();
+  return useLiveQuery(() => getAuthor(db, tripId), [tripId, user?.userId, user?.email]);
 }
 
 const NO_PERSISTED = constant<{ timestamp?: Date } | undefined>(undefined);

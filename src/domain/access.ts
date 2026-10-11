@@ -45,7 +45,7 @@ export interface RealmAccessInput {
 
 const TIED_PREFIX = 'rlm~';
 
-/** Wie `getTiedRealmId` aus dexie-cloud-addon: ein Realm je Boot-Logbuch, auf allen Geräten gleich. */
+/** Wie `getTiedRealmId` aus dexie-cloud-addon: ein Realm je Törn, auf allen Geräten gleich. */
 export function tiedRealmId(tripId: string): string {
   return TIED_PREFIX + tripId;
 }
@@ -54,7 +54,7 @@ export function tripIdOfRealm(realmId: string): string | undefined {
   return realmId.startsWith(TIED_PREFIX) ? realmId.slice(TIED_PREFIX.length) : undefined;
 }
 
-/** In der Cloud geteilt (Boots-Realm) – im Gegensatz zu lokal/privat. */
+/** In der Cloud geteilt (Törn-Realm) – im Gegensatz zu lokal/privat. */
 export function isSharedRealm(realmId: string | undefined): boolean {
   return realmId !== undefined && realmId.startsWith(TIED_PREFIX);
 }
@@ -89,7 +89,7 @@ export function realmPermissions({ realm, selfMembers, globalRoles, userId, conf
   if (!realm) return {};
   if (realm.owner === userId) return { manage: '*' };
   if (confirmedRealms && !confirmedRealms.includes(realm.realmId)) return {};
-  // Bewusst strenger als Addon und Server (der Crew-Schreibzugriffe schon ab Einladung annimmt, geprüft
+  // Bewusst strenger als Addon und Server (der Mitglieds-Schreibzugriffe schon ab Einladung annimmt, geprüft
   // 2026-10-11): geschrieben wird erst nach angenommener Einladung.
   const mine = selfMembers.filter(
     (m) => m.realmId === realm.realmId && (m.userId === undefined || m.userId === userId) && !!m.accepted && !m.rejected,
@@ -108,12 +108,39 @@ export function realmPermissions({ realm, selfMembers, globalRoles, userId, conf
 const includes = (list: TableList | undefined, table: string): boolean =>
   list === '*' || (Array.isArray(list) && list.includes(table));
 
-/** Darf Einträge anlegen = schreibt im Logbuch mit (Crew, Skipper). */
+/**
+ * Rechte eines Mitglieds (Törn-Modell v2, Spike 9.9): nur anlegen. Eigene Datensätze darf der Owner immer
+ * ändern und löschen (Dexie-Cloud-Owner-Regel); fremde, Boote, Crew und Törn nicht. Steht zusätzlich als Rolle
+ * `member` in roles.json und wird beim Einladen explizit am Mitglied gesetzt.
+ */
+export const MEMBER_PERMISSIONS: PermissionSet = Object.freeze({
+  add: ['entries', 'photos', 'dayReports', 'tracks', 'trackChunks'],
+}) as PermissionSet;
+
+/** Wer gerade schreibt: `userId` fehlt im lokalen Modus (nicht angemeldet). */
+export interface Me {
+  userId?: string;
+  /** Admin des Törns (Realm-Owner bzw. eigener, nicht geteilter Törn). */
+  admin: boolean;
+}
+
+const UNSYNCED_OWNER = 'unauthorized';
+
+/**
+ * Darf ich diesen Datensatz ändern/löschen? Lokal alles; angemeldet der Admin alles, sonst nur eigene
+ * (Owner). Noch nicht synchronisierte Datensätze (ohne Owner) gehören diesem Gerät.
+ */
+export function canEditRecord(record: { owner?: string | undefined }, me: Me): boolean {
+  if (me.userId === undefined || me.admin) return true;
+  return record.owner === undefined || record.owner === UNSYNCED_OWNER || record.owner === me.userId;
+}
+
+/** Darf Einträge anlegen = schreibt im Törn mit (Mitglied, Admin). */
 export function canWriteRealm(p: PermissionSet): boolean {
   return includes(p.manage, 'entries') || includes(p.add, 'entries');
 }
 
-/** Darf alles, auch Mitglieder einladen/entfernen (Skipper bzw. Realm-Besitzer). */
+/** Darf alles, auch Boote anlegen und Personen einladen/entfernen (Admin = Realm-Owner). */
 export function canManageRealm(p: PermissionSet): boolean {
   return p.manage === '*';
 }

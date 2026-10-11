@@ -1,7 +1,7 @@
 import Dexie from 'dexie';
 
 /** Databases of earlier schemas (no real data existed, no migration). */
-export const LEGACY_DB_NAMES = ['logbook', 'logbook-v3'];
+export const LEGACY_DB_NAMES = ['logbook', 'logbook-v3', 'logbook-v4'];
 
 /** Removes the databases of earlier schemas once; errors are ignored. */
 export async function deleteLegacyDb(): Promise<void> {

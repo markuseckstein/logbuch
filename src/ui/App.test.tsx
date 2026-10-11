@@ -2,9 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { db } from '../db/db';
-import { setTripOwnership, updateTrip, createEntry } from '../db/repo';
+import { addBoat } from '../db/repo';
 import { App } from './App';
-import { seedTrip, useCleanDb } from './test-utils';
+import { asCloudMember, seedEntry, seedTrip, useCleanDb } from './test-utils';
 
 vi.mock('./components/ChartMap', () => ({ ChartMap: () => null }));
 vi.mock('./UpdatePrompt', () => ({ UpdatePrompt: () => null }));
@@ -20,7 +20,9 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Name des Törns'), 'Sommertörn');
+    await user.type(screen.getByLabelText('Dein Name'), 'Anna');
     await user.click(screen.getByRole('button', { name: 'Weiter' }));
+    await user.type(screen.getByLabelText('Bootsname'), 'Seeschwalbe');
     await user.click(screen.getByRole('button', { name: 'Weiter' }));
     await user.click(screen.getByRole('button', { name: 'Törn anlegen' }));
 
@@ -34,7 +36,8 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByRole('dialog', { name: 'Neuer Törn' })).toBeInTheDocument();
     // wie ein Cloud-Sync nach Login/Einladung: Trip erscheint direkt in der DB, ohne activeTripId
-    await db.trips.add({ id: 'synced', name: 'Aus der Cloud', boat: { name: 'Möwe' }, createdAt: 1, updatedAt: 1, updatedBy: 'x' });
+    await db.trips.add({ id: 'synced', name: 'Aus der Cloud', createdAt: 1, updatedAt: 1, updatedBy: 'x' });
+    await db.boats.add({ id: 'b', tripId: 'synced', name: 'Möwe', colorIndex: 1, createdAt: 1, updatedAt: 1, updatedBy: 'x' });
     expect(await screen.findByRole('navigation', { name: 'Hauptnavigation' })).toBeInTheDocument();
     expect(await screen.findByText('Aus der Cloud', { exact: false })).toBeInTheDocument();
   });
@@ -52,30 +55,43 @@ describe('App', () => {
     await vi.waitFor(() => expect(document.documentElement.dataset['theme']).toBe('dark'));
   });
 
-  it('zeigt fremde Logbücher mit Banner „nur lesen“, ohne Eintrag-Button und mit gesperrtem Törn-Tab', async () => {
-    const trip = await seedTrip('Fremdtörn');
-    await updateTrip(db, trip.id, { boat: { name: 'Möwe' } });
-    const entry = await createEntry(db, trip.id, { time: Date.now(), tzOffsetMin: 0 });
-    await setTripOwnership(db, trip.id, 'foreign');
+  it('Boot-Schalter: ausgeblendet bei einem Boot, mit zwei Booten im Header und gespeichert', async () => {
+    const trip = await seedTrip('Flotte');
     const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByRole('navigation', { name: 'Hauptnavigation' });
+    expect(screen.queryByRole('radiogroup', { name: 'Boot wählen' })).not.toBeInTheDocument();
+    unmount();
+    await addBoat(db, trip.id, { name: 'Möwe' });
     render(<App />);
+    const seg = await screen.findByRole('radiogroup', { name: 'Boot wählen' });
+    expect(screen.getByRole('radio', { name: 'Seeschwalbe' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: /Eintrag jetzt · Seeschwalbe/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'Alle' }));
+    expect(screen.getByRole('radio', { name: 'Alle' })).toHaveAttribute('aria-checked', 'true');
+    expect(seg).toBeInTheDocument();
+    await vi.waitFor(async () => expect((await db.settings.get('boatSelectionByTrip'))?.value).toEqual({ [trip.id]: 'all' }));
+  });
 
-    expect(await screen.findByText('Logbuch der Möwe · nur lesen')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Eintrag jetzt/ })).not.toBeInTheDocument();
-
-    // Eintrag-Sheet: nur Ansicht, keine Bearbeiten-/Löschen-Buttons
-    await user.click(await screen.findByRole('button', { name: /Eintrag \d\d:\d\d Eintrag öffnen/ }));
-    const sheet = await screen.findByRole('dialog');
-    expect(sheet).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Fertig' }));
-    expect(entry.id).toBeTruthy();
-
-    await user.click(screen.getByRole('button', { name: 'Törn' }));
-    expect(screen.getByLabelText('Name des Törns')).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Törndaten speichern' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Logbuch auf diesem Gerät löschen/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Logbuch teilen' })).toBeEnabled();
+  it('Mitglied: fremder Eintrag nur ansehen (Banner), Törn-Tab ohne Admin-Funktionen', async () => {
+    const trip = await seedTrip('Gemeinsam');
+    await seedEntry(trip.id, Date.now());
+    const restore = await asCloudMember(trip.id);
+    try {
+      const user = userEvent.setup();
+      render(<App />);
+      expect(await screen.findByRole('button', { name: /Eintrag jetzt/ })).toBeInTheDocument();
+      await user.click(await screen.findByRole('button', { name: /Eintrag \d\d:\d\d Eintrag.*öffnen/ }));
+      expect(await screen.findByText('Nur ansehen')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Fertig' }));
+      await user.click(screen.getByRole('button', { name: 'Törn' }));
+      expect(await screen.findByText('Nur der Admin lädt Personen ein und legt Boote an.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Einladung senden' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Törn verlassen' })).toBeEnabled();
+    } finally {
+      restore();
+    }
   });
 });

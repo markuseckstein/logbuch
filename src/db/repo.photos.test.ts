@@ -5,13 +5,15 @@ import {
   createEntry, createTrip, dayPhotoHashes, deleteTrip, getDayReport, getPhoto, listEntries, loadTripData,
   removePhotoFromDayReport, mergeBundle, upsertDayReport,
 } from './repo';
-import { dispose, freshDb } from './test-helpers';
+import { dispose, firstBoat, freshDb, tripInput } from './test-helpers';
 
 let db: LogbookDB;
 let tripId: string;
+let boatId: string;
 beforeEach(async () => {
   db = freshDb();
-  tripId = (await createTrip(db, { name: 'T', boat: { name: 'B' }, crew: [] })).id;
+  tripId = (await createTrip(db, tripInput('T'))).id;
+  boatId = await firstBoat(db, tripId);
 });
 afterEach(async () => { await dispose(db); });
 
@@ -28,14 +30,14 @@ describe('limits', () => {
 
 describe('addPhotosToEntry', () => {
   it('stores several photos with hash and links them in order', async () => {
-    const e = await createEntry(db, tripId, { time: DAY, tzOffsetMin: 120 });
+    const e = await createEntry(db, tripId, { boatId, time: DAY, tzOffsetMin: 120 });
     const added = await addPhotosToEntry(db, e.id, [ph('a'), ph('b')]);
     expect(added.map((p) => p.hash)).toEqual(['a', 'b']);
     expect((await listEntries(db, tripId))[0]?.photoIds).toEqual(added.map((p) => p.id));
     expect((await getPhoto(db, added[0]!.id))?.hash).toBe('a');
   });
   it('is atomic: exceeding the limit stores nothing', async () => {
-    const e = await createEntry(db, tripId, { time: DAY, tzOffsetMin: 120 });
+    const e = await createEntry(db, tripId, { boatId, time: DAY, tzOffsetMin: 120 });
     await addPhotosToEntry(db, e.id, [ph('a'), ph('b'), ph('c')]);
     await expect(addPhotosToEntry(db, e.id, [ph('d'), ph('e'), ph('f')])).rejects.toBeInstanceOf(MaxPhotosError);
     expect(await db.photos.count()).toBe(3);
@@ -72,7 +74,7 @@ describe('day report photos', () => {
   it('survives a bundle roundtrip', async () => {
     await addPhotosToDayReport(db, tripId, date, [ph('a')]);
     const bundle = await loadTripData(db, tripId);
-    await mergeBundle(db, bundle, { ownership: 'own' });
+    await mergeBundle(db, bundle);
     expect((await getDayReport(db, tripId, date))?.photoIds).toHaveLength(1);
     expect(await db.photos.count()).toBe(1);
   });
@@ -80,9 +82,9 @@ describe('day report photos', () => {
 
 describe('dayPhotoHashes', () => {
   it('collects hashes of entries of that day (by local date) and the report', async () => {
-    const e = await createEntry(db, tripId, { time: DAY, tzOffsetMin: 120 });
+    const e = await createEntry(db, tripId, { boatId, time: DAY, tzOffsetMin: 120 });
     // 2026-08-10T23:30Z with +120 is already 2026-08-11 locally
-    const late = await createEntry(db, tripId, { time: Date.UTC(2026, 7, 10, 23, 30), tzOffsetMin: 120 });
+    const late = await createEntry(db, tripId, { boatId, time: Date.UTC(2026, 7, 10, 23, 30), tzOffsetMin: 120 });
     await addPhotosToEntry(db, e.id, [ph('a')]);
     await addPhotosToEntry(db, late.id, [ph('late')]);
     await addPhotosToDayReport(db, tripId, date, [ph('r')]);
@@ -90,7 +92,7 @@ describe('dayPhotoHashes', () => {
     expect(await dayPhotoHashes(db, tripId, '2026-08-11')).toEqual(new Set(['late']));
   });
   it('ignores photos without hash', async () => {
-    const e = await createEntry(db, tripId, { time: DAY, tzOffsetMin: 120 });
+    const e = await createEntry(db, tripId, { boatId, time: DAY, tzOffsetMin: 120 });
     await addPhotosToEntry(db, e.id, [{ blob: new Blob(['x']), mime: 'image/jpeg', width: 1, height: 1 }]);
     expect((await dayPhotoHashes(db, tripId, date)).size).toBe(0);
   });

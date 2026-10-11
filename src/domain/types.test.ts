@@ -6,7 +6,6 @@ describe('domain/types', () => {
     const trip: Trip = {
       id: 't1',
       name: 'Test',
-      boat: { name: 'Boot' },
       createdAt: 0,
       updatedAt: 0,
       updatedBy: 'd',
@@ -14,6 +13,7 @@ describe('domain/types', () => {
     const entry: LogEntry = {
       id: 'e1',
       tripId: trip.id,
+      boatId: 'b1',
       time: 0,
       tzOffsetMin: 120,
       type: 'note',

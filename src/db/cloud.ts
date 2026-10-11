@@ -1,8 +1,12 @@
 import type { DBRealmMember } from 'dexie-cloud-addon';
-import { tiedRealmId, isSharedRealm } from '../domain/access';
-import type { ID } from '../domain/types';
+import { MEMBER_PERMISSIONS, tiedRealmId, isSharedRealm } from '../domain/access';
+import { nameFromEmail } from '../domain/boats';
+import type { CrewMember, ID } from '../domain/types';
 import type { LogbookDB } from './db';
-import { getDeviceId, moveTripToRealm, resetDeviceIdCache } from './repo';
+import {
+  addCrewMember, canManageTrip, getAuthor, getDeviceId, listCrew, moveTripToRealm, normalizeEmail, removeCrewMember, resetDeviceIdCache,
+  updateCrewMember,
+} from './repo';
 import { MAX_AUTO_ATTEMPTS, listRescued, recordSyncExchange, resubmitRescued, wrapSyncFetch } from './syncRejections';
 
 /**
@@ -17,9 +21,8 @@ export class CloudNotSignedInError extends Error {
   }
 }
 
-/** Rollen aus roles.json: Crew schreibt mit, andere Boote der Flottille lesen nur. */
-export type InviteRole = 'crew' | 'readonly';
-export type MemberRole = InviteRole | 'skipper';
+/** Rollen aus roles.json: Admin = Realm-Owner (legt den Törn an), Mitglieder schreiben eigene Einträge. */
+export type MemberRole = 'admin' | 'member';
 
 /** Anzeigestatus für Törn-Tab und Topbar. */
 export type CloudStatus = 'local' | 'signed-out' | 'syncing' | 'in-sync' | 'offline' | 'error';
@@ -42,8 +45,6 @@ export function cloudStatus(
   if (sync.phase === 'in-sync') return 'in-sync';
   return 'syncing';
 }
-
-const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
 /** Test-Nutzer (Demo-Accounts der Cloud-DB): Login ohne E-Mail-Code, Einladung ohne Mail. */
 export function isDemoEmail(email: string): boolean {
@@ -80,87 +81,175 @@ function memberIdFields(db: LogbookDB): { id?: string } {
 }
 
 /**
- * „Logbuch in die Cloud bringen“: Realm des Boots anlegen (`rlm~<tripId>`), Trip samt Crew, Einträgen,
- * Fotos, Berichten und Tracks hineinverschieben. Idempotent. Kein eigener Mitglieds-Eintrag: der Server
- * legt für den Realm-Owner selbst `mmb-owner-<realmId>` an (Spike 2026-10-11); der Owner hat `manage: *`.
+ * Törn in seinen Realm bringen (`rlm~<tripId>`): Trip samt Booten, Personen, Einträgen, Fotos, Berichten und
+ * Tracks. Idempotent. Kein eigener Mitglieds-Eintrag: der Server legt für den Realm-Owner selbst
+ * `mmb-owner-<realmId>` an (Spike 9.7); der Owner ist Admin (`manage: *`).
  */
 export async function shareTripToCloud(db: LogbookDB, tripId: ID): Promise<string> {
   requireUser(db);
   const trip = await db.trips.get(tripId);
   if (!trip) throw new Error(`Trip not found: ${tripId}`);
   const realmId = tiedRealmId(tripId);
-  await moveTripToRealm(db, tripId, realmId, { name: trip.boat.name.trim() || trip.name, represents: 'ein Bordbuch' });
+  if (trip.realmId !== realmId) await moveTripToRealm(db, tripId, realmId, { name: trip.name.trim(), represents: 'einen Törn' });
   return realmId;
+}
+
+/**
+ * Nach der Anmeldung: eigene, noch lokale bzw. private Törns in ihren Realm bringen, die eigene Person mit dem
+ * Konto verknüpfen und vorgemerkte Einladungen senden. Liefert die Zahl der verschobenen Törns.
+ */
+export async function adoptOwnTrips(db: LogbookDB): Promise<number> {
+  const user = requireUser(db);
+  let moved = 0;
+  for (const trip of await db.trips.toArray()) {
+    if (isSharedRealm(trip.realmId)) {
+      await sendPendingInvites(db, trip.id);
+      continue;
+    }
+    await shareTripToCloud(db, trip.id);
+    moved++;
+    const me = await getAuthor(db, trip.id);
+    const crew = await listCrew(db, trip.id);
+    const mine = crew.find((c) => c.id === me);
+    if (mine && !mine.email && user.email && !crew.some((c) => c.email === normalizeEmail(user.email!))) {
+      await updateCrewMember(db, mine.id, { email: user.email });
+    }
+    await sendPendingInvites(db, trip.id);
+  }
+  return moved;
 }
 
 export interface InviteInput {
   email: string;
-  role: InviteRole;
-  name?: string;
+  /** Anzeigename; fehlt er, wird er aus der E-Mail abgeleitet. */
+  name?: string | undefined;
+  /** Boot-Vorschlag (nur Vorschlag, keine Berechtigung). */
+  suggestedBoatId?: ID | undefined;
 }
 
-async function sharedRealmOf(db: LogbookDB, tripId: ID): Promise<string> {
-  const trip = await db.trips.get(tripId);
-  if (!trip || !isSharedRealm(trip.realmId)) throw new Error('Das Logbuch ist noch nicht in der Cloud.');
-  return trip.realmId!;
+function memberRow(db: LogbookDB, realmId: string, email: string, name: string): DBRealmMember {
+  return {
+    ...memberIdFields(db), realmId, email, name, roles: ['member'],
+    // Rechte zusätzlich explizit: neu importierte globale Rollen wirken serverseitig verzögert (Spike 9.9)
+    permissions: { add: [...(MEMBER_PERMISSIONS.add as string[])] },
+    invite: !isDemoEmail(email),
+  } as DBRealmMember;
 }
 
-/** Lädt per E-Mail in das Logbuch ein (Mail nur für echte Adressen; Demo-Nutzer sehen die Einladung nach dem Login). */
-export async function inviteMember(db: LogbookDB, tripId: ID, input: InviteInput): Promise<void> {
-  const realmId = await sharedRealmOf(db, tripId);
+/**
+ * Admin lädt eine Person ein: in einer Transaktion `CrewMember` (Name, E-Mail, Boot-Vorschlag) und – wenn
+ * angemeldet – Realm-Mitglied mit Rolle `member`. Nicht angemeldet: nur vorgemerkt (Person ohne Mitglied),
+ * `adoptOwnTrips` sendet nach der Anmeldung.
+ */
+export async function inviteToTrip(db: LogbookDB, tripId: ID, input: InviteInput): Promise<CrewMember> {
   const email = normalizeEmail(input.email);
-  await db.members.add({
-    ...memberIdFields(db), realmId, email, ...(input.name?.trim() ? { name: input.name.trim() } : {}),
-    roles: [input.role], invite: !isDemoEmail(email),
-  } as DBRealmMember);
+  const name = input.name?.trim() || nameFromEmail(email);
+  const user = db.cloudUser();
+  const realmId = user ? await shareTripToCloud(db, tripId) : undefined;
+  return db.transaction('rw', [db.settings, db.trips, db.crewMembers, db.realms, db.members, db.roles], async () => {
+    const member = await addCrewMember(db, tripId, { name, email, suggestedBoatId: input.suggestedBoatId });
+    if (realmId && !(await db.members.where('[email+realmId]').equals([email, realmId]).first())) {
+      await db.members.add(memberRow(db, realmId, email, name));
+    }
+    return member;
+  });
 }
 
-export type MemberStatus = 'invited' | 'accepted' | 'rejected';
+/** Für alle Personen mit E-Mail ohne Realm-Mitglied (vorgemerkt) die Einladung anlegen. */
+export async function sendPendingInvites(db: LogbookDB, tripId: ID): Promise<number> {
+  const user = requireUser(db);
+  const trip = await db.trips.get(tripId);
+  if (!trip || !isSharedRealm(trip.realmId) || !(await canManageTrip(db, tripId))) return 0;
+  const realmId = trip.realmId!;
+  return db.transaction('rw', [db.crewMembers, db.members], async () => {
+    let n = 0;
+    for (const c of await db.crewMembers.where('tripId').equals(tripId).toArray()) {
+      if (c.deletedAt !== undefined || !c.email || c.email === normalizeEmail(user.email ?? '')) continue;
+      if (await db.members.where('[email+realmId]').equals([c.email, realmId]).first()) continue;
+      await db.members.add(memberRow(db, realmId, c.email, c.name));
+      n++;
+    }
+    return n;
+  });
+}
 
-export function memberStatus(m: { accepted?: Date | undefined; rejected?: Date | undefined }): MemberStatus {
+export type MemberStatus = 'pending' | 'invited' | 'accepted' | 'rejected';
+
+export function memberStatus(m: { accepted?: Date | undefined; rejected?: Date | undefined }): Exclude<MemberStatus, 'pending'> {
   if (m.rejected) return 'rejected';
   if (m.accepted) return 'accepted';
   return 'invited';
 }
 
-export interface MemberInfo {
-  id: string;
+/** Eine Person des Törns mit ihrem Einladungsstand (Mitgliederliste). */
+export interface PersonInfo {
+  crewId: ID;
+  name: string;
   email?: string;
-  name?: string;
-  roles: string[];
+  suggestedBoatId?: ID;
+  admin: boolean;
+  /** pending = vorgemerkt (noch kein Realm-Mitglied, z. B. vor der Anmeldung). */
   status: MemberStatus;
-  /** Das bin ich (angemeldeter Nutzer). */
+  memberId?: string;
+  /** Das bin ich. */
   self: boolean;
 }
 
-export async function listMembers(db: LogbookDB, tripId: ID): Promise<MemberInfo[]> {
+/** Personen des Törns (ohne entfernte), Admin zuerst. */
+export async function listPeople(db: LogbookDB, tripId: ID): Promise<PersonInfo[]> {
   const trip = await db.trips.get(tripId);
-  if (!trip || !isSharedRealm(trip.realmId)) return [];
+  if (!trip) return [];
   const user = db.cloudUser();
-  const realm = await db.realms.get(trip.realmId!);
-  const rolesOf = (m: DBRealmMember): string[] =>
-    m.roles?.length ? m.roles : m.userId && m.userId === realm?.owner ? ['skipper'] : [];
-  const rows = await db.members.where('realmId').equals(trip.realmId!).toArray();
-  const rank = (m: DBRealmMember): number => (rolesOf(m).includes('skipper') ? 0 : rolesOf(m).includes('crew') ? 1 : 2);
-  return rows
-    .filter((m): m is DBRealmMember & { id: string } => typeof m.id === 'string')
-    .sort((a, b) => rank(a) - rank(b) || (a.email ?? '').localeCompare(b.email ?? ''))
-    .map((m) => ({
-      id: m.id,
-      ...(m.email ? { email: m.email } : {}),
-      ...(m.name ? { name: m.name } : {}),
-      roles: rolesOf(m),
-      status: memberStatus(m),
-      self: !!user && (m.userId === user.userId || (!!user.email && m.email === user.email.toLowerCase())),
-    }));
+  const shared = isSharedRealm(trip.realmId);
+  const realm = shared ? await db.realms.get(trip.realmId!) : undefined;
+  const rows = shared ? await db.members.where('realmId').equals(trip.realmId!).toArray() : [];
+  const ownerId = realm?.owner ?? trip.owner;
+  const me = await getAuthor(db, tripId);
+  const people = (await listCrew(db, tripId)).filter((c) => c.deletedAt === undefined).map((c): PersonInfo => {
+    const row = c.email ? rows.find((m) => m.email === c.email) : undefined;
+    const isOwner = !!c.email && (c.email === ownerId || (!!user && c.email === normalizeEmail(user.email ?? '') && ownerId === user.userId));
+    const admin = shared ? isOwner : c.role === 'skipper';
+    const status: MemberStatus = admin && shared ? 'accepted' : row ? memberStatus(row) : 'pending';
+    return {
+      crewId: c.id, name: c.name, ...(c.email ? { email: c.email } : {}),
+      ...(c.suggestedBoatId ? { suggestedBoatId: c.suggestedBoatId } : {}), admin, status,
+      ...(row?.id ? { memberId: row.id } : {}), self: c.id === me,
+    };
+  });
+  return people.sort((a, b) => Number(b.admin) - Number(a.admin));
 }
 
-/** Mitglied entfernen (nur Skipper; der Server setzt das durch). */
-export async function removeMember(db: LogbookDB, memberId: string): Promise<void> {
-  await db.members.delete(memberId);
+/** Admin: Person entfernen – Person (Tombstone) und Realm-Mitglied in einer Transaktion. */
+export async function removePerson(db: LogbookDB, crewId: ID): Promise<void> {
+  await db.transaction('rw', [db.settings, db.trips, db.crewMembers, db.realms, db.members, db.roles], async () => {
+    const c = await db.crewMembers.get(crewId);
+    if (!c) return;
+    await removeCrewMember(db, crewId);
+    const trip = await db.trips.get(c.tripId);
+    if (c.email && trip && isSharedRealm(trip.realmId)) {
+      await db.members.where('[email+realmId]').equals([c.email, trip.realmId!]).delete();
+    }
+  });
 }
 
-/** Eigene Mitgliedschaft beenden: das Logbuch synchronisiert danach nicht mehr auf meine Geräte. */
+/** Admin: Einladung erneut senden (Mail nur für echte Adressen; fehlt das Mitglied, wird es angelegt). */
+export async function resendInvite(db: LogbookDB, crewId: ID): Promise<void> {
+  const c = await db.crewMembers.get(crewId);
+  if (!c?.email) return;
+  const trip = await db.trips.get(c.tripId);
+  if (!trip || !isSharedRealm(trip.realmId)) return;
+  const row = await db.members.where('[email+realmId]').equals([c.email, trip.realmId!]).first();
+  if (!row?.id) await sendPendingInvites(db, c.tripId);
+  else await db.members.update(row.id, { invite: !isDemoEmail(c.email) });
+}
+
+async function sharedRealmOf(db: LogbookDB, tripId: ID): Promise<string> {
+  const trip = await db.trips.get(tripId);
+  if (!trip || !isSharedRealm(trip.realmId)) throw new Error('Der Törn ist nicht in der Cloud.');
+  return trip.realmId!;
+}
+
+/** Eigene Mitgliedschaft beenden: der Törn synchronisiert danach nicht mehr auf meine Geräte. */
 export async function leaveTrip(db: LogbookDB, tripId: ID): Promise<void> {
   const user = requireUser(db);
   const realmId = await sharedRealmOf(db, tripId);

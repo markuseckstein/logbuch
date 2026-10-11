@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useTripCrew } from '../../db/hooks';
+import { useAllBoats, useTripCrew } from '../../db/hooks';
 import { captureFix } from '../../device';
 import { db } from '../../db/db';
 import { MAX_PHOTOS_PER_ENTRY, deleteEntry, removePhotoFromEntry, setEntryPosition, updateEntry } from '../../db/repo';
@@ -10,12 +10,15 @@ import {
   SKY_LABELS,
   formatPosition,
   formatTime,
+  canEditRecord,
+  type Boat,
   type EntryType,
   type ID,
   type LogEntry,
 } from '../../domain';
 import { ENTRY_ICON, Icon, SKY_ICON } from '../icons';
-import { useWritableTripIds } from '../cloudHooks';
+import { BoatChips, boatColor } from '../boats';
+import { useMyCrewId, useTripAccessState } from '../cloudHooks';
 import { ENTRY_TYPES, FIX_ERROR_LABEL, authorName, fromLocalInput, parseDecimal, toLocalInput, writeErrorMessage } from '../lib';
 import { usePhotoImport } from '../photoImport';
 import { useToast } from '../toast';
@@ -41,13 +44,27 @@ interface EntrySheetProps {
 
 export function EntrySheet({ entryId, isNew = false, onClose }: EntrySheetProps) {
   const entry = useLiveQuery(() => db.entries.get(entryId), [entryId]);
-  const writable = useWritableTripIds();
+  const access = useTripAccessState(entry?.tripId ?? '');
   const crew = useTripCrew(entry?.tripId);
-  if (!entry || !writable) return null;
-  const readOnly = !writable.includes(entry.tripId);
-  const by = crew.length > 1 ? authorName(crew, entry.authorId) : undefined;
-  if (readOnly) return <EntryView entry={entry} by={by} onClose={onClose} />;
-  return <EntryForm entry={entry} isNew={isNew} by={by} onClose={onClose} />;
+  const boats = useAllBoats(entry?.tripId);
+  const me = useMyCrewId(entry?.tripId ?? '');
+  if (!entry || !access) return null;
+  const editable = (access.admin || access.canWrite) && canEditRecord(entry, access);
+  const by = authorName(crew, entry.authorId);
+  const boat = boats.find((b) => b.id === entry.boatId);
+  const foreign = !!entry.authorId && entry.authorId !== me && access.userId !== undefined && entry.owner !== access.userId;
+  if (!editable) return <EntryView entry={entry} by={by} boat={boat} onClose={onClose} />;
+  return (
+    <EntryForm
+      entry={entry} isNew={isNew} by={by} boats={boats.filter((b) => b.deletedAt === undefined || b.id === entry.boatId)}
+      adminEdit={access.admin && foreign} onClose={onClose}
+    />
+  );
+}
+
+/** „Eintrag von Ben · Möwe“ */
+function originText(by: string | undefined, boat: Boat | undefined): string {
+  return [by ? `Eintrag von ${by}` : 'Eintrag', boat?.name].filter(Boolean).join(' · ');
 }
 
 function subtitleOf(entry: LogEntry, by: string | undefined) {
@@ -65,8 +82,10 @@ function subtitleOf(entry: LogEntry, by: string | undefined) {
   );
 }
 
-function EntryView({ entry, by, onClose }: { entry: LogEntry; by: string | undefined; onClose: () => void }) {
-  const title = `Eintrag · ${formatTime(entry.time, entry.tzOffsetMin)}`;
+function EntryView({
+  entry, by, boat, onClose,
+}: { entry: LogEntry; by: string | undefined; boat: Boat | undefined; onClose: () => void }) {
+  const title = `Eintrag ansehen · ${formatTime(entry.time, entry.tzOffsetMin)}`;
   return (
     <Sheet
       title={title}
@@ -78,7 +97,10 @@ function EntryView({ entry, by, onClose }: { entry: LogEntry; by: string | undef
         </button>
       }
     >
-      <p className="muted">Nur lesen – dieses Logbuch gehört einem anderen Boot.</p>
+      <div className="note" role="note" style={boat ? { ...boatColor(boat), borderLeftColor: 'var(--c)' } : undefined}>
+        <b>Nur ansehen</b>
+        {originText(by, boat)}. Fremde Einträge kannst du nicht ändern oder löschen.
+      </div>
       <EntryReadOnly entry={entry} />
     </Sheet>
   );
@@ -176,9 +198,12 @@ function EntryPhotos({ entry }: { entry: LogEntry }) {
 }
 
 function EntryForm({
-  entry, isNew, by, onClose,
-}: { entry: LogEntry; isNew: boolean; by: string | undefined; onClose: () => void }) {
+  entry, isNew, by, boats, adminEdit, onClose,
+}: {
+  entry: LogEntry; isNew: boolean; by: string | undefined; boats: readonly Boat[]; adminEdit: boolean; onClose: () => void;
+}) {
   const toast = useToast();
+  const [boatId, setBoatId] = useState(entry.boatId);
   const [timeValue, setTimeValue] = useState(toLocalInput(entry.time, entry.tzOffsetMin));
   const [type, setType] = useState<EntryType>(entry.type);
   const [dir, setDir] = useState(entry.windDirDeg);
@@ -197,6 +222,7 @@ function EntryForm({
   const save = async (): Promise<void> => {
     try {
       await updateEntry(db, entry.id, {
+      boatId,
       time: newTime,
       type,
       text: text.trim() === '' ? undefined : text,
@@ -261,6 +287,18 @@ function EntryForm({
 
   return (
     <Sheet title={title} subtitle={subtitle} onClose={onClose} footer={footer}>
+      {adminEdit ? (
+        <div className="note" role="note">
+          <b>Admin-Bearbeitung</b>
+          {originText(by, boats.find((b) => b.id === entry.boatId))}. Als Admin darfst du ihn ändern oder löschen.
+        </div>
+      ) : null}
+      {boats.length > 1 ? (
+        <fieldset>
+          <legend>Boot</legend>
+          <BoatChips boats={boats} value={boatId} onChange={(id) => id && setBoatId(id)} label="Boot" />
+        </fieldset>
+      ) : null}
       <label className="f">
         <span>Zeit</span>
         <input type="datetime-local" value={timeValue} onChange={(e) => setTimeValue(e.target.value)} />

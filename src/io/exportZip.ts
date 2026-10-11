@@ -1,7 +1,7 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { withoutCloudFields } from '../domain/merge';
 import { assembleTracks } from '../domain/tracks';
-import type { CrewMember, DayReport, LogEntry, PhotoMeta, TrackChunk, TrackRecord, Trip } from '../domain/types';
+import type { Boat, CrewMember, DayReport, LogEntry, PhotoMeta, TrackChunk, TrackRecord, Trip } from '../domain/types';
 import { blobToBytes } from './blob';
 import type { TripBundle } from './bundle';
 import { writeGpx, type GpxInput } from './gpx';
@@ -24,14 +24,16 @@ export interface ExportedPhoto {
 }
 
 /**
- * Version 3 (Dexie Cloud schema): crew as own records, track points in chunks, day reports with id.
- * Version stamps and tombstones as in v2; photos may be omitted. Never contains realmId/owner (user specific).
+ * Version 4 (Törn-Modell v2): a trip with several boats (`boats[]`, `boatId` on entries and tracks), cover
+ * picture as a normal photo (`trip.coverPhotoId`). Crew, track chunks, day report sections, version stamps and
+ * tombstones as before; photos may be omitted. Never contains realmId/owner (user specific).
  */
-export interface LogbookJsonV3 {
+export interface LogbookJsonV4 {
   format: 'segel-logbuch';
-  version: 3;
+  version: 4;
   exportedAt: string;
   trip: Trip;
+  boats: Boat[];
   crew: CrewMember[];
   entries: ExportedEntry[];
   dayReports: DayReport[];
@@ -84,7 +86,7 @@ function photoBase(p: PhotoMeta) {
 export async function buildLogbookJson(
   bundle: TripBundle,
   opts: { photoMode: PhotoMode } & ExportOptions,
-): Promise<LogbookJsonV3> {
+): Promise<LogbookJsonV4> {
   const photos: ExportedPhoto[] = [];
   for (const p of bundle.photos) {
     const base = photoBase(p);
@@ -100,9 +102,10 @@ export async function buildLogbookJson(
   for (const p of bundle.missingPhotos) photos.push({ ...photoBase(p), photoOmitted: true });
   return {
     format: 'segel-logbuch',
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     trip: clean(bundle.trip),
+    boats: bundle.boats.map(clean),
     crew: bundle.crew.map(clean),
     entries: bundle.entries.map((e) => ({ ...clean(e), timeIso: toIsoWithOffset(e.time, e.tzOffsetMin) })),
     dayReports: bundle.dayReports.map(clean),
@@ -118,6 +121,7 @@ const clean = <T extends object>(rec: T): T => withoutCloudFields(rec) as T;
 function liveOnly(bundle: TripBundle): GpxInput {
   return {
     trip: bundle.trip,
+    boats: bundle.boats.filter((b) => b.deletedAt === undefined),
     entries: bundle.entries.filter((e) => e.deletedAt === undefined),
     tracks: assembleTracks(bundle.tracks.filter((t) => t.deletedAt === undefined), bundle.trackChunks),
   };

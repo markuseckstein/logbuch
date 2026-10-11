@@ -5,10 +5,10 @@ import { buildLogbookJson, exportFileName, exportJson, exportZip } from './expor
 import { sampleBundle } from './fixtures';
 
 describe('buildLogbookJson', () => {
-  it('has the v3 envelope and timeIso with offset from tzOffsetMin', async () => {
+  it('has the v4 envelope and timeIso with offset from tzOffsetMin', async () => {
     const j = await buildLogbookJson(sampleBundle(), { photoMode: 'file' });
     expect(j.format).toBe('segel-logbuch');
-    expect(j.version).toBe(3);
+    expect(j.version).toBe(4);
     expect(new Date(j.exportedAt).toISOString()).toBe(j.exportedAt);
     expect(j.entries[0]!.timeIso).toBe('2026-08-10T14:32:00+02:00');
     expect(j.entries[1]!.timeIso).toBe('2026-08-10T18:30:00-01:30');
@@ -19,6 +19,17 @@ describe('buildLogbookJson', () => {
     expect(j.tracks).toHaveLength(1);
     expect(j.trackChunks).toHaveLength(2);
     expect(j.crew.map((c) => c.name)).toEqual(['Ann', 'Ben']);
+    expect(j.boats.map((b) => [b.name, b.colorIndex])).toEqual([['Möwe', 1], ['Seeschwalbe', 2]]);
+    expect(j.entries.map((e) => e.boatId)).toEqual(['b1', 'b2', 'b1']);
+    expect(j.tracks[0]!.boatId).toBe('b2');
+    expect(j.trip).not.toHaveProperty('boat');
+    expect(j.trip).not.toHaveProperty('flotilla');
+  });
+
+  it('exports the cover picture (id, focus) of the trip; the image is a normal photo', async () => {
+    const j = await buildLogbookJson(sampleBundle(), { photoMode: 'file' });
+    expect(j.trip).toMatchObject({ coverPhotoId: 'p4', coverFocus: { x: 30, y: 60 } });
+    expect(j.photos.find((p) => p.id === 'p4')).toMatchObject({ file: 'images/p4.jpg' });
   });
 
   it('references photo files with extension from mime', async () => {
@@ -27,6 +38,7 @@ describe('buildLogbookJson', () => {
       { id: 'p1', file: 'images/p1.jpg', mime: 'image/jpeg', width: 4, height: 3, hash: 'hash-p1', createdAt: 7 },
       { id: 'p3', file: 'images/p3.jpg', mime: 'image/jpeg', width: 3, height: 3, hash: 'hash-p3', createdAt: 9 },
       { id: 'p2', file: 'images/p2.webp', mime: 'image/webp', width: 2, height: 2, createdAt: 8 },
+      { id: 'p4', file: 'images/p4.jpg', mime: 'image/jpeg', width: 16, height: 9, createdAt: 10 },
     ]);
   });
 
@@ -39,9 +51,10 @@ describe('buildLogbookJson', () => {
 });
 
 describe('buildLogbookJson merge fields', () => {
-  it('exports version stamps, authors, flotilla and tombstones', async () => {
+  it('exports version stamps, authors, boat suggestions and tombstones', async () => {
     const j = await buildLogbookJson(sampleBundle(), { photoMode: 'file' });
-    expect(j.trip.flotilla).toEqual({ id: 'fl-1', name: 'Ostsee-Flottille' });
+    expect(j.crew[0]!.suggestedBoatId).toBe('b1');
+    expect(j.boats[1]!.deletedAt).toBeUndefined();
     expect(j.trip.updatedBy).toBe('dev-a');
     expect(j.crew[1]!.deletedAt).toBe(3);
     expect(j.entries[0]).toMatchObject({ authorId: 'c1', updatedBy: 'dev-a' });
@@ -56,6 +69,7 @@ describe('buildLogbookJson merge fields', () => {
     b.trip = { ...b.trip, ...cloud };
     b.entries = b.entries.map((e) => ({ ...e, ...cloud }));
     b.crew = b.crew.map((c) => ({ ...c, ...cloud }));
+    b.boats = b.boats.map((x) => ({ ...x, ...cloud }));
     b.trackChunks = b.trackChunks.map((c) => ({ ...c, ...cloud }));
     const text = JSON.stringify(await buildLogbookJson(b, { photoMode: 'file' }));
     expect(text).not.toContain('realmId');
@@ -64,7 +78,7 @@ describe('buildLogbookJson merge fields', () => {
 
   it('includePhotos: false lists photo metadata flagged photoOmitted without files', async () => {
     const j = await buildLogbookJson(sampleBundle(), { photoMode: 'file', includePhotos: false });
-    expect(j.photos).toHaveLength(3);
+    expect(j.photos).toHaveLength(4);
     expect(j.photos[0]).toEqual({
       id: 'p1', photoOmitted: true, mime: 'image/jpeg', width: 4, height: 3, hash: 'hash-p1', createdAt: 7,
     });
@@ -87,11 +101,21 @@ describe('exportZip', () => {
     expect(gpx).not.toContain('GELOESCHT');
   });
 
+  it('route.gpx has one track per boat, waypoints carry the boat name', async () => {
+    const gpx = strFromU8(unzipSync(await blobToBytes(await exportZip(sampleBundle())))['route.gpx']!);
+    expect(gpx.match(/<trk>/g)).toHaveLength(2);
+    expect(gpx).toContain('<name>Möwe</name>');
+    expect(gpx).toContain('<name>Seeschwalbe</name>');
+    expect(gpx).toMatch(/<name>Möwe · Hafen 14:32<\/name>/);
+  });
+
   it('contains logbook.json, uncompressed images and route.gpx', async () => {
     const blob = await exportZip(sampleBundle());
     expect(blob.type).toBe('application/zip');
     const files = unzipSync(await blobToBytes(blob));
-    expect(Object.keys(files).sort()).toEqual(['images/p1.jpg', 'images/p2.webp', 'images/p3.jpg', 'logbook.json', 'route.gpx']);
+    expect(Object.keys(files).sort()).toEqual([
+      'images/p1.jpg', 'images/p2.webp', 'images/p3.jpg', 'images/p4.jpg', 'logbook.json', 'route.gpx',
+    ]);
     expect(Array.from(files['images/p1.jpg']!)).toEqual([1, 2, 3, 255]);
     expect(JSON.parse(strFromU8(files['logbook.json']!)).format).toBe('segel-logbuch');
     expect(strFromU8(files['route.gpx']!)).toContain('<gpx');

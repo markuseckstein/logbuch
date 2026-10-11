@@ -13,6 +13,7 @@ const e = (
 ): LogEntry => ({
   id: `e${minute}`,
   tripId: 't',
+  boatId: 'b',
   time: T0 + minute * MIN,
   tzOffsetMin,
   type,

@@ -2,7 +2,7 @@ import { strFromU8, unzipSync } from 'fflate';
 import type { LogEntry, Photo, PhotoMeta } from '../domain/types';
 import { blobToBytes } from './blob';
 import type { TripBundle } from './bundle';
-import type { ExportedEntry, ExportedPhoto, LogbookJsonV3 } from './exportZip';
+import type { ExportedEntry, ExportedPhoto, LogbookJsonV4 } from './exportZip';
 
 export class ImportFormatError extends Error {
   constructor(message: string) {
@@ -15,26 +15,26 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** Only format version 3 (Dexie-Cloud-Schema) is supported. */
-function validate(raw: unknown): LogbookJsonV3 {
+/** Only format version 4 (Törn-Modell v2, several boats) is supported. */
+function validate(raw: unknown): LogbookJsonV4 {
   if (!isRecord(raw) || raw.format !== 'segel-logbuch') {
     throw new ImportFormatError('Die Datei ist kein Logbuch-Export.');
   }
-  if (raw.version !== 3) {
+  if (raw.version !== 4) {
     throw new ImportFormatError(
-      `Nicht unterstützte Version ${String(raw.version)} – diese App liest nur Version 3.`,
+      `Nicht unterstützte Version ${String(raw.version)} – diese App liest nur Version 4.`,
     );
   }
   if (
-    !isRecord(raw.trip) || !Array.isArray(raw.entries) || !Array.isArray(raw.photos) || !Array.isArray(raw.crew)
+    !isRecord(raw.trip) || !Array.isArray(raw.boats) || !Array.isArray(raw.entries) || !Array.isArray(raw.photos) || !Array.isArray(raw.crew)
     || !Array.isArray(raw.dayReports) || !Array.isArray(raw.tracks) || !Array.isArray(raw.trackChunks)
   ) {
     throw new ImportFormatError('Der Logbuch-Export ist unvollständig oder beschädigt.');
   }
-  return raw as unknown as LogbookJsonV3;
+  return raw as unknown as LogbookJsonV4;
 }
 
-function parseJson(text: string): LogbookJsonV3 {
+function parseJson(text: string): LogbookJsonV4 {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -53,7 +53,7 @@ function dataUrlToBlob(dataUrl: string, mime: string): Blob {
   return new Blob([bytes], { type: mime });
 }
 
-function toBundle(json: LogbookJsonV3, loadPhoto: (p: ExportedPhoto) => Blob): TripBundle {
+function toBundle(json: LogbookJsonV4, loadPhoto: (p: ExportedPhoto) => Blob): TripBundle {
   const tripId = json.trip.id;
   const entries = json.entries.map((e) => {
     const entry: Partial<ExportedEntry> = { ...e };
@@ -71,7 +71,7 @@ function toBundle(json: LogbookJsonV3, loadPhoto: (p: ExportedPhoto) => Blob): T
     else photos.push({ ...meta, blob: loadPhoto(p) });
   }
   return {
-    trip: json.trip, crew: json.crew, entries, photos, dayReports: json.dayReports,
+    trip: json.trip, boats: json.boats, crew: json.crew, entries, photos, dayReports: json.dayReports,
     tracks: json.tracks, trackChunks: json.trackChunks, missingPhotos,
   };
 }

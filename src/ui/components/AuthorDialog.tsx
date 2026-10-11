@@ -5,7 +5,7 @@ import { listCrew } from '../../db/repo';
 import { Dialog } from './Dialog';
 
 interface AuthorDialogProps {
-  trip: Pick<Trip, 'id' | 'boat'>;
+  trip: Pick<Trip, 'id' | 'name'>;
   onPick: (crewId: ID) => void;
   /** Ohne Auswahl fortfahren (Eintrag bleibt ohne Autor). */
   onSkip: () => void;
@@ -21,7 +21,7 @@ export function AuthorDialog({ trip, onPick, onSkip, onCancel }: AuthorDialogPro
   return (
     <Dialog title="Wer schreibt auf diesem Gerät?" onClose={onCancel}>
       <p className="muted">
-        Ich bin … – damit Einträge und Tagesbericht im Logbuch „{trip.boat.name}“ deinem Namen zugeordnet werden.
+        Ich bin … – damit Einträge und Tagesbericht im Törn „{trip.name}“ deinem Namen zugeordnet werden.
       </p>
       <ul className="choice-list">
         {crew.map((c) => (

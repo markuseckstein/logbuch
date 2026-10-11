@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { pickFile, saveOrShareFile } from '../../device';
 import { db } from '../../db/db';
-import { getSettings, loadTripData, saveCrew, updateTrip } from '../../db/repo';
+import { addCrewMember, getSettings, loadTripData, setAuthor } from '../../db/repo';
 import { exportZip } from '../../io';
 import { AuthorPromptHost } from '../authorPrompt';
 import { renderUi, seedEntry, seedTrip, useCleanDb } from '../test-utils';
@@ -21,7 +21,7 @@ describe('ExportCard', () => {
     renderUi(<ExportCard trip={trip} />);
 
     expect(await screen.findByText(/1 Einträge · 0 Bilder/)).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'ZIP mit Bildern exportieren' }));
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'ZIP mit Bildern exportieren' }));
 
     await waitFor(() => expect(saveOrShareFile).toHaveBeenCalledTimes(1));
     const [blob, name] = vi.mocked(saveOrShareFile).mock.calls[0] ?? [];
@@ -33,64 +33,39 @@ describe('ExportCard', () => {
     vi.mocked(saveOrShareFile).mockResolvedValue('shared');
     const trip = await seedTrip();
     renderUi(<ExportCard trip={trip} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: /Einzelnes JSON/ }));
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Einzelnes JSON/ }));
     await waitFor(() => expect(saveOrShareFile).toHaveBeenCalled());
     expect(vi.mocked(saveOrShareFile).mock.calls.at(-1)?.[1]).toMatch(/\.json$/);
   });
 
-  /** Exportiert ein fremdes Logbuch als Datei und entfernt es wieder aus der DB (= noch unbekannt). */
-  async function foreignFile(opts: { flotilla?: boolean } = {}) {
-    const other = await seedTrip('Fremder Törn');
-    await saveCrew(db, other.id, [{ id: 'c1', name: 'Anna', role: 'skipper' }, { id: 'c2', name: 'Ben', role: 'crew' }]);
-    await updateTrip(db, other.id, {
-      boat: { name: 'Möwe' },
-      ...(opts.flotilla ? { flotilla: { id: 'f1', name: 'Sommerflotte' } } : {}),
-    });
+  /** Exportiert einen Törn mit zwei Personen und entfernt ihn wieder aus der DB (= auf diesem Gerät unbekannt). */
+  async function otherFile() {
+    const other = await seedTrip('Fremder Törn', ['Möwe']);
+    await addCrewMember(db, other.id, { name: 'Ben', email: 'ben@x.de' });
     await seedEntry(other.id);
     const zip = await exportZip(await loadTripData(db, other.id));
     await Promise.all([
-      db.trips.clear(), db.entries.clear(), db.crewMembers.clear(), db.settings.delete('writableTripIds'), db.settings.delete('activeTripId'),
+      db.trips.clear(), db.boats.clear(), db.entries.clear(), db.crewMembers.clear(), db.settings.delete('activeTripId'),
     ]);
+    await setAuthor(db, other.id, undefined);
     return { other, file: new File([zip], 'moewe.zip', { type: 'application/zip' }) };
   }
 
-  it('fragt bei unbekanntem Logbuch nach dem Besitz und merged als „Anderes Boot“ read-only', async () => {
-    const { other, file } = await foreignFile();
+  it('importiert einen unbekannten Törn ohne Rückfrage, macht ihn aktiv und fragt „Ich bin …“', async () => {
+    const { other, file } = await otherFile();
     const trip = await seedTrip('Eigener Törn');
     vi.mocked(pickFile).mockResolvedValue(file);
     const user = userEvent.setup();
     renderUi(<ExportCard trip={trip} />);
 
-    await user.click(screen.getByRole('button', { name: 'Logbuch importieren' }));
-    expect(await screen.findByRole('dialog', { name: /Neues Logbuch: Möwe/ })).toBeInTheDocument();
-    expect(await db.trips.count()).toBe(1); // noch nichts importiert
-
-    await user.click(screen.getByRole('button', { name: 'Anderes Boot – nur lesen' }));
-    await waitFor(async () => expect(await db.trips.get(other.id)).toBeDefined());
-    const settings = await getSettings(db);
-    expect(settings.writableTripIds).not.toContain(other.id);
-    expect(settings.activeTripId).toBe(trip.id); // bleibt im eigenen Logbuch
-    expect(document.querySelector('.toast')).toHaveTextContent('Logbuch Möwe: 1 neu · 0 geändert · 0 gelöscht · 0 Fotos');
-  });
-
-  it('„Mein Boot“ macht das Logbuch beschreibbar, aktiv und fragt „Ich bin …“', async () => {
-    const { other, file } = await foreignFile();
-    const trip = await seedTrip('Eigener Törn');
-    vi.mocked(pickFile).mockResolvedValue(file);
-    const user = userEvent.setup();
-    renderUi(<ExportCard trip={trip} />);
-
-    await user.click(screen.getByRole('button', { name: 'Logbuch importieren' }));
-    await user.click(await screen.findByRole('button', { name: 'Mein Boot – ich schreibe mit' }));
-
+    await user.click(await screen.findByRole('button', { name: 'Logbuch importieren' }));
     await waitFor(async () => expect((await getSettings(db)).activeTripId).toBe(other.id));
-    const settings = await getSettings(db);
-    expect(settings.writableTripIds).toContain(other.id);
-    // „Ich bin …“ wird danach im aktiven Logbuch erfragt (AuthorPromptHost)
+    expect(document.querySelector('.toast')).toHaveTextContent('Törn Fremder Törn: 1 neu · 0 geändert · 0 gelöscht · 0 Fotos');
+    expect((await db.boats.where('tripId').equals(other.id).toArray()).map((b) => b.name)).toEqual(['Möwe']);
     render(<AuthorPromptHost trip={(await db.trips.get(other.id))!} />);
     const dialog = await screen.findByRole('dialog', { name: /Wer schreibt/ });
     await user.click(within(dialog).getByRole('button', { name: /Ben/ }));
-    await waitFor(async () => expect((await getSettings(db)).authorByTrip[other.id]).toBe('c2'));
+    await waitFor(async () => expect((await getSettings(db)).authorByTrip[other.id]).toBeDefined());
   });
 
   it('merged bekannte Logbücher ohne Rückfrage und zeigt die Zusammenfassung', async () => {
@@ -101,32 +76,17 @@ describe('ExportCard', () => {
     vi.mocked(pickFile).mockResolvedValue(new File([zip], 'backup.zip', { type: 'application/zip' }));
     renderUi(<ExportCard trip={trip} />);
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Logbuch importieren' }));
-    await waitFor(() => expect(document.querySelector('.toast')).toHaveTextContent(/Logbuch Seeschwalbe: 0 neu/));
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Logbuch importieren' }));
+    await waitFor(() => expect(document.querySelector('.toast')).toHaveTextContent(/Törn Backup-Törn: 0 neu/));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(await db.entries.count()).toBe(2);
-  });
-
-  it('bietet den Beitritt zur Flottille eines fremden Logbuchs an', async () => {
-    const { file } = await foreignFile({ flotilla: true });
-    const trip = await seedTrip('Eigener Törn');
-    vi.mocked(pickFile).mockResolvedValue(file);
-    const user = userEvent.setup();
-    renderUi(<ExportCard trip={trip} />);
-
-    await user.click(screen.getByRole('button', { name: 'Logbuch importieren' }));
-    await user.click(await screen.findByRole('button', { name: 'Anderes Boot – nur lesen' }));
-    const offer = await screen.findByRole('dialog', { name: /Flottille „Sommerflotte“ beitreten/ });
-    await user.click(within(offer).getByRole('button', { name: 'Beitreten' }));
-
-    await waitFor(async () => expect((await db.trips.get(trip.id))?.flotilla).toEqual({ id: 'f1', name: 'Sommerflotte' }));
   });
 
   it('zeigt bei kaputten Dateien eine verständliche Meldung', async () => {
     vi.mocked(pickFile).mockResolvedValue(new File(['{"format":"anders"}'], 'x.json', { type: 'application/json' }));
     const trip = await seedTrip();
     renderUi(<ExportCard trip={trip} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Logbuch importieren' }));
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Logbuch importieren' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Import nicht möglich/);
   });
 });

@@ -245,3 +245,115 @@ fieldset.ro>*+*{margin-top:12px}
 .members li .who{flex:1;min-width:0;overflow-wrap:anywhere}
 .invite-banner{flex-wrap:wrap}
 .invite-banner .actions{display:flex;gap:8px;margin-left:auto}
+
+/* Törn-Modell v2 (Prototyp D „Boot-Schalter“): Bootsfarben + Symbolformen */
+.bsh{display:inline-block;width:12px;height:12px;flex:none;background:var(--c);vertical-align:middle}
+.bsh.s1{border-radius:50%}.bsh.s2{border-radius:2px}
+.bsh.s3{clip-path:polygon(50% 0,100% 90%,0 90%)}
+.bsh.s4{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.bb{display:inline-flex;align-items:center;gap:6px;max-width:100%;font:600 12px var(--font-mono);letter-spacing:.02em;border:1.5px solid var(--c);border-radius:4px;padding:1px 7px 1px 6px;background:var(--surface);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who{font:500 13px var(--font-mono);color:var(--ink-2)}
+.who.me{color:var(--ink);font-weight:600}
+.meta-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:3px}
+.tl li[style] .tl-dot{border-color:var(--c);color:var(--c);border-width:2px}
+.chip .bsh{box-shadow:0 0 0 1.5px var(--surface)}
+.chip[aria-checked="true"] .bsh,.chip[aria-pressed="true"] .bsh{box-shadow:0 0 0 1.5px var(--bg)}
+/* Boot-Schalter im Header */
+.topbar.with-seg{flex-wrap:wrap}
+.topbar .seg{flex:1 1 100%}
+.seg{display:grid;border:1.5px solid var(--ink);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{min-height:46px;padding:4px;display:flex;align-items:center;justify-content:center;gap:6px;font:600 14px var(--font-sans);min-width:0}
+.seg button+button{border-left:1.5px solid var(--ink)}
+.seg button .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg .bsh{box-shadow:0 0 0 1.5px var(--surface)}
+.seg button[aria-checked="true"] .bsh{box-shadow:0 0 0 1.5px var(--bg)}
+.fix .bsh{width:14px;height:14px;box-shadow:0 0 0 2px var(--on-magenta)}
+.fix .lbl{min-width:0}
+.fix .lbl>span{display:block;overflow-wrap:anywhere}
+/* Hinweise im Sheet */
+.note{border:1.5px solid var(--ink-2);border-left-width:6px;border-radius:6px;padding:10px 12px;background:var(--surface);font-size:15px}
+.note b{display:block}
+.note.ok{border-color:var(--ok)}
+/* Tagesbericht-Abschnitte */
+.rep{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px}
+.rep+.rep{margin-top:12px}
+.rep-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rep-h b{font-size:18px}
+.rep-h .num{margin-left:auto;font-size:14px;color:var(--ink-2)}
+.rep p{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.rep.mine{border-color:var(--ink);border-width:1.5px}
+.rep.new{border-style:dashed;border-color:var(--ink-2)}
+.rep-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.rep>*+label,.rep>label+label{margin-top:10px}
+.btn.sm{min-height:44px;padding:6px 12px;font-size:15px}
+.dtbl{width:100%;border-collapse:collapse}
+.dtbl td{padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
+.dtbl td:last-child{text-align:right;font:500 14px var(--font-mono)}
+.dtbl tr:last-child td{border-bottom:0}
+/* Kartenlegende */
+.mleg{list-style:none;margin:0;padding:0}
+.mleg li+li{border-top:1px solid var(--line)}
+.mleg button{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;text-align:left;padding:6px 0}
+.mleg .bsh{width:16px;height:16px}
+.mleg .ml-t{flex:1;min-width:0}
+.mleg .ml-t b{display:block}
+.mleg .ml-t span{font:400 13px var(--font-mono);color:var(--ink-2)}
+.mleg button[aria-pressed="false"] .ml-t,.mleg button[aria-pressed="false"] .bsh{opacity:.4}
+.mleg .sw{flex:none;font:600 12px var(--font-mono);color:var(--ink-2)}
+.boat-mk{background:none;border:0}
+.boat-mk svg{display:block;overflow:visible}
+/* Boote + Personen */
+.bcard{border-left:6px solid var(--c)}
+.bc-head{display:flex;align-items:center;gap:10px}
+.bc-head>div{flex:1;min-width:0}
+.bc-head h3{font-size:18px;overflow-wrap:anywhere}
+.people{display:flex;flex-wrap:wrap;gap:6px}
+.pchip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:2px 10px 2px 4px;border:1px solid var(--ink-2);border-radius:18px;background:var(--surface);font-size:15px}
+.pchip.inv{border-style:dashed;color:var(--ink-2)}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+.av{flex:none;width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:1.5px solid var(--ink-2);display:inline-flex;align-items:center;justify-content:center;font:600 14px var(--font-mono);font-style:normal}
+.av.sm{width:26px;height:26px;font-size:12px}
+.st{font:600 12px var(--font-mono);letter-spacing:.04em;border-radius:3px;padding:2px 7px;white-space:nowrap}
+.st.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok)}
+.st.warn{background:var(--warn-bg);color:var(--warn);border:1px dashed var(--warn)}
+.st.bad{color:var(--danger);border:1px solid var(--danger)}
+.people-list{list-style:none;margin:0;padding:0}
+.mem{padding:12px 0;border-bottom:1px solid var(--line)}
+.mem:last-child{border-bottom:0}
+.mem-top{display:flex;align-items:center;gap:10px}
+.mem-main{flex:1;min-width:0}
+.mem-main b{margin-right:6px}
+.mem-main .muted{font-size:14px;overflow-wrap:anywhere}
+.mem-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+.mem-acts select{width:auto;min-height:44px;flex:1 1 150px}
+.mem .confirm{margin-top:10px}
+.lockcard{border:1.5px dashed var(--ink-2);border-radius:6px;padding:14px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
+.lockcard .row{display:flex;gap:10px;align-items:flex-start}
+.acct{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.acct>div{flex:1;min-width:150px}
+.itemlist{list-style:none;margin:0;padding:0}
+.itemlist li{display:flex;align-items:center;gap:10px;min-height:52px;border-bottom:1px solid var(--line)}
+.itemlist li>div{flex:1;min-width:0;overflow-wrap:anywhere}
+.thumb-s{width:44px;height:36px;border:1px solid var(--ink);border-radius:2px;overflow:hidden;flex:none;background:var(--water-mid);display:flex;align-items:center;justify-content:center;color:var(--ink-2)}
+.thumb-s svg,.thumb-s img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb-s .ico{width:20px;height:20px}
+input[type=email]{width:100%;min-height:48px;padding:10px 12px;border:1px solid var(--ink-2);border-radius:6px;background:var(--surface);color:var(--ink)}
+.empty{padding:16px;border:1px dashed var(--ink-2);border-radius:6px;text-align:center;color:var(--ink-2)}
+/* Cover-Bild */
+.hero{position:relative;aspect-ratio:16/9;border:1px solid var(--ink);border-radius:4px;overflow:hidden;background:var(--water-mid)}
+.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.hero .hero-t{position:absolute;left:0;right:0;bottom:0;padding:32px 14px 12px;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff}
+.hero .hero-t h2{font-size:24px;overflow-wrap:anywhere}
+.hero .hero-t div{font:500 13px var(--font-mono);opacity:.92}
+.hero.empty-cover{aspect-ratio:auto;min-height:0;border-style:dashed;background:var(--surface);padding:14px}
+.hero.empty-cover .hero-t{position:static;background:none;color:var(--ink);padding:0}
+.cover-frame{position:relative;display:inline-block;max-width:100%;cursor:crosshair;touch-action:none}
+.cover-frame img{display:block;max-width:100%;max-height:60vh}
+.cover-frame .frame{position:absolute;border:2px solid #fff;box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none}
+.cover-frame .dot{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--magenta);border:2px solid #fff;pointer-events:none}
+.triplist .thumb-s{width:56px;height:40px}
+legend em.req{font-style:normal;color:var(--magenta);letter-spacing:.04em;margin-left:6px}
+.leaflet-tooltip.boat-label{background:var(--surface);border:1.5px solid currentColor;font:700 12px var(--font-sans);box-shadow:none;padding:1px 6px}
+.leaflet-tooltip.boat-label.b1{color:var(--b1)}.leaflet-tooltip.boat-label.b2{color:var(--b2)}.leaflet-tooltip.boat-label.b3{color:var(--b3)}.leaflet-tooltip.boat-label.b4{color:var(--b4)}
+.leaflet-tooltip-top.boat-label::before{border-top-color:currentColor}

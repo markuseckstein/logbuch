@@ -12,7 +12,7 @@ import { canWriteTrip } from './repo';
  */
 
 /** App-Tabellen, deren Datensätze gerettet werden (Zugriffstabellen wie members/realms nicht). */
-const RESCUE_TABLES = new Set(['trips', 'crewMembers', 'entries', 'photos', 'dayReports', 'tracks', 'trackChunks']);
+const RESCUE_TABLES = new Set(['trips', 'boats', 'crewMembers', 'entries', 'photos', 'dayReports', 'tracks', 'trackChunks']);
 const STORE_KEY = 'syncRescue';
 /** Automatische Wiederholungen; danach nur noch per „Erneut senden“. */
 export const MAX_AUTO_ATTEMPTS = 3;

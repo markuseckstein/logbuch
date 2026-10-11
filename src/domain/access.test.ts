@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { canManageRealm, canWriteRealm, isSharedRealm, realmPermissions, tiedRealmId, tripIdOfRealm } from './access';
+import {
+  MEMBER_PERMISSIONS, canEditRecord, canManageRealm, canWriteRealm, isSharedRealm, realmPermissions, tiedRealmId,
+  tripIdOfRealm,
+} from './access';
 
 const roles = {
-  skipper: { permissions: { manage: '*' as const } },
-  crew: {
-    permissions: {
-      add: ['crewMembers', 'entries', 'photos', 'dayReports', 'tracks', 'trackChunks'],
-      update: { trips: '*' as const, entries: '*' as const },
-    },
-  },
+  admin: { permissions: { manage: '*' as const } },
+  member: { permissions: MEMBER_PERMISSIONS },
   readonly: { permissions: {} },
 };
 
@@ -33,17 +31,17 @@ describe('realmPermissions', () => {
     expect(canManageRealm(p)).toBe(true);
     expect(canWriteRealm(p)).toBe(true);
   });
-  it('crew role can write entries but not manage', () => {
+  it('member role can add entries but not manage', () => {
     const p = realmPermissions({
       realm, userId: 'bob', globalRoles: roles,
-      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['crew'], accepted: 1 }],
+      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['member'], accepted: 1 }],
     });
     expect(canWriteRealm(p)).toBe(true);
     expect(canManageRealm(p)).toBe(false);
   });
   it('only accepted memberships count (server rejects writes before the acceptance arrived)', () => {
     const input = (m: object) => realmPermissions({
-      realm, userId: 'bob', globalRoles: roles, selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['crew'], ...m }],
+      realm, userId: 'bob', globalRoles: roles, selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['member'], ...m }],
     });
     expect(canWriteRealm(input({ accepted: undefined }))).toBe(false);
     expect(canWriteRealm(input({ accepted: new Date(), rejected: new Date() }))).toBe(false);
@@ -52,7 +50,7 @@ describe('realmPermissions', () => {
   it('membership rights apply only once the server confirmed the realm (listed in the synced realm set)', () => {
     const input = (confirmedRealms: readonly string[] | undefined) => realmPermissions({
       realm, userId: 'bob', globalRoles: roles, confirmedRealms,
-      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['crew'], accepted: 1 }],
+      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['member'], accepted: 1 }],
     });
     expect(canWriteRealm(input(['rlm-public', 'bob']))).toBe(false);
     expect(canWriteRealm(input(['rlm-public', 'bob', 'rlm~t']))).toBe(true);
@@ -73,14 +71,14 @@ describe('realmPermissions', () => {
   it('memberships of other realms do not count', () => {
     const p = realmPermissions({
       realm, userId: 'bob', globalRoles: roles,
-      selfMembers: [{ realmId: 'rlm~other', userId: 'bob', roles: ['skipper'] }],
+      selfMembers: [{ realmId: 'rlm~other', userId: 'bob', roles: ['admin'] }],
     });
     expect(canWriteRealm(p)).toBe(false);
   });
   it('without a known realm there are no permissions', () => {
     const p = realmPermissions({
       realm: undefined, userId: 'bob', globalRoles: roles,
-      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['crew'] }],
+      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['member'] }],
     });
     expect(canWriteRealm(p)).toBe(false);
   });
@@ -95,5 +93,33 @@ describe('realmPermissions', () => {
     expect(canWriteRealm({ add: '*' })).toBe(true);
     expect(canWriteRealm({ manage: ['entries'] })).toBe(true);
     expect(canWriteRealm({ update: '*' })).toBe(false);
+  });
+});
+
+describe('MEMBER_PERMISSIONS (Törn-Modell v2)', () => {
+  it('members only add: own records are theirs (owner rule), no update of foreign ones, no crew/boats/trips', () => {
+    expect(MEMBER_PERMISSIONS).toEqual({ add: ['entries', 'photos', 'dayReports', 'tracks', 'trackChunks'] });
+    expect(canWriteRealm(MEMBER_PERMISSIONS)).toBe(true);
+    expect(canManageRealm(MEMBER_PERMISSIONS)).toBe(false);
+  });
+});
+
+describe('canEditRecord', () => {
+  it('local mode (nobody signed in): everything is editable', () => {
+    expect(canEditRecord({ owner: 'alice' }, { admin: false })).toBe(true);
+    expect(canEditRecord({}, { admin: false })).toBe(true);
+  });
+  it('the admin may edit every record', () => {
+    expect(canEditRecord({ owner: 'bob' }, { userId: 'alice', admin: true })).toBe(true);
+  });
+  it('members edit only their own records', () => {
+    const me = { userId: 'bob', admin: false };
+    expect(canEditRecord({ owner: 'bob' }, me)).toBe(true);
+    expect(canEditRecord({ owner: 'alice' }, me)).toBe(false);
+  });
+  it('records created before the login (not yet synced) belong to this device', () => {
+    const me = { userId: 'bob', admin: false };
+    expect(canEditRecord({}, me)).toBe(true);
+    expect(canEditRecord({ owner: 'unauthorized' }, me)).toBe(true);
   });
 });

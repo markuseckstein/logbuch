@@ -1,16 +1,6 @@
 export type ID = string; // crypto.randomUUID()
 
-export interface Boat {
-  name: string;
-  model?: string;
-  lengthM?: number;
-  homePort?: string;
-  callSign?: string;
-  mmsi?: string;
-  photoId?: ID;
-}
-
-/** Felder, nach denen Datensaetze gemergt werden (Flottille, siehe docs/flotilla.md). */
+/** Felder, nach denen Datensaetze gemergt werden (Datei-Import, siehe docs/toern-modell.md). */
 export interface Versioned {
   updatedAt: number;
   updatedBy: string; // deviceId des letzten Schreibers
@@ -19,7 +9,7 @@ export interface Versioned {
 
 /**
  * Von Dexie Cloud verwaltete Felder (siehe docs/research/dexie-cloud-integration.md).
- * `realmId` = Realm des Boot-Logbuchs (`rlm~<tripId>`) bzw. privater Realm; `owner` = Nutzer-ID des Erstellers.
+ * `realmId` = Realm des Törns (`rlm~<tripId>`) bzw. privater Realm; `owner` = Nutzer-ID des Erstellers.
  * Lokal ohne Cloud fehlen sie. Nie exportiert (nutzerspezifisch).
  */
 export interface CloudFields {
@@ -29,36 +19,53 @@ export interface CloudFields {
 
 export type CrewRole = 'skipper' | 'co-skipper' | 'crew';
 
-/** Crew-Mitglied als eigener Datensatz (Tabelle crewMembers), damit parallele Aenderungen nicht kollidieren. */
+/** Farbe + Symbolform eines Boots auf Karte/Timeline (1 Kreis, 2 Quadrat, 3 Dreieck, 4 Raute). */
+export type BoatColorIndex = 1 | 2 | 3 | 4;
+
+/** Boot eines Törns (Tabelle boats). Ein Törn hat 1..n Boote. */
+export interface Boat extends Versioned, CloudFields {
+  id: ID;
+  tripId: ID;
+  name: string;
+  model?: string;
+  lengthM?: number;
+  homePort?: string;
+  callSign?: string;
+  mmsi?: string;
+  photoId?: ID;
+  colorIndex: number; // 1..4 (BoatColorIndex), bei mehr als vier Booten wiederholt
+  createdAt: number;
+}
+
+/**
+ * Person des Törns (Tabelle crewMembers). Im Cloud-Modus legt der Admin sie beim Einladen an (`email`); die
+ * Person mit der E-Mail des angemeldeten Nutzers ist der Autor. `suggestedBoatId` ist nur ein Vorschlag.
+ */
 export interface CrewMember extends Versioned, CloudFields {
   id: ID;
   tripId: ID;
   name: string;
   role?: CrewRole;
-  email?: string; // verknuepft Cloud-Konto und „Ich bin …“
+  email?: string; // Konto der Person (Einladung, Autor im Cloud-Modus)
+  suggestedBoatId?: ID; // Boot-Vorschlag fuer den ersten Eintrag, keine Berechtigung
   createdAt: number;
 }
 
-/** Eingabe fuer Crew-Listen (Onboarding, Crew-Editor). */
-export interface CrewDraft {
-  id: ID;
-  name: string;
-  role?: CrewRole;
+/** Fokuspunkt des Cover-Bilds in Prozent (CSS object-position), je 0..100. */
+export interface CoverFocus {
+  x: number;
+  y: number;
 }
 
-export interface Flotilla {
-  id: ID;
-  name: string;
-}
-
+/** Ein Törn = ein Dexie-Cloud-Realm (`rlm~<id>`), enthält die Boote (Tabelle boats). */
 export interface Trip extends CloudFields {
   id: ID;
   name: string;
   startDate?: string; // YYYY-MM-DD
   endDate?: string;
   area?: string;
-  boat: Boat;
-  flotilla?: Flotilla;
+  coverPhotoId?: ID; // Cover-Bild (Foto in photos, im Törn-Realm geteilt)
+  coverFocus?: CoverFocus; // Bildausschnitt des Covers
   createdAt: number;
   updatedAt: number;
   updatedBy: string;
@@ -87,6 +94,7 @@ export interface Position {
 export interface LogEntry extends CloudFields {
   id: ID;
   tripId: ID;
+  boatId: ID;
   time: number; // epoch ms
   tzOffsetMin: number; // lokaler UTC-Offset zum Erfassungszeitpunkt (z. B. 120) -> Tageszuordnung
   position?: Position; // fehlt, wenn kein Fix
@@ -141,6 +149,7 @@ export interface TrackPoint {
 export interface TrackRecord extends CloudFields {
   id: ID;
   tripId: ID;
+  boatId: ID;
   name: string;
   source: 'gpx' | 'live';
   createdAt: number;
@@ -170,9 +179,13 @@ export interface Settings {
   activeTripId?: ID;
   theme: 'system' | 'light' | 'dark';
   deviceId: string; // lokal, einmalig erzeugt, nie exportiert (Kopie in localStorage, ueberlebt Logout)
-  writableTripIds: ID[]; // lokal eigene Logbuecher; in der Cloud geteilte Trips: Server-Rechte massgeblich
-  authorByTrip: Record<ID, ID>; // "Ich bin ..." je Trip (Crew-Mitglied-ID)
+  authorByTrip: Record<ID, ID>; // "Ich bin ..." je Trip (Crew-Mitglied-ID), lokaler Modus
+  boatSelectionByTrip: Record<ID, BoatSelection>; // Boot-Schalter je Trip
+  lastBoatByTrip: Record<ID, ID>; // zuletzt fuer einen Eintrag gewaehltes Boot (Vorschlag bei „Alle“)
 }
+
+/** Stellung des Boot-Schalters: ein Boot oder alle. */
+export type BoatSelection = ID | 'all';
 
 /** Foto-Metadaten ohne Bilddaten (Export "ohne Fotos"). */
 export type PhotoMeta = Omit<Photo, 'blob'>;
@@ -180,6 +193,7 @@ export type PhotoMeta = Omit<Photo, 'blob'>;
 /** All data of one trip – unit of export/import and bulk persistence. */
 export interface TripBundle {
   trip: Trip;
+  boats: Boat[];
   crew: CrewMember[];
   entries: LogEntry[];
   photos: Photo[];

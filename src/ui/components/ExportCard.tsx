@@ -64,7 +64,7 @@ export function ExportCard({ trip }: { trip: Trip }) {
       <button className="btn block" type="button" disabled={busy} onClick={() => void run('json')}>
         Einzelnes JSON (Bilder eingebettet)
       </button>
-      <ImportLogbook trip={trip} />
+      <ImportLogbook />
       {error ? (
         <div className="err" role="alert">
           {error}

@@ -1,14 +1,15 @@
 import type { FixError } from '../device';
-import { ReadOnlyTripError } from '../db/repo';
-import { slugify } from '../io';
+import { NotPermittedError } from '../db/repo';
 import {
   ENTRY_TYPE_LABELS,
   dayNumber,
   dayRoute,
   dayStats,
+  type ID,
   groupEntriesByDay,
   localDate,
   tripDays,
+  type Boat,
   type CrewMember,
   type DayReport,
   type DayStats,
@@ -106,8 +107,12 @@ export function buildDays(
   entries: readonly LogEntry[],
   reports: readonly DayReport[],
   grouping: TrackGrouping,
+  /** Feste Tagesliste (alle Boote), damit Tagnummern beim Boot-Schalter gleich bleiben. */
+  fixedDates?: readonly string[],
 ): DayInfo[] {
-  const dates = [...new Set([...tripDays(trip, entries, reports), ...Object.keys(grouping.byDate)])].sort();
+  const dates = fixedDates
+    ? [...fixedDates]
+    : [...new Set([...tripDays(trip, entries, reports), ...Object.keys(grouping.byDate)])].sort();
   const groups = new Map(groupEntriesByDay(entries).map((g) => [g.date, g.entries]));
   return dates.map((date) => {
     const es = groups.get(date) ?? [];
@@ -141,9 +146,9 @@ export function initials(name: string): string {
   return letters.map((p) => (p ? Array.from(p)[0] ?? '' : '')).join('').toUpperCase();
 }
 
-/** Meldung für fehlgeschlagene Schreibzugriffe (fremdes Logbuch vs. sonstiger Fehler). */
+/** Meldung für fehlgeschlagene Schreibzugriffe (keine Berechtigung vs. sonstiger Fehler). */
 export function writeErrorMessage(e: unknown, fallback: string): string {
-  return e instanceof ReadOnlyTripError ? 'Dieses Logbuch ist nur lesbar.' : fallback;
+  return e instanceof NotPermittedError ? 'Dafür fehlt dir die Berechtigung in diesem Törn.' : fallback;
 }
 
 /** Fotos eines Tages über alle Abschnitte. */
@@ -151,9 +156,58 @@ export function sectionPhotoIds(sections: readonly DayReport[]): string[] {
   return sections.flatMap((s) => s.photoIds);
 }
 
-/** Dateiname zum Teilen: logbuch-<boot>-<datum>[-ohne-fotos].zip */
-export function shareFileName(trip: Pick<Trip, 'name' | 'boat'>, date: Date, includePhotos: boolean): string {
-  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  const slug = slugify(trip.boat.name) || slugify(trip.name) || 'boot';
-  return `logbuch-${slug}-${day}${includePhotos ? '' : '-ohne-fotos'}.zip`;
+// ---------- Boote auf der Karte ----------
+
+export interface BoatMapLayer {
+  id: string;
+  colorIndex: number;
+  label?: string;
+  routes: { id: string; points: LatLon[] }[];
+  entries: LogEntry[];
+  /** Strecke (sm) der gezeigten Tage. */
+  distanceNm: number;
+}
+
+/**
+ * Kartenebenen je Boot: Route je Tag (Track, sonst Eintragspositionen) und Einträge der gewählten Tage
+ * (`dates` undefined = alle Tage, dann auch Tracks ohne Zeit).
+ */
+export function boatLayers(
+  trip: Trip,
+  boats: readonly Boat[],
+  entries: readonly LogEntry[],
+  tracks: readonly Track[],
+  opts: { dates?: readonly string[] | undefined; labels?: boolean } = {},
+): BoatMapLayer[] {
+  const tz = currentTzOffsetMin();
+  return boats.map((b) => {
+    const es = entries.filter((e) => e.boatId === b.id);
+    const grouping = groupTrackPoints(tracks.filter((t) => t.boatId === b.id), tz);
+    const days = buildDays(trip, es, [], grouping).filter((d) => !opts.dates || opts.dates.includes(d.date));
+    const routes = days.map((d) => ({ id: `${b.id}:${d.date}`, points: d.route }));
+    if (!opts.dates) grouping.untimed.forEach((points, i) => routes.push({ id: `${b.id}:untimed-${i}`, points }));
+    return {
+      id: b.id, colorIndex: b.colorIndex, ...(opts.labels ? { label: b.name } : {}), routes,
+      entries: days.flatMap((d) => d.entries), distanceNm: days.reduce((a, d) => a + d.stats.distanceNm, 0),
+    };
+  });
+}
+
+/**
+ * Statistik eines Tages für die gezeigten Boote: ein Boot → Tageswerte; mehrere → Summe der Strecken je Boot
+ * (keine Route quer über Boote), Einträge und Zahl der Schreibenden.
+ */
+export function selectionDayStats(
+  entries: readonly LogEntry[],
+  trackByBoat: (boatId: ID) => readonly TrackPoint[] | undefined,
+  boatIds: readonly ID[],
+): { stats: DayStats; writers?: number } {
+  if (boatIds.length === 1) {
+    const id = boatIds[0]!;
+    return { stats: dayStats(entries.filter((e) => e.boatId === id), trackByBoat(id)) };
+  }
+  let distanceNm = 0;
+  for (const id of boatIds) distanceNm += dayStats(entries.filter((e) => e.boatId === id), trackByBoat(id)).distanceNm;
+  const writers = new Set(entries.flatMap((e) => (e.authorId ? [e.authorId] : []))).size;
+  return { stats: { distanceNm, underwayMin: 0, entryCount: entries.length }, writers };
 }

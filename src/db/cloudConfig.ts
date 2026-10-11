@@ -1,7 +1,7 @@
 import type Dexie from 'dexie';
 import type { DexieCloudOptions } from 'dexie-cloud-addon';
 
-/** Tables that never leave the device (deviceId, writableTripIds, authorByTrip, theme, activeTripId). */
+/** Tables that never leave the device (deviceId, authorByTrip, boat selection, theme, activeTripId). */
 export const UNSYNCED_TABLES = ['settings'];
 
 export function cloudOptions(databaseUrl: string): DexieCloudOptions {

@@ -52,15 +52,9 @@ export function alertText(a: DXCAlert): string {
   }
 }
 
-export function roleLabel(roles: readonly string[]): string {
-  if (roles.includes('skipper')) return 'Skipper';
-  if (roles.includes('crew')) return 'Crew (schreibt mit)';
-  if (roles.includes('readonly')) return 'Anderes Boot (nur lesen)';
-  return 'Mitglied';
-}
-
 const KIND: Record<string, [string, string]> = {
   entries: ['Eintrag', 'Einträge'],
+  boats: ['Boot', 'Boote'],
   photos: ['Foto', 'Fotos'],
   dayReports: ['Tagesbericht', 'Tagesberichte'],
   crewMembers: ['Crew-Mitglied', 'Crew-Mitglieder'],

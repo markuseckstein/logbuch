@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import dexieCloud from 'dexie-cloud-addon';
-import type { CrewMember, DayReport, LogEntry, Photo, TrackChunk, TrackRecord, Trip } from '../domain/types';
+import type { Boat, CrewMember, DayReport, LogEntry, Photo, TrackChunk, TrackRecord, Trip } from '../domain/types';
 import { configureCloud } from './cloudConfig';
 
 export interface SettingRow {
@@ -9,11 +9,10 @@ export interface SettingRow {
 }
 
 /**
- * Default database name. Schema "v4" (Dexie Cloud, Stufe 2) starts a fresh database: crew and track points
- * live in their own tables, day reports have a string id. No migration from `logbook`/`logbook-v3`
- * (no real data existed); `legacy.ts` removes them.
+ * Default database name. Schema "v5" (Törn-Modell v2: one trip = one realm with several boats) starts a fresh
+ * database. No migration from earlier schemas (no real data existed); `legacy.ts` removes them.
  */
-export const DEFAULT_DB_NAME = 'logbook-v4';
+export const DEFAULT_DB_NAME = 'logbook-v5';
 
 /** localStorage copy of the device id: a cloud logout clears every table, the device id must survive. */
 export const DEVICE_ID_STORAGE_KEY = 'logbuch.deviceId';
@@ -32,6 +31,7 @@ export interface DbOptions {
 /** Synced tables (Dexie Cloud); `settings` stays local (unsyncedTables). */
 const STORES = {
   trips: 'id',
+  boats: 'id, tripId',
   crewMembers: 'id, tripId',
   entries: 'id, tripId, [tripId+time]',
   photos: 'id, tripId, hash',
@@ -43,7 +43,7 @@ const STORES = {
 
 /**
  * Access-control tables as plain local tables when the cloud addon is not active (same key paths as the
- * addon's own schema). They stay empty in local mode, so permission checks fall back to `writableTripIds`;
+ * addon's own schema). They stay empty in local mode (everything allowed);
  * tests fill them to exercise the cloud permission rules without a server.
  */
 const LOCAL_ACCESS_STORES = {
@@ -70,6 +70,7 @@ export function rememberDeviceId(id: string): void {
 
 export class LogbookDB extends Dexie {
   trips!: EntityTable<Trip, 'id'>;
+  boats!: EntityTable<Boat, 'id'>;
   crewMembers!: EntityTable<CrewMember, 'id'>;
   entries!: EntityTable<LogEntry, 'id'>;
   photos!: EntityTable<Photo, 'id'>;
