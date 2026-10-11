@@ -24,7 +24,7 @@ Ziel: Mehrere Handys pro Boot führen dasselbe Logbuch, Boote sehen sich gegense
 - Fotos: fehlende IDs einfügen; Foto mit gleicher `hash` aber anderer ID am selben Tag → ID in `photoIds` auf vorhandenes Foto umschreiben (Dedup).
 - Fehlende Foto-Blobs (Export „ohne Fotos“) → Referenz behalten, UI zeigt Platzhalter „Foto nicht übertragen“.
 - Ergebnis: Zusammenfassung `{ added, updated, deleted, photosAdded }` für Toast.
-- Es gibt nur Exportformat Version 2; ältere Dateien werden abgelehnt (keine Abwärtskompatibilität, es gab keine echten Altdaten).
+- Exportformat: seit Stufe 2 nur noch Version 3 (Crew und Track-Chunks als eigene Listen); ältere Dateien werden abgelehnt (keine Abwärtskompatibilität, es gab keine echten Altdaten).
 
 ## UI
 - Törn-Tab: „Ich bin …“ (Crew-Auswahl pro Gerät/Trip, Pflicht vor dem ersten Eintrag in einem geteilten Logbuch; bei Einzelnutzung automatisch Skipper bzw. erstes Crew-Mitglied).
@@ -43,3 +43,6 @@ Ziel: Mehrere Handys pro Boot führen dasselbe Logbuch, Boote sehen sich gegense
 - **Tracks** werden als ganzer Datensatz per LWW gemergt (parallele Live-Aufzeichnung auf zwei Geräten desselben Tracks würde Punkte verlieren; Live-Tracks haben je Gerät eigene IDs).
 - **Trip-Gleichstand** (gleiche Version): deterministisch per JSON-Vergleich, damit der Merge kommutativ bleibt.
 - Testumgebung: fake-indexeddb behält in jsdom keine Blob-Inhalte; Szenario-Tests (`io/merge.scenario.test.ts`) ersetzen sie vor dem Export.
+
+## Stufe 2 (Dexie Cloud) – Stand
+Automatischer Sync per Dexie Cloud, Datei-Austausch bleibt Fallback. Ein Realm je Boot-Logbuch (`rlm~<tripId>`), Rollen `skipper` (manage), `crew` (anlegen + ändern), `readonly` (andere Boote). Boote einer Flottille = Trips mit gleicher `trip.flotilla.id`, deren Realm man als Mitglied sieht. Ohne Login bzw. ohne `VITE_DEXIE_CLOUD_URL` ist die App voll lokal nutzbar. Schema-Änderungen gegenüber Stufe 1: Crew als Tabelle `crewMembers`, Track-Punkte in `trackChunks`, Tagesbericht mit String-`id`, Exportformat v3. Einrichtung: `docs/dexie-cloud-setup.md`; Details: `docs/architecture.md`.

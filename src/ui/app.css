@@ -235,3 +235,13 @@ fieldset.ro>*+*{margin-top:12px}
 .leaflet-tooltip.fleet-label{background:var(--surface);color:var(--fleet);border:1.5px solid var(--fleet);font:600 12px var(--font-mono);box-shadow:none}
 .leaflet-tooltip-top.fleet-label::before{border-top-color:var(--fleet)}
 .scrim.dlg{z-index:59}
+
+/* Cloud-Sync (Stufe 2) */
+.sync-ind{display:flex;align-items:center;color:var(--ink-2,inherit)}
+.sync-ind[data-status="error"]{color:var(--magenta)}
+.sync-ind[data-status="offline"]{opacity:.6}
+.members{list-style:none;margin:0;padding:0}
+.members li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:52px;border-bottom:1px solid var(--line);padding:6px 0}
+.members li .who{flex:1;min-width:0;overflow-wrap:anywhere}
+.invite-banner{flex-wrap:wrap}
+.invite-banner .actions{display:flex;gap:8px;margin-left:auto}

@@ -1,6 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { db } from '../db/db';
-import { setAuthor } from '../db/repo';
+import { chooseAuthor } from './cloud/identity';
 import type { ID, Trip } from '../domain';
 import { AuthorDialog } from './components/AuthorDialog';
 
@@ -35,7 +34,7 @@ export function AuthorPromptHost({ trip }: { trip: Trip }) {
   return (
     <AuthorDialog
       trip={trip}
-      onPick={(crewId) => void setAuthor(db, trip.id, crewId).then(done)}
+      onPick={(crewId) => void chooseAuthor(trip, crewId).then(done)}
       onSkip={done}
       onCancel={done}
     />

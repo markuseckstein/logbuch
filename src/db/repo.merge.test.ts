@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { LogbookDB } from './db';
 import {
   addPhotosToDayReport, addPhotosToEntry, addTrack, createEntry, createTrip, deleteEntry, getDayReport, getSettings,
-  getTrip, listDayReports, listEntries, listTracks, loadTripData, mergeBundle, setAuthor, updateEntry, updateTrip,
+  getTrip, listCrew, listDayReports, listEntries, listTracks, loadTripData, mergeBundle, saveCrew, setAuthor, updateEntry, updateTrip,
   upsertDayReport,
 } from './repo';
 import { dispose, freshDb } from './test-helpers';
@@ -85,10 +85,11 @@ describe('mergeBundle: known trip', () => {
   it('merges trip fields (newer wins) and crew per member, incl. flotilla', async () => {
     const trip = await seedA();
     await shareToB(trip.id);
-    await updateTrip(a, trip.id, { crew: [{ id: 'c1', name: 'Ann' }, { id: 'c2', name: 'Ben' }, { id: 'c3', name: 'Cem' }], flotilla: { id: 'f', name: 'Flotte' } });
+    await saveCrew(a, trip.id, [{ id: 'c1', name: 'Ann' }, { id: 'c2', name: 'Ben' }, { id: 'c3', name: 'Cem' }]);
+    await updateTrip(a, trip.id, { flotilla: { id: 'f', name: 'Flotte' } });
     await mergeBundle(b, await loadTripData(a, trip.id), { ownership: 'own' });
     const t = (await getTrip(b, trip.id))!;
-    expect(t.crew.map((c) => c.id)).toEqual(['c1', 'c2', 'c3']);
+    expect((await listCrew(b, trip.id)).map((c) => c.id)).toEqual(['c1', 'c2', 'c3']);
     expect(t.flotilla).toEqual({ id: 'f', name: 'Flotte' });
   });
   it('keeps both authors’ day report sections of the same day', async () => {

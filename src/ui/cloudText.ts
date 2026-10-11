@@ -1,0 +1,58 @@
+import type { DXCAlert } from 'dexie-cloud-addon';
+import type { CloudStatus } from '../db/cloud';
+
+/** Statuszeile im Abschnitt „Synchronisation“. */
+export function statusLabel(status: CloudStatus, lastSyncAt: number | undefined, now: number): string {
+  switch (status) {
+    case 'local':
+      return 'Nur auf diesem Gerät (keine Cloud eingerichtet)';
+    case 'signed-out':
+      return 'Nicht angemeldet – Daten nur auf diesem Gerät';
+    case 'syncing':
+      return 'Synchronisiert gerade …';
+    case 'offline':
+      return 'Offline – Änderungen werden später übertragen';
+    case 'error':
+      return 'Fehler beim Synchronisieren';
+    case 'in-sync': {
+      if (lastSyncAt === undefined) return 'Synchronisiert';
+      const min = Math.floor((now - lastSyncAt) / 60_000);
+      if (min < 1) return 'Synchronisiert – gerade eben';
+      if (min < 60) return `Synchronisiert vor ${min} min`;
+      return `Synchronisiert vor ${Math.floor(min / 60)} h`;
+    }
+  }
+}
+
+const resolve = (a: DXCAlert): string => a.message.replace(/\{(\w+)\}/g, (_, k: string) => a.messageParams[k] ?? '');
+
+/** Deutsche Texte für Hinweise des Dexie-Cloud-Logins (eigene Dialoge). */
+export function alertText(a: DXCAlert): string {
+  switch (a.messageCode) {
+    case 'OTP_SENT':
+      return `Wir haben dir einen Code an ${a.messageParams['email'] ?? 'deine E-Mail-Adresse'} geschickt.`;
+    case 'INVALID_OTP':
+      return 'Der Code stimmt nicht. Bitte erneut eingeben.';
+    case 'INVALID_EMAIL':
+      return 'Bitte eine gültige E-Mail-Adresse eingeben.';
+    case 'LICENSE_LIMIT_REACHED':
+    case 'NO_SEATS_AVAILABLE':
+      return 'Die Cloud hat keine freien Plätze mehr. Bitte den Skipper fragen.';
+    case 'USER_NOT_REGISTERED':
+    case 'USER_NOT_ACCEPTED':
+      return 'Diese E-Mail-Adresse ist für die Cloud nicht freigeschaltet.';
+    case 'USER_DEACTIVATED':
+      return 'Dieses Konto ist deaktiviert.';
+    case 'LOGOUT_CONFIRMATION':
+      return 'Es gibt noch nicht übertragene Änderungen. Beim Abmelden gehen sie verloren.';
+    default:
+      return a.type === 'error' ? `Fehler: ${resolve(a)}` : resolve(a);
+  }
+}
+
+export function roleLabel(roles: readonly string[]): string {
+  if (roles.includes('skipper')) return 'Skipper';
+  if (roles.includes('crew')) return 'Crew (schreibt mit)';
+  if (roles.includes('readonly')) return 'Anderes Boot (nur lesen)';
+  return 'Mitglied';
+}

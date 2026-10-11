@@ -1,12 +1,15 @@
 import Dexie from 'dexie';
 
-export const LEGACY_DB_NAME = 'logbook';
+/** Databases of earlier schemas (no real data existed, no migration). */
+export const LEGACY_DB_NAMES = ['logbook', 'logbook-v3'];
 
-/** Removes the pre-Flottille database once (no data to carry over); errors are ignored. */
+/** Removes the databases of earlier schemas once; errors are ignored. */
 export async function deleteLegacyDb(): Promise<void> {
-  try {
-    await Dexie.delete(LEGACY_DB_NAME);
-  } catch {
-    // nothing to clean up or deletion blocked: irrelevant for the new database
+  for (const name of LEGACY_DB_NAMES) {
+    try {
+      await Dexie.delete(name);
+    } catch {
+      // nothing to clean up or deletion blocked: irrelevant for the new database
+    }
   }
 }

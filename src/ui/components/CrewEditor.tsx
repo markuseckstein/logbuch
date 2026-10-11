@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { ROLE_LABELS, type CrewMember } from '../../domain';
+import { ROLE_LABELS, type CrewDraft } from '../../domain';
 import { Icon } from '../icons';
 
-type Role = NonNullable<CrewMember['role']>;
+type Role = NonNullable<CrewDraft['role']>;
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
 
 interface CrewEditorProps {
-  crew: readonly CrewMember[];
-  onChange: (crew: CrewMember[]) => void;
+  crew: readonly CrewDraft[];
+  onChange: (crew: CrewDraft[]) => void;
   defaultRole?: Role;
   emptyText?: string;
 }

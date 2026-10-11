@@ -4,8 +4,9 @@ import type { LogbookDB } from './db';
 import {
   MaxPhotosError, ReadOnlyTripError, addPhotosToDayReport, addPhotosToEntry, addTrack, appendTrackPoints,
   createEntry, createTrip, deleteEntry, deleteTrack, deleteTrip, getAuthor, getDayReport, getDeviceId, getSettings,
-  getTrip, listDayReports, listEntries, listFlotillaTrips, listTracks, loadTripData, removePhotoFromDayReport,
-  setAuthor, setEntryPosition, setFlotilla, setTripOwnership, updateEntry, updateTrip, upsertDayReport,
+  getTrip, linkCrewEmail, listCrew, listDayReports, listEntries, listFlotillaTrips, listTracks, loadTripData,
+  removePhotoFromDayReport, saveCrew, setAuthor, setEntryPosition, setFlotilla, setTripOwnership, updateEntry,
+  resetDeviceIdCache, updateTrip, upsertDayReport,
 } from './repo';
 import { dispose, freshDb } from './test-helpers';
 
@@ -64,6 +65,8 @@ describe('ownership and read-only trips', () => {
     await expect(deleteTrack(db, track.id)).rejects.toBeInstanceOf(ro);
     await expect(updateTrip(db, trip.id, { name: 'n' })).rejects.toBeInstanceOf(ro);
     await expect(setFlotilla(db, trip.id, { id: 'f', name: 'F' })).rejects.toBeInstanceOf(ro);
+    await expect(saveCrew(db, trip.id, [])).rejects.toBeInstanceOf(ro);
+    await expect(linkCrewEmail(db, 'c1', 'a@b.de')).rejects.toBeInstanceOf(ro);
     expect((await listEntries(db, trip.id))[0]!.text).toBeUndefined();
   });
   it('deleteTrip stays a hard, local delete (also for foreign trips) and forgets ownership/author', async () => {
@@ -100,13 +103,26 @@ describe('version stamps and patches', () => {
     expect(f.flotilla).toEqual({ id: 'f1', name: 'Regatta' });
     expect((await setFlotilla(db, trip.id, undefined)).flotilla).toBeUndefined();
   });
-  it('appendTrackPoints bumps the track version', async () => {
+  it('appendTrackPoints fills chunks of this device and leaves the track record alone', async () => {
     const trip = await newTrip();
     const k = await addTrack(db, trip.id, { name: 'k', source: 'live', points: [] });
     await appendTrackPoints(db, k.id, [{ lat: 1, lon: 1 }]);
+    await appendTrackPoints(db, k.id, [{ lat: 2, lon: 2 }]);
     const [again] = await listTracks(db, trip.id);
-    expect(again!.points).toHaveLength(1);
-    expect(again!.updatedAt).toBeGreaterThan(k.updatedAt);
+    expect(again!.points.map((p) => p.lat)).toEqual([1, 2]);
+    expect(again!.updatedAt).toBe(k.updatedAt);
+    const { trackChunks } = await loadTripData(db, trip.id);
+    expect(trackChunks).toHaveLength(1);
+    expect(trackChunks[0]!.updatedBy).toBe(await getDeviceId(db));
+  });
+  it('a full chunk starts the next one (seq + 1)', async () => {
+    const trip = await newTrip();
+    const many = Array.from({ length: 450 }, (_, i) => ({ lat: i, lon: 0 }));
+    const k = await addTrack(db, trip.id, { name: 'k', source: 'gpx', points: many.slice(0, 390) });
+    await appendTrackPoints(db, k.id, many.slice(390));
+    const { trackChunks } = await loadTripData(db, trip.id);
+    expect(trackChunks.map((c) => [c.seq, c.points.length])).toEqual([[0, 200], [1, 200], [2, 50]]);
+    expect((await listTracks(db, trip.id))[0]!.points.map((p) => p.lat)).toEqual(many.map((p) => p.lat));
   });
 });
 
@@ -128,23 +144,36 @@ describe('tombstones', () => {
     expect(await listTracks(db, trip.id)).toEqual([]);
     expect((await loadTripData(db, trip.id)).tracks[0]!.deletedAt).toBeDefined();
   });
-  it('removing crew via updateTrip tombstones the member; re-adding revives it', async () => {
+  it('crew members are records of their trip; createTrip stores them', async () => {
     const trip = await newTrip();
-    const u = await updateTrip(db, trip.id, { crew: [{ id: 'c1', name: 'Ann' }] });
+    const crew = await listCrew(db, trip.id);
+    expect(crew.map((c) => [c.id, c.tripId, c.name])).toEqual([['c1', trip.id, 'Ann'], ['c2', trip.id, 'Ben']]);
+    expect(crew[0]!.updatedBy).toBe(await getDeviceId(db));
+  });
+  it('removing crew via saveCrew tombstones the member; re-adding revives it', async () => {
+    const trip = await newTrip();
+    const u = await saveCrew(db, trip.id, [{ id: 'c1', name: 'Ann' }]);
     expect(activeCrew(u).map((c) => c.id)).toEqual(['c1']);
-    const gone = u.crew.find((c) => c.id === 'c2')!;
+    const gone = u.find((c) => c.id === 'c2')!;
     expect(gone.deletedAt).toBeGreaterThan(0);
     expect(gone.updatedBy).toBe(await getDeviceId(db));
-    const back = await updateTrip(db, trip.id, { crew: [{ id: 'c1', name: 'Ann' }, { id: 'c2', name: 'Ben' }] });
+    const back = await saveCrew(db, trip.id, [{ id: 'c1', name: 'Ann' }, { id: 'c2', name: 'Ben' }]);
     expect(activeCrew(back).map((c) => c.id)).toEqual(['c1', 'c2']);
   });
   it('unchanged crew members keep their version when other members change', async () => {
     const trip = await newTrip();
-    const a = await updateTrip(db, trip.id, { crew: [{ id: 'c1', name: 'Ann' }, { id: 'c2', name: 'Ben' }, { id: 'c3', name: 'Cem' }] });
-    const b = await updateTrip(db, trip.id, { crew: [{ id: 'c1', name: 'Ann' }, { id: 'c2', name: 'Benno' }, { id: 'c3', name: 'Cem' }] });
-    const ver = (t: typeof a, id: string) => t.crew.find((c) => c.id === id)!.updatedAt;
+    const a = await saveCrew(db, trip.id, [{ id: 'c1', name: 'Ann' }, { id: 'c2', name: 'Ben' }, { id: 'c3', name: 'Cem' }]);
+    const b = await saveCrew(db, trip.id, [{ id: 'c1', name: 'Ann' }, { id: 'c2', name: 'Benno' }, { id: 'c3', name: 'Cem' }]);
+    const ver = (list: typeof a, id: string) => list.find((c) => c.id === id)!.updatedAt;
     expect(ver(b, 'c1')).toBe(ver(a, 'c1'));
-    expect(ver(b, 'c2')).toBeGreaterThan(ver(a, 'c2')!);
+    expect(ver(b, 'c2')).toBeGreaterThan(ver(a, 'c2'));
+  });
+  it('linkCrewEmail stores a normalized e-mail on exactly one member', async () => {
+    const trip = await newTrip();
+    await linkCrewEmail(db, 'c1', ' Ann@Example.DE ');
+    await linkCrewEmail(db, 'c2', 'ann@example.de');
+    const crew = await listCrew(db, trip.id);
+    expect(crew.map((c) => c.email)).toEqual([undefined, 'ann@example.de']);
   });
 });
 
@@ -205,12 +234,23 @@ describe('authors and day reports per author', () => {
 
 describe('flotilla queries', () => {
   it('listFlotillaTrips returns trips of that flotilla only', async () => {
-    const a = await newTrip('A');
-    const b = await newTrip('B');
-    await newTrip('C');
+    const a = await newTrip('A', []);
+    const b = await newTrip('B', []);
+    await newTrip('C', []);
     await setFlotilla(db, a.id, { id: 'f1', name: 'F' });
     await setFlotilla(db, b.id, { id: 'f1', name: 'F' });
     expect((await listFlotillaTrips(db, 'f1')).map((t) => t.name).sort()).toEqual(['A', 'B']);
     expect(await listFlotillaTrips(db, 'none')).toEqual([]);
+  });
+});
+
+describe('device id after a cloud logout (all tables cleared)', () => {
+  it('is restored from the localStorage copy, not regenerated', async () => {
+    const before = await getDeviceId(db);
+    await db.settings.clear();
+    resetDeviceIdCache(db);
+    expect((await getSettings(db)).deviceId).toBe(before);
+    expect(await getDeviceId(db)).toBe(before);
+    expect((await db.settings.get('deviceId'))?.value).toBe(before);
   });
 });

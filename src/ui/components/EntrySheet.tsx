@@ -15,7 +15,7 @@ import {
   type LogEntry,
 } from '../../domain';
 import { ENTRY_ICON, Icon, SKY_ICON } from '../icons';
-import { useSettings } from '../hooks';
+import { useWritableTripIds } from '../cloudHooks';
 import { ENTRY_TYPES, FIX_ERROR_LABEL, authorName, fromLocalInput, parseDecimal, toLocalInput, writeErrorMessage } from '../lib';
 import { usePhotoImport } from '../photoImport';
 import { useToast } from '../toast';
@@ -41,10 +41,10 @@ interface EntrySheetProps {
 
 export function EntrySheet({ entryId, isNew = false, onClose }: EntrySheetProps) {
   const entry = useLiveQuery(() => db.entries.get(entryId), [entryId]);
-  const settings = useSettings();
+  const writable = useWritableTripIds();
   const crew = useTripCrew(entry?.tripId);
-  if (!entry || !settings) return null;
-  const readOnly = !settings.writableTripIds.includes(entry.tripId);
+  if (!entry || !writable) return null;
+  const readOnly = !writable.includes(entry.tripId);
   const by = crew.length > 1 ? authorName(crew, entry.authorId) : undefined;
   if (readOnly) return <EntryView entry={entry} by={by} onClose={onClose} />;
   return <EntryForm entry={entry} isNew={isNew} by={by} onClose={onClose} />;

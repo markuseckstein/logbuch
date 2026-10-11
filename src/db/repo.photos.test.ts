@@ -3,7 +3,7 @@ import { LogbookDB } from './db';
 import {
   MAX_PHOTOS_PER_DAY_REPORT, MAX_PHOTOS_PER_ENTRY, MaxPhotosError, addPhotosToDayReport, addPhotosToEntry,
   createEntry, createTrip, dayPhotoHashes, deleteTrip, getDayReport, getPhoto, listEntries, loadTripData,
-  removePhotoFromDayReport, replaceTripData, upsertDayReport,
+  removePhotoFromDayReport, mergeBundle, upsertDayReport,
 } from './repo';
 import { dispose, freshDb } from './test-helpers';
 
@@ -72,7 +72,7 @@ describe('day report photos', () => {
   it('survives a bundle roundtrip', async () => {
     await addPhotosToDayReport(db, tripId, date, [ph('a')]);
     const bundle = await loadTripData(db, tripId);
-    await replaceTripData(db, bundle);
+    await mergeBundle(db, bundle, { ownership: 'own' });
     expect((await getDayReport(db, tripId, date))?.photoIds).toHaveLength(1);
     expect(await db.photos.count()).toBe(1);
   });

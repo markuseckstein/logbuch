@@ -1,5 +1,5 @@
 import { localDate } from './days';
-import type { CrewMember, DayReport, ID, LogEntry, Trip, Versioned } from './types';
+import type { CloudFields, CrewMember, DayReport, ID, LogEntry, Trip, Versioned } from './types';
 
 /** Minimal version info; legacy records (e.g. old crew members) may lack it and count as oldest. */
 export interface VersionLike {
@@ -27,10 +27,6 @@ export interface MergeResult<T> {
   stats: MergeStats;
 }
 
-export function dayReportKey(r: Pick<DayReport, 'tripId' | 'date' | 'authorId'>): string {
-  return JSON.stringify([r.tripId, r.date, r.authorId]);
-}
-
 /** Per-record last-writer-wins merge; tombstones take part like any other version. */
 export function mergeRecords<T extends Versioned>(
   local: readonly T[], incoming: readonly T[], keyOf: (r: T) => string = (r) => (r as unknown as { id: ID }).id,
@@ -56,38 +52,31 @@ export function mergeRecords<T extends Versioned>(
 }
 
 /** Crew without tombstones. */
-export function activeCrew(trip: Pick<Trip, 'crew'>): CrewMember[] {
-  return trip.crew.filter((c) => c.deletedAt === undefined);
+export function activeCrew(crew: readonly CrewMember[]): CrewMember[] {
+  return crew.filter((c) => c.deletedAt === undefined);
 }
 
-function mergeCrew(primary: readonly CrewMember[], secondary: readonly CrewMember[]): CrewMember[] {
-  const byId = new Map<ID, CrewMember>();
-  for (const m of [...primary, ...secondary]) {
-    const have = byId.get(m.id);
-    if (!have || isNewer(m, have)) byId.set(m.id, m);
-  }
-  const order: ID[] = [];
-  for (const m of [...primary, ...secondary]) if (!order.includes(m.id)) order.push(m.id);
-  return order.map((id) => byId.get(id)!);
+/** Record without the user-specific Dexie Cloud fields. */
+export function withoutCloudFields<T extends CloudFields>(rec: T): Omit<T, 'realmId' | 'owner'> {
+  const copy: T = { ...rec };
+  delete copy.realmId;
+  delete copy.owner;
+  return copy;
 }
 
 /**
- * Merges two versions of the same trip: trip fields (incl. flotilla) from the newer
- * version, crew per member by id (LWW per member). Commutative and idempotent.
+ * Merges two versions of the same trip: trip fields (incl. flotilla) from the newer version (LWW),
+ * earliest createdAt. Cloud fields (realmId/owner) stay those of the local copy. Commutative and idempotent.
  */
 export function mergeTrip(local: Trip, incoming: Trip): Trip {
-  let winner = local;
-  let other = incoming;
-  const sameVersion = !isNewer(incoming, local) && !isNewer(local, incoming);
-  if (isNewer(incoming, local) || (sameVersion && JSON.stringify(incoming) > JSON.stringify(local))) {
-    winner = incoming;
-    other = local;
-  }
-  return {
-    ...winner,
-    createdAt: Math.min(local.createdAt, incoming.createdAt),
-    crew: mergeCrew(winner.crew, other.crew),
-  };
+  const a = withoutCloudFields(local);
+  const b = withoutCloudFields(incoming);
+  const sameVersion = !isNewer(b, a) && !isNewer(a, b);
+  const winner = isNewer(b, a) || (sameVersion && JSON.stringify(b) > JSON.stringify(a)) ? b : a;
+  const out: Trip = { ...winner, createdAt: Math.min(local.createdAt, incoming.createdAt) };
+  if (local.realmId !== undefined) out.realmId = local.realmId;
+  if (local.owner !== undefined) out.owner = local.owner;
+  return out;
 }
 
 export interface RemapInput {

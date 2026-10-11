@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { pickFile } from '../../device';
 import { db } from '../../db/db';
-import { createTrip, setFlotilla } from '../../db/repo';
+import { createTrip, listTracks, setFlotilla } from '../../db/repo';
 import { renderUi, seedTrip, useCleanDb } from '../test-utils';
 import { MapScreen } from './MapScreen';
 
@@ -29,7 +29,7 @@ describe('MapScreen – GPX', () => {
 
     await user.click(await screen.findByRole('button', { name: 'GPX importieren' }));
     await waitFor(async () => expect(await db.tracks.count()).toBe(1));
-    const [track] = await db.tracks.toArray();
+    const [track] = await listTracks(db, trip.id);
     expect(track).toMatchObject({ tripId: trip.id, name: 'Kiel-Eckernförde', source: 'gpx' });
     expect(track?.points).toHaveLength(2);
     expect(await screen.findByRole('list', { name: 'Tracks' })).toHaveTextContent(/GPX · 2 Punkte · 10\.08\./);

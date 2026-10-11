@@ -10,15 +10,6 @@ export interface Boat {
   photoId?: ID;
 }
 
-export interface CrewMember {
-  id: ID;
-  name: string;
-  role?: 'skipper' | 'co-skipper' | 'crew';
-  updatedAt?: number; // Merge-Version je Mitglied (fehlt bei Altdaten = 0)
-  updatedBy?: string; // deviceId
-  deletedAt?: number; // Tombstone: Mitglied bleibt im Trip, UI blendet aus (siehe activeCrew)
-}
-
 /** Felder, nach denen Datensaetze gemergt werden (Flottille, siehe docs/flotilla.md). */
 export interface Versioned {
   updatedAt: number;
@@ -26,19 +17,47 @@ export interface Versioned {
   deletedAt?: number; // Tombstone
 }
 
+/**
+ * Von Dexie Cloud verwaltete Felder (siehe docs/research/dexie-cloud-integration.md).
+ * `realmId` = Realm des Boot-Logbuchs (`rlm~<tripId>`) bzw. privater Realm; `owner` = Nutzer-ID des Erstellers.
+ * Lokal ohne Cloud fehlen sie. Nie exportiert (nutzerspezifisch).
+ */
+export interface CloudFields {
+  realmId?: string;
+  owner?: string;
+}
+
+export type CrewRole = 'skipper' | 'co-skipper' | 'crew';
+
+/** Crew-Mitglied als eigener Datensatz (Tabelle crewMembers), damit parallele Aenderungen nicht kollidieren. */
+export interface CrewMember extends Versioned, CloudFields {
+  id: ID;
+  tripId: ID;
+  name: string;
+  role?: CrewRole;
+  email?: string; // verknuepft Cloud-Konto und „Ich bin …“
+  createdAt: number;
+}
+
+/** Eingabe fuer Crew-Listen (Onboarding, Crew-Editor). */
+export interface CrewDraft {
+  id: ID;
+  name: string;
+  role?: CrewRole;
+}
+
 export interface Flotilla {
   id: ID;
   name: string;
 }
 
-export interface Trip {
+export interface Trip extends CloudFields {
   id: ID;
   name: string;
   startDate?: string; // YYYY-MM-DD
   endDate?: string;
   area?: string;
   boat: Boat;
-  crew: CrewMember[]; // enthaelt auch Tombstones -> activeCrew(trip)
   flotilla?: Flotilla;
   createdAt: number;
   updatedAt: number;
@@ -65,7 +84,7 @@ export interface Position {
   accuracyM?: number;
 }
 
-export interface LogEntry {
+export interface LogEntry extends CloudFields {
   id: ID;
   tripId: ID;
   time: number; // epoch ms
@@ -87,7 +106,7 @@ export interface LogEntry {
   deletedAt?: number;
 }
 
-export interface Photo {
+export interface Photo extends CloudFields {
   id: ID;
   tripId: ID;
   blob: Blob;
@@ -98,13 +117,14 @@ export interface Photo {
   createdAt: number;
 }
 
-export interface DayReport {
+export interface DayReport extends CloudFields {
+  id: ID; // = dayReportId(tripId, date, authorId): deterministisch, gleiche Sektion auf allen Geraeten
   tripId: ID;
   date: string; // YYYY-MM-DD lokal
   title?: string;
   text: string;
   photoIds: ID[]; // max 15 pro Tag ueber alle Abschnitte
-  authorId: ID; // Schluessel [tripId+date+authorId]; '' = ohne Autor
+  authorId: ID; // '' = ohne Autor
   updatedAt: number;
   updatedBy: string;
   deletedAt?: number;
@@ -117,23 +137,40 @@ export interface TrackPoint {
   ele?: number;
 }
 
-export interface Track {
+/** Gespeicherter Track (Tabelle tracks) ohne Punkte; die Punkte liegen in TrackChunks. */
+export interface TrackRecord extends CloudFields {
   id: ID;
   tripId: ID;
   name: string;
   source: 'gpx' | 'live';
-  points: TrackPoint[];
   createdAt: number;
   updatedAt: number;
   updatedBy: string;
   deletedAt?: number;
 }
 
+/**
+ * Abschnitt von Track-Punkten (Tabelle trackChunks). Jedes Geraet haengt nur an eigene Chunks an,
+ * dadurch kollidiert paralleles Anhaengen nie. Reihenfolge: seq, dann erster Zeitstempel, dann id.
+ */
+export interface TrackChunk extends Versioned, CloudFields {
+  id: ID;
+  tripId: ID;
+  trackId: ID;
+  seq: number;
+  points: TrackPoint[];
+}
+
+/** Lesemodell: Track mit allen Punkten (aus den Chunks zusammengesetzt). */
+export interface Track extends TrackRecord {
+  points: TrackPoint[];
+}
+
 export interface Settings {
   activeTripId?: ID;
   theme: 'system' | 'light' | 'dark';
-  deviceId: string; // lokal, einmalig erzeugt, nie exportiert
-  writableTripIds: ID[]; // eigene Logbuecher; alle anderen Trips sind read-only
+  deviceId: string; // lokal, einmalig erzeugt, nie exportiert (Kopie in localStorage, ueberlebt Logout)
+  writableTripIds: ID[]; // lokal eigene Logbuecher; in der Cloud geteilte Trips: Server-Rechte massgeblich
   authorByTrip: Record<ID, ID>; // "Ich bin ..." je Trip (Crew-Mitglied-ID)
 }
 
@@ -143,10 +180,12 @@ export type PhotoMeta = Omit<Photo, 'blob'>;
 /** All data of one trip – unit of export/import and bulk persistence. */
 export interface TripBundle {
   trip: Trip;
+  crew: CrewMember[];
   entries: LogEntry[];
   photos: Photo[];
   dayReports: DayReport[];
-  tracks: Track[];
+  tracks: TrackRecord[];
+  trackChunks: TrackChunk[];
   /** Fotos, die referenziert werden, deren Bilddaten aber nicht mitgeliefert wurden (Export ohne Fotos). */
   missingPhotos: PhotoMeta[];
 }

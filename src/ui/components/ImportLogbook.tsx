@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { pickFile } from '../../device';
 import { db } from '../../db/db';
-import { getSettings, mergeBundle, setActiveTrip, setAuthor, setFlotilla, type MergeSummary, type TripBundle } from '../../db/repo';
+import { listCrew, listWritableTripIds, mergeBundle, setActiveTrip, setAuthor, setFlotilla, type MergeSummary, type TripBundle } from '../../db/repo';
 import { activeCrew, type Flotilla, type Trip } from '../../domain';
 import { ImportFormatError, importJson, importZip } from '../../io';
 import { Icon } from '../icons';
@@ -40,10 +40,10 @@ export function ImportLogbook({ trip }: { trip?: Trip }) {
       const sum = await mergeBundle(db, bundle, { ownership });
       toast(mergeMessage(boatOf(bundle), sum), 5000);
       const merged = await db.trips.get(sum.tripId);
-      const writable = (await getSettings(db)).writableTripIds;
+      const writable = await listWritableTripIds(db);
       if (sum.tripCreated && ownership === 'own' && merged) {
         // Mein Boot: aktiv setzen, vorher „Ich bin …“ klären.
-        const crew = activeCrew(merged);
+        const crew = activeCrew(await listCrew(db, merged.id));
         const [only] = crew;
         if (crew.length === 1 && only) await setAuthor(db, merged.id, only.id);
         await setActiveTrip(db, merged.id);

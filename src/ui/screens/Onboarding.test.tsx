@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { db } from '../../db/db';
-import { getSettings } from '../../db/repo';
+import { getSettings, listCrew } from '../../db/repo';
 import { renderUi, useCleanDb } from '../test-utils';
 import { Onboarding } from './Onboarding';
 
@@ -50,7 +50,7 @@ describe('Onboarding', () => {
     expect(trip).toMatchObject({ name: 'Dänische Südsee', area: 'Ostsee' });
     expect(trip?.boat).toMatchObject({ name: 'Seeschwalbe', lengthM: 10.3 });
     expect(trip?.boat.photoId).toBeTruthy();
-    expect(trip?.crew).toMatchObject([{ name: 'Jonas', role: 'skipper' }]);
+    expect(await listCrew(db, trip!.id)).toMatchObject([{ name: 'Jonas', role: 'skipper' }]);
     expect((await getSettings(db)).activeTripId).toBe(trip?.id);
   });
 });

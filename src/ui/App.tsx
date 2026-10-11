@@ -18,6 +18,10 @@ import { MapScreen } from './screens/MapScreen';
 import { LiveRouteContext, useLiveRoute, useLiveRouteState } from './live';
 import { TodayScreen } from './screens/TodayScreen';
 import { TripScreen } from './screens/TripScreen';
+import { CloudLoginHost } from './cloud/LoginHost';
+import { InviteBanner, JoinWatcher } from './cloud/InviteBanner';
+import { SyncIndicator } from './cloud/SyncIndicator';
+import { WritableTripsContext, useWritableTripIds } from './cloudHooks';
 
 const TABS: readonly { id: TabId; label: string; icon: IconName }[] = [
   { id: 'today', label: 'Heute', icon: 'tab-heute' },
@@ -73,6 +77,7 @@ function Topbar({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTo
         <span>{n >= 1 ? `${trip.name} · Tag ${n}` : trip.name}</span>
       </div>
       <RecIndicator />
+      <SyncIndicator />
       <button
         className="icon-btn"
         type="button"
@@ -108,6 +113,7 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
       <LiveRouteContext.Provider value={live}>
         <div id="app">
           <Topbar trip={trip} dark={dark} onToggleTheme={onToggleTheme} />
+          <InviteBanner />
           {readOnly ? (
             <div className="banner">
               <Icon name="sichtung" size={20} />
@@ -171,15 +177,18 @@ function Root() {
   }, [trip]);
 
   const trips = useLiveQuery(() => db.trips.count(), []);
+  const writable = useWritableTripIds();
 
-  if (trip === undefined || trips === undefined || settings === undefined) return null;
+  if (trip === undefined || trips === undefined || settings === undefined || writable === undefined) return null;
   if (trip === null) {
     // trips > 0 -> Aktivierung läuft gerade; sonst Onboarding (nicht abbrechbar).
     return trips > 0 ? null : <Onboarding onDone={() => undefined} />;
   }
   return (
     <SettingsContext.Provider value={settings}>
-      <Shell key={trip.id} trip={trip} dark={dark} onToggleTheme={toggle} />
+      <WritableTripsContext.Provider value={writable}>
+        <Shell key={trip.id} trip={trip} dark={dark} onToggleTheme={toggle} />
+      </WritableTripsContext.Provider>
     </SettingsContext.Provider>
   );
 }
@@ -188,6 +197,8 @@ export function App() {
   return (
     <ToastProvider>
       <Root />
+      <JoinWatcher />
+      <CloudLoginHost />
       <UpdatePrompt />
     </ToastProvider>
   );

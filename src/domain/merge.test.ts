@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { activeCrew, dayReportKey, isNewer, mergeRecords, mergeTrip, remapPhotoIds } from './merge';
-import type { DayReport, LogEntry, Trip } from './types';
+import { dayReportId } from './ids';
+import { activeCrew, isNewer, mergeRecords, mergeTrip, remapPhotoIds } from './merge';
+import type { CrewMember, DayReport, LogEntry, Trip } from './types';
 
 const v = (updatedAt: number, updatedBy = 'A', deletedAt?: number) => ({
   updatedAt, updatedBy, ...(deletedAt !== undefined ? { deletedAt } : {}),
@@ -11,11 +12,11 @@ function entry(id: string, version = v(1), extra: Partial<LogEntry> = {}): LogEn
 }
 
 function report(date: string, authorId: string, version = v(1), extra: Partial<DayReport> = {}): DayReport {
-  return { tripId: 't', date, authorId, text: '', photoIds: [], ...version, ...extra };
+  return { id: dayReportId('t', date, authorId), tripId: 't', date, authorId, text: '', photoIds: [], ...version, ...extra };
 }
 
 function trip(version = v(1), extra: Partial<Trip> = {}): Trip {
-  return { id: 't', name: 'T', boat: { name: 'B' }, crew: [], createdAt: 1, ...version, ...extra };
+  return { id: 't', name: 'T', boat: { name: 'B' }, createdAt: 1, ...version, ...extra };
 }
 
 describe('isNewer', () => {
@@ -78,10 +79,10 @@ describe('mergeRecords', () => {
     const local2 = [entry('a', v(5, 'B'), { text: 'b' })];
     expect(mergeRecords(local2, [entry('a', v(5, 'A'), { text: 'a' })]).toPut).toEqual([]);
   });
-  it('supports custom keys (day reports per author)', () => {
+  it('day report sections per author are separate records', () => {
     const local = [report('2026-07-01', 'ann', v(1), { text: 'ann' })];
     const incoming = [report('2026-07-01', 'ben', v(1), { text: 'ben' })];
-    const r = mergeRecords(local, incoming, dayReportKey);
+    const r = mergeRecords(local, incoming);
     expect(r.toPut.map((x) => x.authorId)).toEqual(['ben']);
     expect(r.stats.added).toBe(1);
   });
@@ -129,44 +130,30 @@ describe('mergeTrip', () => {
     const left = mergeTrip(joined, trip(v(3)));
     expect(left.flotilla).toBeUndefined();
   });
-  it('merges crew per member with LWW, keeping members of both sides', () => {
-    const local = trip(v(5, 'A'), { crew: [
-      { id: 'c1', name: 'Ann', updatedAt: 1, updatedBy: 'A' },
-      { id: 'c2', name: 'Ben old', updatedAt: 1, updatedBy: 'A' },
-    ] });
-    const incoming = trip(v(2, 'B'), { crew: [
-      { id: 'c2', name: 'Ben new', updatedAt: 3, updatedBy: 'B' },
-      { id: 'c3', name: 'Cem', updatedAt: 2, updatedBy: 'B' },
-    ] });
-    const merged = mergeTrip(local, incoming);
-    expect(merged.name).toBe(local.name);
-    expect(merged.crew.map((c) => [c.id, c.name])).toEqual([['c1', 'Ann'], ['c2', 'Ben new'], ['c3', 'Cem']]);
-  });
-  it('a newer crew tombstone hides the member, an older one does not', () => {
-    const local = trip(v(1), { crew: [{ id: 'c1', name: 'Ann', updatedAt: 2, updatedBy: 'A' }] });
-    const del = trip(v(1), { crew: [{ id: 'c1', name: 'Ann', updatedAt: 3, updatedBy: 'B', deletedAt: 3 }] });
-    expect(activeCrew(mergeTrip(local, del))).toEqual([]);
-    const oldDel = trip(v(1), { crew: [{ id: 'c1', name: 'Ann', updatedAt: 1, updatedBy: 'B', deletedAt: 1 }] });
-    expect(activeCrew(mergeTrip(local, oldDel)).map((c) => c.id)).toEqual(['c1']);
-  });
   it('keeps the earliest createdAt', () => {
     expect(mergeTrip(trip(v(1), { createdAt: 9 }), trip(v(2), { createdAt: 4 })).createdAt).toBe(4);
   });
   it('is idempotent and commutative', () => {
-    const a = trip(v(5, 'A'), { name: 'a', crew: [{ id: 'c1', name: 'Ann', updatedAt: 1, updatedBy: 'A' }] });
-    const b = trip(v(6, 'B'), { name: 'b', crew: [
-      { id: 'c1', name: 'Anna', updatedAt: 2, updatedBy: 'B' }, { id: 'c2', name: 'Ben' },
-    ] });
+    const a = trip(v(5, 'A'), { name: 'a' });
+    const b = trip(v(6, 'B'), { name: 'b' });
+    const c = trip(v(6, 'B'), { name: 'c' });
     expect(mergeTrip(a, b)).toEqual(mergeTrip(b, a));
     expect(mergeTrip(mergeTrip(a, b), b)).toEqual(mergeTrip(a, b));
     expect(mergeTrip(mergeTrip(a, b), a)).toEqual(mergeTrip(a, b));
+    expect(mergeTrip(b, c)).toEqual(mergeTrip(c, b)); // gleiche Version: deterministisch
+  });
+  it('ignores realmId/owner of the incoming copy (cloud fields are local)', () => {
+    const merged = mergeTrip(trip(v(1), { realmId: 'rlm~t', owner: 'me' }), trip(v(2), { name: 'n', realmId: 'x', owner: 'y' }));
+    expect(merged).toMatchObject({ name: 'n', realmId: 'rlm~t', owner: 'me' });
   });
 });
 
 describe('activeCrew', () => {
   it('filters tombstones', () => {
-    const t = trip(v(1), { crew: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B', deletedAt: 1 }] });
-    expect(activeCrew(t).map((c) => c.id)).toEqual(['a']);
+    const m = (id: string, deletedAt?: number): CrewMember => ({
+      id, tripId: 't', name: id, createdAt: 1, ...v(1, 'A', deletedAt),
+    });
+    expect(activeCrew([m('a'), m('b', 1)]).map((c) => c.id)).toEqual(['a']);
   });
 });
 

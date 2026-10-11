@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { resizeImage } from '../../device';
 import { db } from '../../db/db';
 import { createTrip, setActiveTrip, setAuthor, setBoatPhoto, type PhotoInput } from '../../db/repo';
-import type { CrewMember } from '../../domain';
+import type { CrewDraft } from '../../domain';
 import { Icon } from '../icons';
 import { useToast } from '../toast';
 import { BoatPicture } from '../components/BoatPicture';
 import { CrewEditor } from '../components/CrewEditor';
 import { ImportLogbook } from '../components/ImportLogbook';
+import { SignInDialog } from '../cloud/CloudCard';
+import { InviteBanner } from '../cloud/InviteBanner';
+import { useCloudStatus } from '../cloudHooks';
 import {
   BoatFields,
   TripFields,
@@ -31,12 +34,14 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
   const [step, setStep] = useState(0);
   const [trip, setTrip] = useState(emptyTripDraft);
   const [boat, setBoat] = useState(emptyBoatDraft);
-  const [crew, setCrew] = useState<CrewMember[]>([]);
+  const [crew, setCrew] = useState<CrewDraft[]>([]);
   const [photo, setPhoto] = useState<{ input: PhotoInput; url: string }>();
   const urlRef = useRef<string>(undefined);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const cloud = useCloudStatus();
+  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => () => {
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
@@ -70,7 +75,7 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
     try {
       const created = await createTrip(db, { ...tripPatchOf(trip), boat: boatOf(boat), crew });
       // Gründer schreibt: Skipper, sonst erstes Crew-Mitglied.
-      const founder = created.crew.find((c) => c.role === 'skipper') ?? created.crew[0];
+      const founder = crew.find((c) => c.role === 'skipper') ?? crew[0];
       if (founder) await setAuthor(db, created.id, founder.id);
       if (photo) await setBoatPhoto(db, created.id, photo.input);
       await setActiveTrip(db, created.id);
@@ -126,6 +131,22 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
                 <ImportLogbook />
               </div>
             )}
+            {onCancel || cloud === 'local' ? null : (
+              <div className="card">
+                <InviteBanner />
+                {cloud === 'signed-out' ? (
+                  <>
+                    <p className="muted">Du wurdest in ein Logbuch eingeladen? Melde dich mit deiner E-Mail-Adresse an.</p>
+                    <button className="btn block" type="button" onClick={() => setSigningIn(true)}>
+                      Mit Cloud-Konto anmelden
+                    </button>
+                  </>
+                ) : (
+                  <p className="muted">Angemeldet – Einladungen erscheinen hier, sobald sie da sind.</p>
+                )}
+              </div>
+            )}
+            {signingIn ? <SignInDialog onClose={() => setSigningIn(false)} /> : null}
           </section>
         ) : null}
         {step === 1 ? (

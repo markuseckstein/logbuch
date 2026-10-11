@@ -5,6 +5,7 @@ import { useDayReports, useEntries, useTracks } from '../db/hooks';
 import { getSettings, listEntries, listFlotillaTrips, listTracks, listTrips } from '../db/repo';
 import { localDate, type LatLon, type LogEntry, type Settings, type Track, type Trip } from '../domain';
 import { buildDays, currentTzOffsetMin, groupTrackPoints, type DayInfo } from './lib';
+import { useWritableTripIds } from './cloudHooks';
 
 /** Von `Root` bereitgestellte Einstellungen: innerhalb der App sofort verfügbar, ohne Flackern. */
 export const SettingsContext = createContext<Settings | undefined>(undefined);
@@ -50,11 +51,14 @@ export function useTripDays(trip: Trip): TripDaysData | undefined {
   }, [trip, entries, reports, tracks]);
 }
 
-/** Fremdes (nicht beschreibbares) Logbuch? Solange die Einstellungen laden: false. */
+/**
+ * Fremdes (nicht beschreibbares) Logbuch? Lokal: nicht in `writableTripIds`; in der Cloud geteilt:
+ * Server-Rechte (Crew schreibt, andere Boote lesen). Solange geladen wird: false.
+ */
 export function useReadOnly(tripId: string | undefined): boolean {
-  const settings = useSettings();
-  if (!settings || !tripId) return false;
-  return !settings.writableTripIds.includes(tripId);
+  const writable = useWritableTripIds();
+  if (!writable || !tripId) return false;
+  return !writable.includes(tripId);
 }
 
 /** „Ich bin …“ dieses Geräts im Logbuch. */

@@ -5,10 +5,10 @@ import { buildLogbookJson, exportFileName, exportJson, exportZip } from './expor
 import { sampleBundle } from './fixtures';
 
 describe('buildLogbookJson', () => {
-  it('has the v2 envelope and timeIso with offset from tzOffsetMin', async () => {
+  it('has the v3 envelope and timeIso with offset from tzOffsetMin', async () => {
     const j = await buildLogbookJson(sampleBundle(), { photoMode: 'file' });
     expect(j.format).toBe('segel-logbuch');
-    expect(j.version).toBe(2);
+    expect(j.version).toBe(3);
     expect(new Date(j.exportedAt).toISOString()).toBe(j.exportedAt);
     expect(j.entries[0]!.timeIso).toBe('2026-08-10T14:32:00+02:00');
     expect(j.entries[1]!.timeIso).toBe('2026-08-10T18:30:00-01:30');
@@ -17,6 +17,8 @@ describe('buildLogbookJson', () => {
     expect(j.dayReports).toHaveLength(2);
     expect(j.dayReports[0]!.photoIds).toEqual(['p3']);
     expect(j.tracks).toHaveLength(1);
+    expect(j.trackChunks).toHaveLength(2);
+    expect(j.crew.map((c) => c.name)).toEqual(['Ann', 'Ben']);
   });
 
   it('references photo files with extension from mime', async () => {
@@ -36,16 +38,28 @@ describe('buildLogbookJson', () => {
   });
 });
 
-describe('buildLogbookJson v2 fields', () => {
+describe('buildLogbookJson merge fields', () => {
   it('exports version stamps, authors, flotilla and tombstones', async () => {
     const j = await buildLogbookJson(sampleBundle(), { photoMode: 'file' });
     expect(j.trip.flotilla).toEqual({ id: 'fl-1', name: 'Ostsee-Flottille' });
     expect(j.trip.updatedBy).toBe('dev-a');
-    expect(j.trip.crew[1]!.deletedAt).toBe(3);
+    expect(j.crew[1]!.deletedAt).toBe(3);
     expect(j.entries[0]).toMatchObject({ authorId: 'c1', updatedBy: 'dev-a' });
     expect(j.entries.find((e) => e.id === 'e3')!.deletedAt).toBe(12);
     expect(j.dayReports.map((r) => r.authorId)).toEqual(['c1', '']);
     expect(j.tracks[0]).toMatchObject({ updatedAt: 10, updatedBy: 'dev-a' });
+  });
+
+  it('never exports the user-specific cloud fields realmId/owner', async () => {
+    const b = sampleBundle();
+    const cloud = { realmId: 'rlm~trip-1', owner: 'alice' };
+    b.trip = { ...b.trip, ...cloud };
+    b.entries = b.entries.map((e) => ({ ...e, ...cloud }));
+    b.crew = b.crew.map((c) => ({ ...c, ...cloud }));
+    b.trackChunks = b.trackChunks.map((c) => ({ ...c, ...cloud }));
+    const text = JSON.stringify(await buildLogbookJson(b, { photoMode: 'file' }));
+    expect(text).not.toContain('realmId');
+    expect(text).not.toContain('alice');
   });
 
   it('includePhotos: false lists photo metadata flagged photoOmitted without files', async () => {

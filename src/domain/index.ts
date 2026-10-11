@@ -7,3 +7,6 @@ export * from './wind';
 export * from './labels';
 export * from './photos';
 export * from './merge';
+export * from './access';
+export * from './tracks';
+export * from './ids';

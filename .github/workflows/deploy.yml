@@ -29,6 +29,8 @@ jobs:
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          # Dexie-Cloud-Datenbank-URL (öffentlich, kein Geheimnis); leer = rein lokale App
+          VITE_DEXIE_CLOUD_URL: ${{ vars.DEXIE_CLOUD_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

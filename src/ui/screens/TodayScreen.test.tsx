@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FixResult } from '../../device';
 import { captureFix } from '../../device';
 import { db } from '../../db/db';
-import { getAuthor, setAuthor, setTripOwnership, updateTrip } from '../../db/repo';
+import { getAuthor, saveCrew, setAuthor, setTripOwnership } from '../../db/repo';
 import { makeActions, renderUi, seedTrip, useCleanDb } from '../test-utils';
 import { TodayScreen } from './TodayScreen';
 
@@ -68,7 +68,7 @@ describe('TodayScreen – Eintrag jetzt', () => {
   it('fragt „Ich bin …“ vor dem ersten Eintrag, wenn mehrere Crew-Mitglieder und kein Autor gesetzt sind', async () => {
     mockFix({ error: 'denied' });
     const trip = await seedTrip();
-    await updateTrip(db, trip.id, { crew });
+    await saveCrew(db, trip.id, crew);
     const actions = makeActions();
     renderUi(<TodayScreen trip={(await db.trips.get(trip.id))!} reports={[]} />, actions);
     const user = userEvent.setup();
@@ -86,7 +86,7 @@ describe('TodayScreen – Eintrag jetzt', () => {
   it('übernimmt bei nur einem Crew-Mitglied automatisch den Autor, ohne Rückfrage', async () => {
     mockFix({ error: 'denied' });
     const trip = await seedTrip();
-    await updateTrip(db, trip.id, { crew: [crew[0]!] });
+    await saveCrew(db, trip.id, [crew[0]!]);
     const actions = makeActions();
     renderUi(<TodayScreen trip={(await db.trips.get(trip.id))!} reports={[]} />, actions);
 
@@ -99,7 +99,7 @@ describe('TodayScreen – Eintrag jetzt', () => {
   it('fragt nicht erneut, wenn der Autor bereits gesetzt ist', async () => {
     mockFix({ error: 'denied' });
     const trip = await seedTrip();
-    await updateTrip(db, trip.id, { crew });
+    await saveCrew(db, trip.id, crew);
     await setAuthor(db, trip.id, 'c1');
     const actions = makeActions();
     renderUi(<TodayScreen trip={(await db.trips.get(trip.id))!} reports={[]} />, actions);

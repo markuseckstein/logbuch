@@ -7,7 +7,7 @@ import type { Trip } from '../../domain';
 import { exportZip } from '../../io';
 import { Icon } from '../icons';
 import { shareFileName } from '../lib';
-import { useSettings } from '../hooks';
+import { useWritableTripIds } from '../cloudHooks';
 import { useToast } from '../toast';
 import { Dialog } from './Dialog';
 import { OwnershipBadge } from './OwnershipBadge';
@@ -28,7 +28,7 @@ export async function shareLogbook(
 
 export function FlotillaCard({ trip, readOnly }: { trip: Trip; readOnly: boolean }) {
   const toast = useToast();
-  const settings = useSettings();
+  const writable = useWritableTripIds();
   const [name, setName] = useState('');
   const [error, setError] = useState<string>();
   const [choosing, setChoosing] = useState(false);
@@ -77,7 +77,7 @@ export function FlotillaCard({ trip, readOnly }: { trip: Trip; readOnly: boolean
             </p>
             <ul className="fleetlist" aria-label="Boote der Flottille">
               {boats.map((t) => {
-                const own = settings?.writableTripIds.includes(t.id) ?? false;
+                const own = writable?.includes(t.id) ?? false;
                 return (
                   <li key={t.id}>
                     <span className="triplist-name">

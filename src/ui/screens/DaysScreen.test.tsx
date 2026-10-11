@@ -2,7 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { db } from '../../db/db';
-import { addPhotosToDayReport, addPhotosToEntry, setAuthor, setTripOwnership, updateTrip, upsertDayReport } from '../../db/repo';
+import { dayReportId } from '../../domain';
+import { addPhotosToDayReport, addPhotosToEntry, saveCrew, setAuthor, setTripOwnership, upsertDayReport } from '../../db/repo';
 import { hashBlob } from '../../device';
 import { seedEntry, seedTrip, renderUi, makeActions, useCleanDb } from '../test-utils';
 import { DaysScreen } from './DaysScreen';
@@ -78,9 +79,7 @@ describe('DaysScreen', () => {
 
   async function twoAuthors() {
     const trip = await seedTrip();
-    await updateTrip(db, trip.id, {
-      crew: [{ id: 'c1', name: 'Anna', role: 'skipper' }, { id: 'c2', name: 'Ben', role: 'crew' }],
-    });
+    await saveCrew(db, trip.id, [{ id: 'c1', name: 'Anna', role: 'skipper' }, { id: 'c2', name: 'Ben', role: 'crew' }]);
     await seedEntry(trip.id);
     const png = { blob: new Blob(['p']), mime: 'image/jpeg', width: 1, height: 1 };
     await setAuthor(db, trip.id, 'c2');
@@ -108,8 +107,8 @@ describe('DaysScreen', () => {
     await user.clear(screen.getByLabelText('Reisebericht'));
     await user.type(screen.getByLabelText('Reisebericht'), 'Neu.');
     await user.click(screen.getByRole('button', { name: 'Tagesbericht speichern' }));
-    await waitFor(async () => expect((await db.dayReports.get([trip.id, '2026-08-10', 'c1']))?.text).toBe('Neu.'));
-    expect((await db.dayReports.get([trip.id, '2026-08-10', 'c2']))?.text).toBe('Flaute am Nachmittag.');
+    await waitFor(async () => expect((await db.dayReports.get(dayReportId(trip.id, '2026-08-10', 'c1')))?.text).toBe('Neu.'));
+    expect((await db.dayReports.get(dayReportId(trip.id, '2026-08-10', 'c2')))?.text).toBe('Flaute am Nachmittag.');
   });
 
   it('zeigt die Tageslisten-Vorschau des ersten Abschnitts mit Text', async () => {

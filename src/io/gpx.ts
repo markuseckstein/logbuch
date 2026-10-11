@@ -1,12 +1,18 @@
-import type { TrackPoint } from '../domain/types';
+import type { LogEntry, Track, TrackPoint, Trip } from '../domain/types';
 import { ENTRY_TYPE_LABELS } from '../domain/labels';
-import type { TripBundle } from './bundle';
 
 export class GpxParseError extends Error {
   constructor(message = 'Die GPX-Datei ist kein gültiges XML.') {
     super(message);
     this.name = 'GpxParseError';
   }
+}
+
+/** What the GPX writer needs: tracks with their assembled points. */
+export interface GpxInput {
+  trip: Trip;
+  entries: readonly LogEntry[];
+  tracks: readonly Track[];
 }
 
 export interface ParsedTrack {
@@ -128,7 +134,7 @@ function ptXml(tag: string, p: TrackPoint, indent: string): string {
   return `${indent}<${tag} lat="${p.lat}" lon="${p.lon}">${inner}</${tag}>`;
 }
 
-export function writeGpx(bundle: TripBundle): string {
+export function writeGpx(bundle: GpxInput): string {
   const lines: string[] = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<gpx version="1.1" creator="Logbuch" xmlns="http://www.topografix.com/GPX/1/1">',

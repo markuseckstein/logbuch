@@ -7,7 +7,6 @@ describe('domain/types', () => {
       id: 't1',
       name: 'Test',
       boat: { name: 'Boot' },
-      crew: [],
       createdAt: 0,
       updatedAt: 0,
       updatedBy: 'd',

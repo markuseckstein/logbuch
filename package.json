@@ -11,13 +11,15 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:cloud": "E2E_CLOUD=1 playwright test"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/source-sans-3": "5.3.1",
     "@types/leaflet": "1.9.22",
     "dexie": "4.4.6",
+    "dexie-cloud-addon": "4.4.15",
     "dexie-react-hooks": "4.4.0",
     "fflate": "0.8.3",
     "leaflet": "1.9.4",

@@ -8,15 +8,15 @@ export function sampleBundle(): TripBundle {
       name: 'Ostsee Törn Süd',
       startDate: '2026-08-08',
       boat: { name: 'Möwe', lengthM: 10.5 },
-      crew: [
-        { id: 'c1', name: 'Ann', role: 'skipper', updatedAt: 2, updatedBy: 'dev-a' },
-        { id: 'c2', name: 'Ben', updatedAt: 3, updatedBy: 'dev-b', deletedAt: 3 },
-      ],
       createdAt: 1,
       updatedAt: 2,
       updatedBy: 'dev-a',
       flotilla: { id: 'fl-1', name: 'Ostsee-Flottille' },
     },
+    crew: [
+      { id: 'c1', tripId: 'trip-1', name: 'Ann', role: 'skipper', createdAt: 1, updatedAt: 2, updatedBy: 'dev-a' },
+      { id: 'c2', tripId: 'trip-1', name: 'Ben', createdAt: 1, updatedAt: 3, updatedBy: 'dev-b', deletedAt: 3 },
+    ],
     entries: [
       {
         id: 'e1', tripId: 'trip-1', time: Date.UTC(2026, 7, 10, 12, 32), tzOffsetMin: 120,
@@ -38,12 +38,16 @@ export function sampleBundle(): TripBundle {
       { id: 'p2', tripId: 'trip-1', blob: new Blob([new Uint8Array([9, 8, 7])], { type: 'image/webp' }), mime: 'image/webp', width: 2, height: 2, createdAt: 8 },
     ],
     dayReports: [
-      { tripId: 'trip-1', date: '2026-08-10', authorId: 'c1', title: 'Tag 3', text: 'Schön.', photoIds: ['p3'], updatedAt: 9, updatedBy: 'dev-a' },
-      { tripId: 'trip-1', date: '2026-08-10', authorId: '', text: 'alt', photoIds: [], updatedAt: 9, updatedBy: 'dev-a', deletedAt: 9 },
+      { id: 'trip-1|2026-08-10|c1', tripId: 'trip-1', date: '2026-08-10', authorId: 'c1', title: 'Tag 3', text: 'Schön.', photoIds: ['p3'], updatedAt: 9, updatedBy: 'dev-a' },
+      { id: 'trip-1|2026-08-10|-', tripId: 'trip-1', date: '2026-08-10', authorId: '', text: 'alt', photoIds: [], updatedAt: 9, updatedBy: 'dev-a', deletedAt: 9 },
     ],
     missingPhotos: [],
     tracks: [
-      { id: 'k1', tripId: 'trip-1', name: 'Tag 3', source: 'live', createdAt: 10, updatedAt: 10, updatedBy: 'dev-a', points: [{ lat: 54, lon: 10, time: 1000 }, { lat: 54.1, lon: 10.1, ele: 3 }] },
+      { id: 'k1', tripId: 'trip-1', name: 'Tag 3', source: 'live', createdAt: 10, updatedAt: 10, updatedBy: 'dev-a' },
+    ],
+    trackChunks: [
+      { id: 'k1-a', tripId: 'trip-1', trackId: 'k1', seq: 0, points: [{ lat: 54, lon: 10, time: 1000 }], updatedAt: 10, updatedBy: 'dev-a' },
+      { id: 'k1-b', tripId: 'trip-1', trackId: 'k1', seq: 0, points: [{ lat: 54.1, lon: 10.1, ele: 3 }], updatedAt: 11, updatedBy: 'dev-b' },
     ],
   };
 }

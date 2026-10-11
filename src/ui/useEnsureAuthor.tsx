@@ -1,6 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { db } from '../db/db';
-import { getAuthor, setAuthor } from '../db/repo';
+import { getAuthor, listCrew, setAuthor } from '../db/repo';
+import { chooseAuthor } from './cloud/identity';
 import { activeCrew, type Trip } from '../domain';
 import { AuthorDialog } from './components/AuthorDialog';
 
@@ -12,7 +13,7 @@ export function useEnsureAuthor(trip: Trip): { ensure: () => Promise<boolean>; d
   const [waiting, setWaiting] = useState<(proceed: boolean) => void>();
 
   const ensure = useCallback(async (): Promise<boolean> => {
-    const crew = activeCrew(trip);
+    const crew = activeCrew(await listCrew(db, trip.id));
     const current = await getAuthor(db, trip.id);
     if (current && crew.some((c) => c.id === current)) return true;
     const [only] = crew;
@@ -33,7 +34,7 @@ export function useEnsureAuthor(trip: Trip): { ensure: () => Promise<boolean>; d
     <AuthorDialog
       trip={trip}
       onPick={(id) => {
-        void setAuthor(db, trip.id, id).then(() => finish(true));
+        void chooseAuthor(trip, id).then(() => finish(true));
       }}
       onSkip={() => finish(true)}
       onCancel={() => finish(false)}

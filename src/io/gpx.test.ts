@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GpxParseError, parseGpx, writeGpx } from './gpx';
-import type { TripBundle } from './bundle';
+import { GpxParseError, parseGpx, writeGpx, type GpxInput } from './gpx';
 
 const gpx11 = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="OsmAnd" xmlns="http://www.topografix.com/GPX/1/1" xmlns:osmand="https://osmand.net">
@@ -69,9 +68,9 @@ describe('parseGpx', () => {
   });
 });
 
-function bundle(withTracks: boolean): TripBundle {
+function bundle(withTracks: boolean): GpxInput {
   return {
-    trip: { id: 't', name: 'Törn <Ost> & "Co"', boat: { name: 'B' }, crew: [], createdAt: 0, updatedAt: 0, updatedBy: 'd' },
+    trip: { id: 't', name: 'Törn <Ost> & "Co"', boat: { name: 'B' }, createdAt: 0, updatedAt: 0, updatedBy: 'd' },
     entries: [
       {
         id: 'e1', tripId: 't', time: Date.UTC(2026, 7, 10, 12, 32), tzOffsetMin: 120,
@@ -83,9 +82,6 @@ function bundle(withTracks: boolean): TripBundle {
         position: { lat: 54.2, lon: 10.3 }, type: 'departure', photoIds: [], createdAt: 0, updatedAt: 0, updatedBy: 'd',
       },
     ],
-    photos: [],
-    missingPhotos: [],
-    dayReports: [],
     tracks: withTracks
       ? [{ id: 'k', tripId: 't', name: 'Live & <1>', source: 'live', createdAt: 0, updatedAt: 0, updatedBy: 'd',
           points: [{ lat: 54, lon: 10, time: 1000, ele: 2 }, { lat: 54.1, lon: 10.1 }] }]

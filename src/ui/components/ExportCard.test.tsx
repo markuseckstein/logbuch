@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { pickFile, saveOrShareFile } from '../../device';
 import { db } from '../../db/db';
-import { getSettings, loadTripData, updateTrip } from '../../db/repo';
+import { getSettings, loadTripData, saveCrew, updateTrip } from '../../db/repo';
 import { exportZip } from '../../io';
 import { AuthorPromptHost } from '../authorPrompt';
 import { renderUi, seedEntry, seedTrip, useCleanDb } from '../test-utils';
@@ -41,14 +41,16 @@ describe('ExportCard', () => {
   /** Exportiert ein fremdes Logbuch als Datei und entfernt es wieder aus der DB (= noch unbekannt). */
   async function foreignFile(opts: { flotilla?: boolean } = {}) {
     const other = await seedTrip('Fremder Törn');
+    await saveCrew(db, other.id, [{ id: 'c1', name: 'Anna', role: 'skipper' }, { id: 'c2', name: 'Ben', role: 'crew' }]);
     await updateTrip(db, other.id, {
       boat: { name: 'Möwe' },
-      crew: [{ id: 'c1', name: 'Anna', role: 'skipper' }, { id: 'c2', name: 'Ben', role: 'crew' }],
       ...(opts.flotilla ? { flotilla: { id: 'f1', name: 'Sommerflotte' } } : {}),
     });
     await seedEntry(other.id);
     const zip = await exportZip(await loadTripData(db, other.id));
-    await Promise.all([db.trips.clear(), db.entries.clear(), db.settings.delete('writableTripIds'), db.settings.delete('activeTripId')]);
+    await Promise.all([
+      db.trips.clear(), db.entries.clear(), db.crewMembers.clear(), db.settings.delete('writableTripIds'), db.settings.delete('activeTripId'),
+    ]);
     return { other, file: new File([zip], 'moewe.zip', { type: 'application/zip' }) };
   }
 

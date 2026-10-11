@@ -13,12 +13,12 @@ const entry = (time: number, tzOffsetMin = 120, id = String(time)): LogEntry => 
   updatedAt: time,
   updatedBy: 'd',
 });
-const report = (date: string): DayReport => ({ tripId: 't', date, text: 'x', photoIds: [], authorId: '', updatedAt: 0, updatedBy: 'd' });
+const report = (date: string): DayReport => ({ id: date, tripId: 't', date, text: 'x', photoIds: [], authorId: '', updatedAt: 0, updatedBy: 'd' });
 const trip = (extra: Partial<Trip> = {}): Trip => ({
   id: 't',
   name: 'T',
   boat: { name: 'B' },
-  crew: [],
+
   createdAt: 0,
   updatedAt: 0,
   updatedBy: 'd',

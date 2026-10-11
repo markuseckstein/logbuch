@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { keepScreenOn, startLiveTracking } from '../device';
 import { db } from '../db/db';
-import { addTrack, appendTrackPoints, deleteTrack } from '../db/repo';
+import { addTrack, appendTrackPoints, deleteTrack, getTrack } from '../db/repo';
 import { localDate, type ID, type TrackPoint } from '../domain';
 import { FIX_ERROR_LABEL, currentTzOffsetMin } from './lib';
 import { useToast } from './toast';
@@ -45,7 +45,7 @@ export function useLiveRouteState(tripId: ID): LiveRoute {
     s.stop();
     s.release?.();
     await s.queue;
-    const track = await db.tracks.get(s.trackId);
+    const track = await getTrack(db, s.trackId);
     if (track && track.points.length === 0) await deleteTrack(db, s.trackId);
   }, []);
 

@@ -1,8 +1,10 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
-import type { DayReport, LogEntry, PhotoMeta, Track, Trip } from '../domain/types';
+import { withoutCloudFields } from '../domain/merge';
+import { assembleTracks } from '../domain/tracks';
+import type { CrewMember, DayReport, LogEntry, PhotoMeta, TrackChunk, TrackRecord, Trip } from '../domain/types';
 import { blobToBytes } from './blob';
 import type { TripBundle } from './bundle';
-import { writeGpx } from './gpx';
+import { writeGpx, type GpxInput } from './gpx';
 
 export interface ExportedEntry extends LogEntry {
   timeIso: string;
@@ -21,15 +23,20 @@ export interface ExportedPhoto {
   photoOmitted?: true;
 }
 
-/** Version 2 (Flottille): version stamps, tombstones, authors, flotilla; photos may be omitted. */
-export interface LogbookJsonV2 {
+/**
+ * Version 3 (Dexie Cloud schema): crew as own records, track points in chunks, day reports with id.
+ * Version stamps and tombstones as in v2; photos may be omitted. Never contains realmId/owner (user specific).
+ */
+export interface LogbookJsonV3 {
   format: 'segel-logbuch';
-  version: 2;
+  version: 3;
   exportedAt: string;
   trip: Trip;
+  crew: CrewMember[];
   entries: ExportedEntry[];
   dayReports: DayReport[];
-  tracks: Track[];
+  tracks: TrackRecord[];
+  trackChunks: TrackChunk[];
   photos: ExportedPhoto[];
 }
 
@@ -77,7 +84,7 @@ function photoBase(p: PhotoMeta) {
 export async function buildLogbookJson(
   bundle: TripBundle,
   opts: { photoMode: PhotoMode } & ExportOptions,
-): Promise<LogbookJsonV2> {
+): Promise<LogbookJsonV3> {
   const photos: ExportedPhoto[] = [];
   for (const p of bundle.photos) {
     const base = photoBase(p);
@@ -93,22 +100,26 @@ export async function buildLogbookJson(
   for (const p of bundle.missingPhotos) photos.push({ ...photoBase(p), photoOmitted: true });
   return {
     format: 'segel-logbuch',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
-    trip: bundle.trip,
-    entries: bundle.entries.map((e) => ({ ...e, timeIso: toIsoWithOffset(e.time, e.tzOffsetMin) })),
-    dayReports: bundle.dayReports,
-    tracks: bundle.tracks,
+    trip: clean(bundle.trip),
+    crew: bundle.crew.map(clean),
+    entries: bundle.entries.map((e) => ({ ...clean(e), timeIso: toIsoWithOffset(e.time, e.tzOffsetMin) })),
+    dayReports: bundle.dayReports.map(clean),
+    tracks: bundle.tracks.map(clean),
+    trackChunks: bundle.trackChunks.map(clean),
     photos,
   };
 }
 
-/** Bundle without tombstones, for human-facing outputs (GPX). */
-function liveOnly(bundle: TripBundle): TripBundle {
+const clean = <T extends object>(rec: T): T => withoutCloudFields(rec) as T;
+
+/** Without tombstones, tracks with their points: for human-facing outputs (GPX). */
+function liveOnly(bundle: TripBundle): GpxInput {
   return {
-    ...bundle,
+    trip: bundle.trip,
     entries: bundle.entries.filter((e) => e.deletedAt === undefined),
-    tracks: bundle.tracks.filter((t) => t.deletedAt === undefined),
+    tracks: assembleTracks(bundle.tracks.filter((t) => t.deletedAt === undefined), bundle.trackChunks),
   };
 }
 

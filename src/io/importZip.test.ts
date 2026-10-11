@@ -65,7 +65,7 @@ describe('importZip', () => {
   it('rejects wrong format or version with a German message', async () => {
     const mk = (o: object) => new Blob([zipSync({ 'logbook.json': strToU8(JSON.stringify(o)) }) as Uint8Array<ArrayBuffer>]);
     await expect(importZip(mk({ format: 'x', version: 1 }))).rejects.toThrow(/Logbuch/);
-    await expect(importZip(mk({ format: 'segel-logbuch', version: 3 }))).rejects.toThrow(/Version 3/);
+    await expect(importZip(mk({ format: 'segel-logbuch', version: 2 }))).rejects.toThrow(/Version 2/);
     await expect(importZip(mk({ format: 'segel-logbuch', version: 1 }))).rejects.toThrow(/Version 1/);
   });
 
