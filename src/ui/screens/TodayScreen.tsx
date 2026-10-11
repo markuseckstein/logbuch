@@ -16,9 +16,10 @@ import {
   type Trip,
 } from '../../domain';
 import { useApp } from '../AppContext';
-import { useToday } from '../hooks';
+import { useReadOnly, useToday } from '../hooks';
 import { Icon } from '../icons';
-import { FIX_ERROR_LABEL, currentTzOffsetMin, groupTrackPoints } from '../lib';
+import { FIX_ERROR_LABEL, currentTzOffsetMin, groupTrackPoints, writeErrorMessage } from '../lib';
+import { useEnsureAuthor } from '../useEnsureAuthor';
 import { useToast } from '../toast';
 import { ChartMap } from '../components/ChartMap';
 import { StatsBar } from '../components/StatsBar';
@@ -35,6 +36,8 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const readOnly = useReadOnly(trip.id);
+  const { ensure, dialog } = useEnsureAuthor(trip);
 
   const today = useToday();
   const todays = useMemo(
@@ -55,6 +58,7 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
     busyRef.current = true;
     setBusy(true);
     try {
+      if (!(await ensure())) return;
       // Eintrag sofort anlegen – auch ohne Position.
       const time = Date.now();
       const entry = await createEntry(db, trip.id, { time, tzOffsetMin: currentTzOffsetMin() });
@@ -73,8 +77,8 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
         : `ohne Position${res.error ? ` (GPS: ${FIX_ERROR_LABEL[res.error]})` : ''}`;
       toast(`Eintrag ${t} gespeichert · ${where}`, 3800);
       openEntry(entry.id, true);
-    } catch {
-      toast('Eintrag konnte nicht gespeichert werden');
+    } catch (e) {
+      toast(writeErrorMessage(e, 'Eintrag konnte nicht gespeichert werden'));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -86,13 +90,16 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
       <h2 id="screen-title" className="sr-only">
         Heute
       </h2>
-      <button className={busy ? 'fix busy' : 'fix'} type="button" disabled={busy} onClick={() => void quickEntry()}>
-        <Icon name={busy ? 'motor' : 'eintrag'} size={40} />
-        <span className="lbl">
-          <span>{busy ? 'Position wird bestimmt …' : 'Eintrag jetzt'}</span>
-          <small>{busy ? 'GPS-Fix, bitte kurz warten' : '1 Tap · GPS und Uhrzeit'}</small>
-        </span>
-      </button>
+      {readOnly ? null : (
+        <button className={busy ? 'fix busy' : 'fix'} type="button" disabled={busy} onClick={() => void quickEntry()}>
+          <Icon name={busy ? 'motor' : 'eintrag'} size={40} />
+          <span className="lbl">
+            <span>{busy ? 'Position wird bestimmt …' : 'Eintrag jetzt'}</span>
+            <small>{busy ? 'GPS-Fix, bitte kurz warten' : '1 Tap · GPS und Uhrzeit'}</small>
+          </span>
+        </button>
+      )}
+      {dialog}
       <ChartMap
         compact
         label="Karte der heutigen Route"
@@ -109,7 +116,9 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
       </div>
       {todays.length === 0 ? (
         <p className="muted">
-          Heute noch kein Eintrag. Tippe auf „Eintrag jetzt“, um Position und Uhrzeit festzuhalten.
+          {readOnly
+            ? 'Heute noch kein Eintrag in diesem Logbuch.'
+            : 'Heute noch kein Eintrag. Tippe auf „Eintrag jetzt“, um Position und Uhrzeit festzuhalten.'}
         </p>
       ) : (
         <Timeline entries={[...todays].reverse()} onOpen={(id) => openEntry(id)} />

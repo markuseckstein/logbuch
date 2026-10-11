@@ -5,12 +5,12 @@ import { addTrack, deleteTrack } from '../../db/repo';
 import { GpxParseError, parseGpx } from '../../io';
 import { formatTime, localDate, type Track, type Trip } from '../../domain';
 import { useApp } from '../AppContext';
-import { useTripDays } from '../hooks';
+import { useFleetBoats, useFleetTrips, useReadOnly, useTripDays } from '../hooks';
 import { Icon } from '../icons';
-import { currentTzOffsetMin, num1 } from '../lib';
+import { buildDays, currentTzOffsetMin, groupTrackPoints, num1 } from '../lib';
 import { useLiveRoute } from '../live';
 import { useToast } from '../toast';
-import { ChartMap, type MapRoute } from '../components/ChartMap';
+import { ChartMap, type FleetLayer, type MapRoute } from '../components/ChartMap';
 
 /** „10.08. 09:12 – 14:40“ bzw. „ohne Zeit“. */
 export function trackPeriod(points: Track['points'], tzOffsetMin: number): string {
@@ -143,6 +143,10 @@ function LiveCard() {
 
 export function MapScreen({ trip }: { trip: Trip }) {
   const data = useTripDays(trip);
+  const readOnly = useReadOnly(trip.id);
+  const others = useFleetTrips(trip);
+  const [showFleet, setShowFleet] = useState(false);
+  const fleetBoats = useFleetBoats(others, showFleet);
   const { openEntry } = useApp();
   const [chosen, setFilter] = useState<string>('all');
   const filter = data?.days.some((d) => d.date === chosen) ? chosen : 'all';
@@ -156,6 +160,19 @@ export function MapScreen({ trip }: { trip: Trip }) {
     const sm = days.reduce((a, d) => a + d.stats.distanceNm, 0);
     return { days, routes, entries, sm };
   }, [data, filter]);
+
+  const fleet = useMemo<FleetLayer[]>(() => {
+    if (!showFleet) return [];
+    const tz = currentTzOffsetMin();
+    return fleetBoats.map(({ trip: t, entries, tracks }) => {
+      const grouping = groupTrackPoints(tracks, tz);
+      const days = buildDays(t, entries, [], grouping);
+      const shown = filter === 'all' ? days : days.filter((d) => d.date === filter);
+      const routes: MapRoute[] = shown.map((d) => ({ id: `${t.id}:${d.date}`, points: d.route }));
+      if (filter === 'all') grouping.untimed.forEach((points, i) => routes.push({ id: `${t.id}:untimed-${i}`, points }));
+      return { id: t.id, label: t.boat.name.trim() || t.name, routes, entries: shown.flatMap((d) => d.entries) };
+    });
+  }, [showFleet, fleetBoats, filter]);
 
   if (!data || !view) return null;
 
@@ -178,18 +195,53 @@ export function MapScreen({ trip }: { trip: Trip }) {
           </button>
         ))}
       </div>
+      {others.length > 0 ? (
+        <button
+          className="toggle"
+          type="button"
+          role="switch"
+          aria-checked={showFleet}
+          onClick={() => setShowFleet((v) => !v)}
+        >
+          <span className="track" />
+          <span>
+            <b>Flottille anzeigen</b>
+            <br />
+            <span className="muted">Routen der anderen Boote ({trip.flotilla?.name})</span>
+          </span>
+        </button>
+      ) : null}
       <ChartMap
         label="Törnkarte"
         routes={view.routes}
+        fleet={fleet}
         entries={view.entries}
         onOpenEntry={(id) => openEntry(id)}
-        fitKey={`${filter}:${view.entries.length}:${data.tracks.length}`}
+        fitKey={`${filter}:${view.entries.length}:${data.tracks.length}:${fleet.length}`}
       />
       <div className="muted num">
         {num1(view.sm)} sm · {view.entries.length} Einträge
       </div>
-      <GpxCard trip={trip} tracks={data.tracks} />
-      <LiveCard />
+      {fleet.length > 0 ? (
+        <ul className="fleet-legend" aria-label="Legende">
+          <li className="own">
+            <i />
+            {trip.boat.name.trim() || trip.name}
+          </li>
+          {fleet.map((f) => (
+            <li key={f.id} className="other">
+              <i />
+              {f.label}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {readOnly ? null : (
+        <>
+          <GpxCard trip={trip} tracks={data.tracks} />
+          <LiveCard />
+        </>
+      )}
     </main>
   );
 }

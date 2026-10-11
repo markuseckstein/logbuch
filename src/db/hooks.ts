@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import type { DayReport, ID, LogEntry, Track, Trip } from '../domain/types';
+import type { CrewMember, DayReport, ID, LogEntry, Track, Trip } from '../domain/types';
 import { db } from './db';
 import { getSettings, listDayReports, listEntries, listTracks } from './repo';
 
@@ -25,22 +25,38 @@ export function useTracks(tripId: ID | undefined): Track[] | undefined {
   return useLiveQuery(() => (tripId ? listTracks(db, tripId) : []), [tripId]);
 }
 
-/** Object URL for a stored photo (photos are immutable); revoked on change/unmount. */
-export function usePhotoUrl(photoId: ID | undefined): string | undefined {
-  const [state, setState] = useState<{ photoId: ID; url: string }>();
+/** All crew members of the trip incl. removed ones (tombstones keep their names for author labels). */
+export function useTripCrew(tripId: ID | undefined): CrewMember[] {
+  return useLiveQuery(async () => (tripId ? ((await db.trips.get(tripId))?.crew ?? []) : []), [tripId]) ?? [];
+}
+
+export interface PhotoImage {
+  /** Object URL of the stored image. */
+  url?: string;
+  /** The photo row does not exist on this device (e.g. export without photos). */
+  missing: boolean;
+}
+
+/** Object URL for a stored photo; `missing` when the row is absent. Reacts when the photo arrives later (import). */
+export function usePhotoImage(photoId: ID | undefined): PhotoImage {
+  const row = useLiveQuery(async () => (photoId ? ((await db.photos.get(photoId)) ?? null) : undefined), [photoId]);
+  const [state, setState] = useState<{ blob: Blob; url: string }>();
+  const blob = row?.blob;
   useEffect(() => {
-    if (!photoId) return;
-    let objectUrl: string | undefined;
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
     let cancelled = false;
-    void db.photos.get(photoId).then((photo) => {
-      if (cancelled || !photo) return;
-      objectUrl = URL.createObjectURL(photo.blob);
-      setState({ photoId, url: objectUrl });
+    void Promise.resolve().then(() => {
+      if (!cancelled) setState({ blob, url });
     });
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      URL.revokeObjectURL(url);
     };
-  }, [photoId]);
-  return state && state.photoId === photoId ? state.url : undefined;
+  }, [blob]);
+  return { ...(blob && state?.blob === blob ? { url: state.url } : {}), missing: row === null };
+}
+
+export function usePhotoUrl(photoId: ID | undefined): string | undefined {
+  return usePhotoImage(photoId).url;
 }

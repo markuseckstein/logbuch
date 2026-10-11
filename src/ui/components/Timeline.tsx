@@ -1,4 +1,4 @@
-import { usePhotoUrl } from '../../db/hooks';
+import { useTripCrew } from '../../db/hooks';
 import {
   ENTRY_TYPE_LABELS,
   SKY_LABELS,
@@ -10,11 +10,16 @@ import {
   type LogEntry,
 } from '../../domain';
 import { ENTRY_ICON, Icon, SKY_ICON } from '../icons';
+import { authorName, initials } from '../lib';
+import { PhotoImage } from './PhotoImage';
 import { sectorIndex } from './WindRose';
 
 function Thumb({ photoId }: { photoId: ID }) {
-  const url = usePhotoUrl(photoId);
-  return <span className="thumb">{url ? <img src={url} alt="Foto" /> : null}</span>;
+  return (
+    <span className="thumb">
+      <PhotoImage photoId={photoId} alt="Foto" />
+    </span>
+  );
 }
 
 function WindChip({ entry }: { entry: LogEntry }) {
@@ -49,11 +54,14 @@ interface TimelineProps {
 }
 
 export function Timeline({ entries, onOpen }: TimelineProps) {
+  const crew = useTripCrew(entries[0]?.tripId);
+  const showAuthor = crew.length > 1;
   return (
     <ol className="tl">
       {entries.map((e) => {
         const time = formatTime(e.time, e.tzOffsetMin);
         const label = ENTRY_TYPE_LABELS[e.type];
+        const author = showAuthor ? authorName(crew, e.authorId) : undefined;
         return (
           <li key={e.id}>
             <button className="tl-item" type="button" aria-label={`Eintrag ${time} ${label} öffnen`} onClick={() => onOpen(e.id)}>
@@ -64,6 +72,12 @@ export function Timeline({ entries, onOpen }: TimelineProps) {
               <span className="tl-body">
                 <span className="tl-head">
                   <b>{label}</b>
+                  {author ? (
+                    <span className="author" title={`von ${author}`}>
+                      {initials(author)}
+                      <span className="sr-only"> von {author}</span>
+                    </span>
+                  ) : null}
                   <WindChip entry={e} />
                   {e.sky ? (
                     <span className="wind" style={{ background: 'none', border: 0, padding: 0 }} title={SKY_LABELS[e.sky]}>

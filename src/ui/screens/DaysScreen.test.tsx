@@ -1,8 +1,8 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { db } from '../../db/db';
-import { addPhotosToEntry } from '../../db/repo';
+import { addPhotosToDayReport, addPhotosToEntry, setAuthor, setTripOwnership, updateTrip, upsertDayReport } from '../../db/repo';
 import { hashBlob } from '../../device';
 import { seedEntry, seedTrip, renderUi, makeActions, useCleanDb } from '../test-utils';
 import { DaysScreen } from './DaysScreen';
@@ -60,7 +60,7 @@ describe('DaysScreen', () => {
     const user = userEvent.setup();
     renderUi(<DaysScreen trip={trip} />);
     await user.click(await screen.findByRole('button', { name: /Tag 1, .* öffnen/ }));
-    expect(await screen.findByText('0 / 15')).toBeInTheDocument();
+    expect(await screen.findByText('0 / 15 heute')).toBeInTheDocument();
 
     await user.upload(screen.getByLabelText('Galerie'), [img('a'), img('b'), img('c'), img('b2', 'b')]);
     await waitFor(() =>
@@ -68,11 +68,66 @@ describe('DaysScreen', () => {
         '2 Fotos hinzugefügt · 2 übersprungen (schon an diesem Tag vorhanden)',
       ),
     );
-    expect(await screen.findByText('2 / 15')).toBeInTheDocument();
+    expect(await screen.findByText('2 / 15 heute')).toBeInTheDocument();
     expect((await db.dayReports.toArray())[0]?.photoIds).toHaveLength(2);
 
     await user.click(screen.getByRole('button', { name: 'Foto 1 entfernen' }));
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Foto entfernt'));
-    expect(await screen.findByText('1 / 15')).toBeInTheDocument();
+    expect(await screen.findByText('1 / 15 heute')).toBeInTheDocument();
+  });
+
+  async function twoAuthors() {
+    const trip = await seedTrip();
+    await updateTrip(db, trip.id, {
+      crew: [{ id: 'c1', name: 'Anna', role: 'skipper' }, { id: 'c2', name: 'Ben', role: 'crew' }],
+    });
+    await seedEntry(trip.id);
+    const png = { blob: new Blob(['p']), mime: 'image/jpeg', width: 1, height: 1 };
+    await setAuthor(db, trip.id, 'c2');
+    await upsertDayReport(db, trip.id, '2026-08-10', { title: 'Bens Sicht', text: 'Flaute am Nachmittag.' });
+    await addPhotosToDayReport(db, trip.id, '2026-08-10', [png, { ...png, hash: 'h2' }]);
+    await setAuthor(db, trip.id, 'c1');
+    await upsertDayReport(db, trip.id, '2026-08-10', { text: 'Annas Bericht.' });
+    return (await db.trips.get(trip.id))!;
+  }
+
+  it('zeigt Tagesberichte mehrerer Autoren: fremder Abschnitt gelesen, eigener editierbar, Foto-Zähler über alle', async () => {
+    const trip = await twoAuthors();
+    const user = userEvent.setup();
+    renderUi(<DaysScreen trip={trip} />);
+    await user.click(await screen.findByRole('button', { name: /Tag 1, .* öffnen/ }));
+
+    const bens = await screen.findByRole('region', { name: 'Tagesbericht von Ben' });
+    expect(within(bens).getByRole('heading', { name: 'Ben' })).toBeInTheDocument();
+    expect(bens).toHaveTextContent('Bens Sicht');
+    expect(bens).toHaveTextContent('Flaute am Nachmittag.');
+    expect(await within(bens).findAllByRole('img')).toHaveLength(2);
+    expect(screen.getByLabelText('Reisebericht')).toHaveValue('Annas Bericht.');
+    expect(await screen.findByText('2 / 15 heute')).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('Reisebericht'));
+    await user.type(screen.getByLabelText('Reisebericht'), 'Neu.');
+    await user.click(screen.getByRole('button', { name: 'Tagesbericht speichern' }));
+    await waitFor(async () => expect((await db.dayReports.get([trip.id, '2026-08-10', 'c1']))?.text).toBe('Neu.'));
+    expect((await db.dayReports.get([trip.id, '2026-08-10', 'c2']))?.text).toBe('Flaute am Nachmittag.');
+  });
+
+  it('zeigt die Tageslisten-Vorschau des ersten Abschnitts mit Text', async () => {
+    const trip = await twoAuthors();
+    renderUi(<DaysScreen trip={trip} />);
+    expect(await screen.findByText('Annas Bericht.')).toBeInTheDocument();
+  });
+
+  it('zeigt im fremden Logbuch alle Abschnitte read-only ohne Editor und Foto-Buttons', async () => {
+    const trip = await twoAuthors();
+    await setTripOwnership(db, trip.id, 'foreign');
+    const user = userEvent.setup();
+    renderUi(<DaysScreen trip={trip} />);
+    await user.click(await screen.findByRole('button', { name: /Tag 1, .* öffnen/ }));
+    expect(await screen.findByRole('region', { name: 'Tagesbericht von Ben' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Tagesbericht von Anna' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByLabelText('Reisebericht')).not.toBeInTheDocument());
+    expect(screen.queryByLabelText('Galerie')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /entfernen/ })).not.toBeInTheDocument();
   });
 });

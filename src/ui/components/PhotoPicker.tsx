@@ -1,7 +1,7 @@
 import { useId } from 'react';
-import { usePhotoUrl } from '../../db/hooks';
 import type { ID } from '../../domain';
 import { Icon } from '../icons';
+import { PhotoImage } from './PhotoImage';
 
 interface PhotoPickerProps {
   maxCount: number;
@@ -10,13 +10,18 @@ interface PhotoPickerProps {
   onRemove: (id: ID) => void | Promise<void>;
   /** Fortschrittstext, solange Fotos verarbeitet werden (sperrt die Buttons). */
   progress?: string;
+  /** Zähler-Text statt „n / max“ (z. B. „4 / 15 heute“, wenn mehrere Abschnitte zählen). */
+  countText?: string;
+  /** Aktuelle Gesamtzahl für die Sperre bei Erreichen des Limits (Standard: eigene Fotos). */
+  totalCount?: number;
 }
 
 function Tile({ photoId, index, onRemove }: { photoId: ID; index: number; onRemove: () => void }) {
-  const url = usePhotoUrl(photoId);
   return (
     <div className="slotwrap">
-      <div className="slot filled">{url ? <img src={url} alt={`Foto ${index + 1}`} /> : null}</div>
+      <div className="slot filled">
+        <PhotoImage photoId={photoId} alt={`Foto ${index + 1}`} />
+      </div>
       <button className="slot-x" type="button" aria-label={`Foto ${index + 1} entfernen`} onClick={onRemove}>
         <span>
           <Icon name="x" size={16} />
@@ -27,9 +32,9 @@ function Tile({ photoId, index, onRemove }: { photoId: ID; index: number; onRemo
 }
 
 /** Galerie (Mehrfachauswahl) + Kamera, Vorschau-Raster der vorhandenen Fotos mit Entfernen. */
-export function PhotoPicker({ maxCount, photoIds, onAdd, onRemove, progress }: PhotoPickerProps) {
+export function PhotoPicker({ maxCount, photoIds, onAdd, onRemove, progress, countText, totalCount }: PhotoPickerProps) {
   const uid = useId();
-  const full = photoIds.length >= maxCount;
+  const full = (totalCount ?? photoIds.length) >= maxCount;
   const disabled = full || progress !== undefined;
   const pick = (files: FileList | null, input: HTMLInputElement): void => {
     const list = files ? Array.from(files) : [];
@@ -67,7 +72,7 @@ export function PhotoPicker({ maxCount, photoIds, onAdd, onRemove, progress }: P
         </label>
       </div>
       <div className="muted photo-count" aria-live="polite">
-        {progress ?? `${photoIds.length} / ${maxCount}`}
+        {progress ?? countText ?? `${photoIds.length} / ${maxCount}`}
       </div>
       {photoIds.length > 0 ? (
         <div className="photogrid">

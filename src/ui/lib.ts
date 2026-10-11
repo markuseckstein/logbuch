@@ -1,4 +1,6 @@
 import type { FixError } from '../device';
+import { ReadOnlyTripError } from '../db/repo';
+import { slugify } from '../io';
 import {
   ENTRY_TYPE_LABELS,
   dayNumber,
@@ -7,6 +9,7 @@ import {
   groupEntriesByDay,
   localDate,
   tripDays,
+  type CrewMember,
   type DayReport,
   type DayStats,
   type EntryType,
@@ -89,6 +92,9 @@ export interface DayInfo {
   date: string;
   no: number;
   entries: LogEntry[];
+  /** Alle Abschnitte des Tages (je Autor einer). */
+  sections: DayReport[];
+  /** Auszug für Listen: erster Abschnitt mit Text (sonst erster Abschnitt). */
   report?: DayReport;
   stats: DayStats;
   route: LatLon[];
@@ -106,14 +112,48 @@ export function buildDays(
   return dates.map((date) => {
     const es = groups.get(date) ?? [];
     const tp = grouping.byDate[date];
-    const report = reports.find((r) => r.date === date);
+    const sections = reports.filter((r) => r.date === date);
+    const report = sections.find((r) => r.text.trim() !== '') ?? sections[0];
     return {
       date,
       no: dayNumber(trip, date, dates),
       entries: es,
+      sections,
       ...(report ? { report } : {}),
       stats: dayStats(es, tp),
       route: dayRoute(es, tp),
     };
   });
+}
+
+// ---------- Autoren ----------
+
+/** Name des Crew-Mitglieds (auch entfernte); undefined ohne Autor oder unbekannte ID. */
+export function authorName(crew: readonly CrewMember[], authorId: string | undefined): string | undefined {
+  if (!authorId) return undefined;
+  return crew.find((c) => c.id === authorId)?.name;
+}
+
+/** Initialen (max. 2 Buchstaben) für das Autoren-Badge. */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const letters = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : [parts[0]];
+  return letters.map((p) => (p ? Array.from(p)[0] ?? '' : '')).join('').toUpperCase();
+}
+
+/** Meldung für fehlgeschlagene Schreibzugriffe (fremdes Logbuch vs. sonstiger Fehler). */
+export function writeErrorMessage(e: unknown, fallback: string): string {
+  return e instanceof ReadOnlyTripError ? 'Dieses Logbuch ist nur lesbar.' : fallback;
+}
+
+/** Fotos eines Tages über alle Abschnitte. */
+export function sectionPhotoIds(sections: readonly DayReport[]): string[] {
+  return sections.flatMap((s) => s.photoIds);
+}
+
+/** Dateiname zum Teilen: logbuch-<boot>-<datum>[-ohne-fotos].zip */
+export function shareFileName(trip: Pick<Trip, 'name' | 'boat'>, date: Date, includePhotos: boolean): string {
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const slug = slugify(trip.boat.name) || slugify(trip.name) || 'boot';
+  return `logbuch-${slug}-${day}${includePhotos ? '' : '-ohne-fotos'}.zip`;
 }

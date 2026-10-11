@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { pickFile } from '../../device';
 import { db } from '../../db/db';
+import { createTrip, setFlotilla } from '../../db/repo';
 import { renderUi, seedTrip, useCleanDb } from '../test-utils';
 import { MapScreen } from './MapScreen';
 
@@ -48,5 +49,25 @@ describe('MapScreen – GPX', () => {
     await userEvent.setup().click(await screen.findByRole('button', { name: 'GPX importieren' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/GPX|XML/);
     expect(await db.tracks.count()).toBe(0);
+  });
+
+  it('zeigt den Schalter „Flottille anzeigen“ nur bei einer Flottille mit mindestens zwei Booten', async () => {
+    const trip = await seedTrip();
+    const user = userEvent.setup();
+    const view = renderUi(<MapScreen trip={trip} />);
+    await screen.findByRole('button', { name: 'GPX importieren' });
+    expect(screen.queryByRole('switch', { name: /Flottille anzeigen/ })).not.toBeInTheDocument();
+
+    const flotilla = { id: 'f1', name: 'Flotte' };
+    const mine = await setFlotilla(db, trip.id, flotilla);
+    view.rerender(<MapScreen trip={mine} />);
+    expect(screen.queryByRole('switch', { name: /Flottille anzeigen/ })).not.toBeInTheDocument(); // nur ein Boot
+
+    await createTrip(db, { name: 'Zweites Boot', boat: { name: 'Möwe' }, crew: [], flotilla });
+    const toggle = await screen.findByRole('switch', { name: /Flottille anzeigen/ });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(await screen.findByRole('list', { name: 'Legende' })).toHaveTextContent('Möwe');
   });
 });

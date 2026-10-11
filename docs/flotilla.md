@@ -35,7 +35,7 @@ Ziel: Mehrere Handys pro Boot führen dasselbe Logbuch, Boote sehen sich gegense
 - Einträge/Tagesbericht zeigen Autor (Initialen/Name).
 
 ## Umsetzungsnotizen (Daten-/Logikschicht)
-- **Keine Migration**: neues Schema unter DB-Name `logbook-v3` (Version 1); die alte DB `logbook` wird nicht angefasst/gelöscht. `deviceId` entsteht beim Anlegen der DB (`populate`), `getSettings` ist rein lesend (liveQuery-tauglich).
+- **Keine Migration**: neues Schema unter DB-Name `logbook-v3` (Version 1); die alte DB `logbook` wird beim App-Start einmalig gelöscht (`db/legacy.ts`). `deviceId` entsteht beim Anlegen der DB (`populate`), `getSettings` ist rein lesend (liveQuery-tauglich).
 - **API fuer die UI**: `getDeviceId`, `setAuthor/getAuthor(db, tripId)`, `setTripOwnership(db, tripId, 'own'|'foreign')`, `setFlotilla(db, tripId, {id,name}|undefined)`, `listFlotillaTrips`, `mergeBundle` -> `{tripId, tripCreated, added, updated, deleted, photosAdded}`, `deleteDayReport`, `activeCrew(trip)` (domain). `getSettings` liefert `writableTripIds`, `authorByTrip`, `deviceId`. `exportZip/exportJson(bundle, {includePhotos})`.
 - **Autor-Standard**: `createEntry`/`upsertDayReport`/`addPhotosToDayReport`/`getDayReport` nehmen den Autor aus `authorByTrip` (sonst `''`); `upsertDayReport`, `getDayReport`, `addPhotosToDayReport`, `removePhotoFromDayReport` haben optionalen letzten Parameter `authorId`. `listDayReports` liefert alle Abschnitte (Datum, dann Autor).
 - **Crew**: `Trip.crew` enthält Tombstones; UI nutzt `activeCrew(trip)`. `updateTrip(…, {crew})` vergibt Versionen nur für geänderte Mitglieder, entfernte werden Tombstones, wieder hinzugefügte aufgeweckt. `CrewMember.updatedAt/updatedBy` bleiben optional (Eingabe ohne Version erlaubt; fehlend = älteste Version).

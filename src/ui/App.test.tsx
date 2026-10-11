@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { db } from '../db/db';
+import { setTripOwnership, updateTrip, createEntry } from '../db/repo';
 import { App } from './App';
 import { seedTrip, useCleanDb } from './test-utils';
 
@@ -40,5 +41,32 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: /Darstellung wechseln/ }));
     await vi.waitFor(() => expect(document.documentElement.dataset['theme']).toBe('dark'));
+  });
+
+  it('zeigt fremde Logbücher mit Banner „nur lesen“, ohne Eintrag-Button und mit gesperrtem Törn-Tab', async () => {
+    const trip = await seedTrip('Fremdtörn');
+    await updateTrip(db, trip.id, { boat: { name: 'Möwe' } });
+    const entry = await createEntry(db, trip.id, { time: Date.now(), tzOffsetMin: 0 });
+    await setTripOwnership(db, trip.id, 'foreign');
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('Logbuch der Möwe · nur lesen')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Eintrag jetzt/ })).not.toBeInTheDocument();
+
+    // Eintrag-Sheet: nur Ansicht, keine Bearbeiten-/Löschen-Buttons
+    await user.click(await screen.findByRole('button', { name: /Eintrag \d\d:\d\d Eintrag öffnen/ }));
+    const sheet = await screen.findByRole('dialog');
+    expect(sheet).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Fertig' }));
+    expect(entry.id).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Törn' }));
+    expect(screen.getByLabelText('Name des Törns')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Törndaten speichern' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Logbuch auf diesem Gerät löschen/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Logbuch teilen' })).toBeEnabled();
   });
 });

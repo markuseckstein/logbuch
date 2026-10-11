@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { resizeImage } from '../../device';
 import { db } from '../../db/db';
-import { createTrip, setActiveTrip, setBoatPhoto, type PhotoInput } from '../../db/repo';
+import { createTrip, setActiveTrip, setAuthor, setBoatPhoto, type PhotoInput } from '../../db/repo';
 import type { CrewMember } from '../../domain';
 import { Icon } from '../icons';
 import { useToast } from '../toast';
 import { BoatPicture } from '../components/BoatPicture';
 import { CrewEditor } from '../components/CrewEditor';
+import { ImportLogbook } from '../components/ImportLogbook';
 import {
   BoatFields,
   TripFields,
@@ -68,6 +69,9 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
     setSaving(true);
     try {
       const created = await createTrip(db, { ...tripPatchOf(trip), boat: boatOf(boat), crew });
+      // Gründer schreibt: Skipper, sonst erstes Crew-Mitglied.
+      const founder = created.crew.find((c) => c.role === 'skipper') ?? created.crew[0];
+      if (founder) await setAuthor(db, created.id, founder.id);
       if (photo) await setBoatPhoto(db, created.id, photo.input);
       await setActiveTrip(db, created.id);
       toast(`Törn „${created.name}“ angelegt`, 4200);
@@ -116,6 +120,12 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
         {step === 0 ? (
           <section className="onb-step">
             <TripFields value={trip} onChange={setTrip} autoFocus />
+            {onCancel ? null : (
+              <div className="card">
+                <p className="muted">Schreibt ihr zu mehreren auf einem Boot? Dann importiere das geteilte Logbuch.</p>
+                <ImportLogbook />
+              </div>
+            )}
           </section>
         ) : null}
         {step === 1 ? (

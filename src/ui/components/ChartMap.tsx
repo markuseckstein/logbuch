@@ -8,8 +8,18 @@ export interface MapRoute {
   points: readonly LatLon[];
 }
 
+/** Routen und Einträge eines anderen Boots der Flottille (zweite Farbe, mit Bootsname). */
+export interface FleetLayer {
+  id: string;
+  label: string;
+  routes: readonly MapRoute[];
+  entries: readonly LogEntry[];
+}
+
 export interface ChartMapProps {
   routes: readonly MapRoute[];
+  /** Andere Boote der Flottille. */
+  fleet?: readonly FleetLayer[];
   entries: readonly LogEntry[];
   onOpenEntry?: (entryId: string) => void;
   /** Ändert sich der Schlüssel, wird die Karte neu auf die Daten eingepasst. */
@@ -29,6 +39,7 @@ const GRID_STEPS_MIN = [1, 5, 10, 30, 60, 120, 300, 600];
 
 interface Colors {
   magenta: string;
+  fleet: string;
   grid: string;
   surface: string;
 }
@@ -36,7 +47,7 @@ interface Colors {
 function readColors(): Colors {
   const cs = getComputedStyle(document.documentElement);
   const get = (name: string, fallback: string): string => cs.getPropertyValue(name).trim() || fallback;
-  return { magenta: get('--magenta', '#b0106a'), grid: get('--grid', '#a8739f'), surface: get('--surface', '#ffffff') };
+  return { magenta: get('--magenta', '#b0106a'), fleet: get('--fleet', '#0b6b8a'), grid: get('--grid', '#a8739f'), surface: get('--surface', '#ffffff') };
 }
 
 /** Zählt Theme-Wechsel (data-theme oder Systemeinstellung), damit Farben neu gelesen werden. */
@@ -104,17 +115,21 @@ interface MapState {
 }
 
 /** Leaflet-Seekarte (OSM-Kacheln auf Wasserfarbe + Gradnetz, damit sie auch ohne Kacheln lesbar bleibt). */
-export function ChartMap({ routes, entries, onOpenEntry, fitKey, label, compact = false, fallback }: ChartMapProps) {
+const NO_FLEET: readonly FleetLayer[] = [];
+
+export function ChartMap({
+  routes, fleet = NO_FLEET, entries, onOpenEntry, fitKey, label, compact = false, fallback,
+}: ChartMapProps) {
   const host = useRef<HTMLDivElement>(null);
   const state = useRef<MapState | null>(null);
   const openRef = useRef(onOpenEntry);
   const fitState = useRef({ key: '', sized: false });
-  const latest = useRef({ routes, entries, fallback, fitKey });
+  const latest = useRef({ routes, fleet, entries, fallback, fitKey });
   const theme = useThemeVersion();
 
   useEffect(() => {
     openRef.current = onOpenEntry;
-    latest.current = { routes, entries, fallback, fitKey };
+    latest.current = { routes, fleet, entries, fallback, fitKey };
   });
 
   useEffect(() => {
@@ -135,10 +150,14 @@ export function ChartMap({ routes, entries, onOpenEntry, fitKey, label, compact 
     const data = L.layerGroup().addTo(map);
 
     const refit = (): void => {
-      const { routes: rs, entries: es, fallback: fb } = latest.current;
+      const { routes: rs, fleet: fl, entries: es, fallback: fb } = latest.current;
       const pts: L.LatLngTuple[] = [];
       for (const r of rs) for (const p of r.points) pts.push([p.lat, p.lon]);
       for (const e of es) if (e.position) pts.push([e.position.lat, e.position.lon]);
+      for (const f of fl) {
+        for (const r of f.routes) for (const p of r.points) pts.push([p.lat, p.lon]);
+        for (const e of f.entries) if (e.position) pts.push([e.position.lat, e.position.lon]);
+      }
       if (pts.length === 0) {
         const c = fb ?? KIEL_BAY;
         map.setView([c.lat, c.lon], fb ? 11 : 9, { animate: false });
@@ -201,13 +220,36 @@ export function ChartMap({ routes, entries, onOpenEntry, fitKey, label, compact 
         .on('click', () => openRef.current?.(e.id))
         .addTo(s.data);
     }
+    for (const f of fleet) {
+      let anchor: L.LatLngTuple | undefined;
+      for (const r of f.routes) {
+        if (r.points.length < 2) continue;
+        const line = r.points.map((p): L.LatLngTuple => [p.lat, p.lon]);
+        L.polyline(line, { color: colors.fleet, weight: 3.5, opacity: 0.9, lineJoin: 'round', dashArray: '8 6' }).addTo(s.data);
+        anchor = line[line.length - 1];
+      }
+      for (const e of f.entries) {
+        if (!e.position) continue;
+        anchor ??= [e.position.lat, e.position.lon];
+        L.circleMarker([e.position.lat, e.position.lon], {
+          radius: 8, color: colors.fleet, weight: 3, fillColor: FILLED_TYPES.has(e.type) ? colors.fleet : colors.surface, fillOpacity: 1,
+        })
+          .on('click', () => openRef.current?.(e.id))
+          .addTo(s.data);
+      }
+      if (anchor) {
+        L.circleMarker(anchor, { radius: 1, opacity: 0, fillOpacity: 0, interactive: false })
+          .bindTooltip(f.label, { permanent: true, direction: 'top', className: 'fleet-label' })
+          .addTo(s.data);
+      }
+    }
     drawGrid(s.map, s.grid, colors.grid);
-    const key = `${fitKey}|${routes.length + entries.length === 0 ? 'empty' : 'data'}`;
+    const key = `${fitKey}|${routes.length + entries.length + fleet.length === 0 ? 'empty' : 'data'}`;
     if (fitState.current.key !== key) {
       fitState.current.key = key;
       s.refit();
     }
-  }, [routes, entries, fitKey, theme]);
+  }, [routes, fleet, entries, fitKey, theme]);
 
   return (
     <div className="mapframe">

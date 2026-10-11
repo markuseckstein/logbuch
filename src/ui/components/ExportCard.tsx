@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { pickFile, saveOrShareFile } from '../../device';
+import { saveOrShareFile } from '../../device';
 import { db } from '../../db/db';
 import { useEntries } from '../../db/hooks';
-import { loadTripData, replaceTripData, setActiveTrip, type TripBundle } from '../../db/repo';
+import { loadTripData } from '../../db/repo';
 import { getStorageEstimate } from '../../db/storage';
 import type { Trip } from '../../domain';
-import { ImportFormatError, exportFileName, exportJson, exportZip, importJson, importZip } from '../../io';
+import { exportFileName, exportJson, exportZip } from '../../io';
 import { Icon } from '../icons';
 import { useToast } from '../toast';
+import { ImportLogbook } from './ImportLogbook';
 
 const mb = (bytes: number): string => (bytes / 1_000_000).toFixed(1).replace('.', ',');
 
-/** Export (ZIP / JSON), Backup-Import mit Bestätigung vor dem Ersetzen. */
+/** Export (ZIP / JSON) und Logbuch-Import (Merge). */
 export function ExportCard({ trip }: { trip: Trip }) {
   const toast = useToast();
   const entries = useEntries(trip.id);
@@ -20,7 +21,6 @@ export function ExportCard({ trip }: { trip: Trip }) {
   const [usage, setUsage] = useState<number>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const [pending, setPending] = useState<TripBundle>();
 
   useEffect(() => {
     let cancelled = false;
@@ -50,50 +50,9 @@ export function ExportCard({ trip }: { trip: Trip }) {
     }
   };
 
-  const apply = async (bundle: TripBundle): Promise<void> => {
-    await replaceTripData(db, bundle);
-    await setActiveTrip(db, bundle.trip.id);
-    toast(`Törn „${bundle.trip.name}“ importiert`);
-  };
-
-  const importBackup = async (): Promise<void> => {
-    setError(undefined);
-    const file = await pickFile('.zip,application/zip,.json,application/json');
-    if (!file) return;
-    setBusy(true);
-    try {
-      const isJson = /\.json$/i.test(file.name) || file.type === 'application/json';
-      const bundle = isJson ? await importJson(await file.text()) : await importZip(file);
-      if (await db.trips.get(bundle.trip.id)) setPending(bundle);
-      else await apply(bundle);
-    } catch (e) {
-      setError(
-        e instanceof ImportFormatError
-          ? `Import nicht möglich: ${e.message}`
-          : 'Die Datei konnte nicht importiert werden. Ist es ein Logbuch-Backup (ZIP oder JSON)?',
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirmReplace = async (): Promise<void> => {
-    const bundle = pending;
-    setPending(undefined);
-    if (!bundle) return;
-    setBusy(true);
-    try {
-      await apply(bundle);
-    } catch {
-      setError('Der Import ist fehlgeschlagen.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <section className="card" aria-label="Export">
-      <div className="legend">Export &amp; Backup</div>
+      <div className="legend">Export &amp; Import</div>
       <p className="muted num">
         {entries?.length ?? 0} Einträge · {photoCount ?? 0} Bilder
         {usage !== undefined ? ` · Speicher belegt ${mb(usage)} MB` : ''}
@@ -105,24 +64,7 @@ export function ExportCard({ trip }: { trip: Trip }) {
       <button className="btn block" type="button" disabled={busy} onClick={() => void run('json')}>
         Einzelnes JSON (Bilder eingebettet)
       </button>
-      <button className="btn block" type="button" disabled={busy} onClick={() => void importBackup()}>
-        <Icon name="up" size={20} />
-        Backup importieren
-      </button>
-      {pending ? (
-        <div className="confirm" role="alertdialog" aria-label="Import bestätigen">
-          <p>
-            Vorhandenen Törn „{pending.trip.name}“ ersetzen? Alle lokalen Einträge, Fotos und Tracks dieses Törns werden
-            überschrieben.
-          </p>
-          <button className="btn" type="button" autoFocus onClick={() => setPending(undefined)}>
-            Abbrechen
-          </button>
-          <button className="btn danger" type="button" onClick={() => void confirmReplace()}>
-            Ersetzen
-          </button>
-        </div>
-      ) : null}
+      <ImportLogbook trip={trip} />
       {error ? (
         <div className="err" role="alert">
           {error}
@@ -130,7 +72,7 @@ export function ExportCard({ trip }: { trip: Trip }) {
       ) : null}
       <p className="muted">
         Sichere den Törn regelmäßig (ZIP) und lege die Datei an einem zweiten Ort ab – die Daten liegen nur in diesem
-        Browser.
+        Browser. Beim Import werden Einträge mit dem vorhandenen Logbuch zusammengeführt.
       </p>
     </section>
   );

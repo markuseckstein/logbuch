@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useTripCrew } from '../../db/hooks';
 import { captureFix } from '../../device';
 import { db } from '../../db/db';
 import { MAX_PHOTOS_PER_ENTRY, deleteEntry, removePhotoFromEntry, setEntryPosition, updateEntry } from '../../db/repo';
@@ -14,11 +15,13 @@ import {
   type LogEntry,
 } from '../../domain';
 import { ENTRY_ICON, Icon, SKY_ICON } from '../icons';
-import { ENTRY_TYPES, FIX_ERROR_LABEL, fromLocalInput, parseDecimal, toLocalInput } from '../lib';
+import { useSettings } from '../hooks';
+import { ENTRY_TYPES, FIX_ERROR_LABEL, authorName, fromLocalInput, parseDecimal, toLocalInput, writeErrorMessage } from '../lib';
 import { usePhotoImport } from '../photoImport';
 import { useToast } from '../toast';
 import { BeaufortBar } from './BeaufortBar';
 import { PhotoPicker } from './PhotoPicker';
+import { EntryReadOnly } from './EntryReadOnly';
 import { Sheet } from './Sheet';
 import { WindRose } from './WindRose';
 
@@ -38,8 +41,47 @@ interface EntrySheetProps {
 
 export function EntrySheet({ entryId, isNew = false, onClose }: EntrySheetProps) {
   const entry = useLiveQuery(() => db.entries.get(entryId), [entryId]);
-  if (!entry) return null;
-  return <EntryForm entry={entry} isNew={isNew} onClose={onClose} />;
+  const settings = useSettings();
+  const crew = useTripCrew(entry?.tripId);
+  if (!entry || !settings) return null;
+  const readOnly = !settings.writableTripIds.includes(entry.tripId);
+  const by = crew.length > 1 ? authorName(crew, entry.authorId) : undefined;
+  if (readOnly) return <EntryView entry={entry} by={by} onClose={onClose} />;
+  return <EntryForm entry={entry} isNew={isNew} by={by} onClose={onClose} />;
+}
+
+function subtitleOf(entry: LogEntry, by: string | undefined) {
+  const pos = entry.position
+    ? `${formatPosition(entry.position, 3)}${entry.position.accuracyM !== undefined ? ` · ± ${Math.round(entry.position.accuracyM)} m` : ''}`
+    : 'Keine Position';
+  return by ? (
+    <>
+      {pos}
+      <br />
+      von {by}
+    </>
+  ) : (
+    pos
+  );
+}
+
+function EntryView({ entry, by, onClose }: { entry: LogEntry; by: string | undefined; onClose: () => void }) {
+  const title = `Eintrag · ${formatTime(entry.time, entry.tzOffsetMin)}`;
+  return (
+    <Sheet
+      title={title}
+      subtitle={subtitleOf(entry, by)}
+      onClose={onClose}
+      footer={
+        <button className="btn primary" type="button" onClick={onClose}>
+          Fertig
+        </button>
+      }
+    >
+      <p className="muted">Nur lesen – dieses Logbuch gehört einem anderen Boot.</p>
+      <EntryReadOnly entry={entry} />
+    </Sheet>
+  );
 }
 
 function PositionSection({ entry }: { entry: LogEntry }) {
@@ -118,8 +160,8 @@ function EntryPhotos({ entry }: { entry: LogEntry }) {
   const onRemove = async (photoId: ID): Promise<void> => {
     try {
       await removePhotoFromEntry(db, entry.id, photoId);
-    } catch {
-      toast('Foto konnte nicht entfernt werden');
+    } catch (e) {
+      toast(writeErrorMessage(e, 'Foto konnte nicht entfernt werden'));
     }
   };
   return (
@@ -133,7 +175,9 @@ function EntryPhotos({ entry }: { entry: LogEntry }) {
   );
 }
 
-function EntryForm({ entry, isNew, onClose }: { entry: LogEntry; isNew: boolean; onClose: () => void }) {
+function EntryForm({
+  entry, isNew, by, onClose,
+}: { entry: LogEntry; isNew: boolean; by: string | undefined; onClose: () => void }) {
   const toast = useToast();
   const [timeValue, setTimeValue] = useState(toLocalInput(entry.time, entry.tzOffsetMin));
   const [type, setType] = useState<EntryType>(entry.type);
@@ -151,7 +195,8 @@ function EntryForm({ entry, isNew, onClose }: { entry: LogEntry; isNew: boolean;
   const title = `${isNew ? 'Eintrag ergänzen' : 'Eintrag'} · ${formatTime(newTime, entry.tzOffsetMin)}`;
 
   const save = async (): Promise<void> => {
-    await updateEntry(db, entry.id, {
+    try {
+      await updateEntry(db, entry.id, {
       time: newTime,
       type,
       text: text.trim() === '' ? undefined : text,
@@ -161,21 +206,28 @@ function EntryForm({ entry, isNew, onClose }: { entry: LogEntry; isNew: boolean;
       seaState: sea,
       pressureHpa: parseDecimal(hpa),
       tempC: parseDecimal(temp),
-    });
+      });
+    } catch (e) {
+      toast(writeErrorMessage(e, 'Eintrag konnte nicht gespeichert werden'));
+      return;
+    }
     toast(`Eintrag ${formatTime(newTime, entry.tzOffsetMin)} gespeichert`);
     onClose();
   };
 
   const remove = async (): Promise<void> => {
     const t = formatTime(entry.time, entry.tzOffsetMin);
-    await deleteEntry(db, entry.id);
+    try {
+      await deleteEntry(db, entry.id);
+    } catch (e) {
+      toast(writeErrorMessage(e, 'Eintrag konnte nicht gelöscht werden'));
+      return;
+    }
     toast(`Eintrag ${t} gelöscht`);
     onClose();
   };
 
-  const subtitle = entry.position
-    ? `${formatPosition(entry.position, 3)}${entry.position.accuracyM !== undefined ? ` · ± ${Math.round(entry.position.accuracyM)} m` : ''}`
-    : 'Keine Position';
+  const subtitle = subtitleOf(entry, by);
 
   const footer = confirming ? (
     <div className="confirm" role="alertdialog" aria-label="Löschen bestätigen">

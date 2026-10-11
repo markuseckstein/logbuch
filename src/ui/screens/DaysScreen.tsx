@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
 import { db } from '../../db/db';
 import { MAX_PHOTOS_PER_DAY_REPORT, removePhotoFromDayReport, upsertDayReport } from '../../db/repo';
-import { formatDateLong, type Trip } from '../../domain';
+import { useTripCrew } from '../../db/hooks';
+import { formatDateLong, type DayReport, type Trip } from '../../domain';
 import { useApp } from '../AppContext';
-import { useTripDays } from '../hooks';
+import { useAuthorId, useReadOnly, useTripDays } from '../hooks';
 import { Icon } from '../icons';
-import { num1, type DayInfo } from '../lib';
+import { authorName, num1, sectionPhotoIds, writeErrorMessage, type DayInfo } from '../lib';
+import { useEnsureAuthor } from '../useEnsureAuthor';
 import { usePhotoImport } from '../photoImport';
 import { useToast } from '../toast';
+import { PhotoGrid } from '../components/PhotoImage';
 import { PhotoPicker } from '../components/PhotoPicker';
 import { ChartMap } from '../components/ChartMap';
 import { StatsBar } from '../components/StatsBar';
@@ -44,18 +47,25 @@ function DayCard({ day, onOpen }: { day: DayInfo; onOpen: () => void }) {
   );
 }
 
-export function ReportEditor({ tripId, day }: { tripId: string; day: DayInfo }) {
+export function ReportEditor({
+  tripId, day, section, ensureAuthor, label,
+}: { tripId: string; day: DayInfo; section: DayReport | undefined; ensureAuthor: () => Promise<boolean>; label: string }) {
   const toast = useToast();
-  const [title, setTitle] = useState(day.report?.title ?? '');
-  const [text, setText] = useState(day.report?.text ?? '');
+  const [title, setTitle] = useState(section?.title ?? '');
+  const [text, setText] = useState(section?.text ?? '');
   const save = async (): Promise<void> => {
     const t = title.trim();
-    await upsertDayReport(db, tripId, day.date, t ? { title: t, text } : { text });
-    toast(`Tagesbericht Tag ${day.no} gespeichert`);
+    try {
+      if (!(await ensureAuthor())) return;
+      await upsertDayReport(db, tripId, day.date, t ? { title: t, text } : { text });
+      toast(`Tagesbericht Tag ${day.no} gespeichert`);
+    } catch (e) {
+      toast(writeErrorMessage(e, 'Tagesbericht konnte nicht gespeichert werden'));
+    }
   };
   return (
     <section className="card" aria-label="Tagesbericht">
-      <div className="legend">Tagesbericht</div>
+      <div className="legend">{label}</div>
       <label className="f">
         <span>Titel (optional)</span>
         <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -71,16 +81,33 @@ export function ReportEditor({ tripId, day }: { tripId: string; day: DayInfo }) 
   );
 }
 
-function DayPhotos({ tripId, day }: { tripId: string; day: DayInfo }) {
+/** Abschnitt eines anderen Autors (oder jeder Abschnitt in einem fremden Logbuch), nur lesbar. */
+function SectionCard({ section, name }: { section: DayReport; name: string }) {
+  return (
+    <section className="card section-card" aria-label={`Tagesbericht von ${name}`}>
+      <h3>{name}</h3>
+      {section.title?.trim() ? <b>{section.title.trim()}</b> : null}
+      {section.text.trim() ? <p className="section-text">{section.text}</p> : null}
+      <PhotoGrid photoIds={section.photoIds} />
+    </section>
+  );
+}
+
+function DayPhotos({
+  tripId, day, own, total, allIds, ensureAuthor,
+}: { tripId: string; day: DayInfo; own: DayReport | undefined; total: number; allIds: readonly string[]; ensureAuthor: () => Promise<boolean> }) {
   const toast = useToast();
-  const photoIds = day.report?.photoIds ?? [];
-  const { onAdd, progress } = usePhotoImport({ kind: 'report', tripId, date: day.date, photoIds });
+  const photoIds = own?.photoIds ?? [];
+  const { onAdd: add, progress } = usePhotoImport({ kind: 'report', tripId, date: day.date, photoIds: allIds });
+  const onAdd = async (files: File[]): Promise<void> => {
+    if (await ensureAuthor()) await add(files);
+  };
   const onRemove = async (photoId: string): Promise<void> => {
     try {
       await removePhotoFromDayReport(db, tripId, day.date, photoId);
       toast('Foto entfernt');
-    } catch {
-      toast('Foto konnte nicht entfernt werden');
+    } catch (e) {
+      toast(writeErrorMessage(e, 'Foto konnte nicht entfernt werden'));
     }
   };
   return (
@@ -89,6 +116,8 @@ function DayPhotos({ tripId, day }: { tripId: string; day: DayInfo }) {
       <PhotoPicker
         maxCount={MAX_PHOTOS_PER_DAY_REPORT}
         photoIds={photoIds}
+        totalCount={total}
+        countText={`${total} / ${MAX_PHOTOS_PER_DAY_REPORT} heute`}
         onAdd={onAdd}
         onRemove={onRemove}
         progress={progress}
@@ -99,7 +128,15 @@ function DayPhotos({ tripId, day }: { tripId: string; day: DayInfo }) {
 
 function DayView({ trip, day, onBack }: { trip: Trip; day: DayInfo; onBack: () => void }) {
   const { openEntry } = useApp();
+  const readOnly = useReadOnly(trip.id);
+  const authorId = useAuthorId(trip.id) ?? '';
+  const crew = useTripCrew(trip.id);
+  const { ensure, dialog } = useEnsureAuthor(trip);
   const routes = useMemo(() => [{ id: day.date, points: day.route }], [day]);
+  const nameOf = (id: string): string => authorName(crew, id) ?? (id ? 'Unbekannt' : 'Ohne Autor');
+  const own = readOnly ? undefined : day.sections.find((s) => s.authorId === authorId);
+  const others = day.sections.filter((s) => (readOnly || s !== own) && (s.text.trim() || s.title?.trim() || s.photoIds.length));
+  const allIds = sectionPhotoIds(day.sections);
   return (
     <main className="screen" aria-labelledby="screen-title">
       <button className="back" type="button" onClick={onBack}>
@@ -121,8 +158,24 @@ function DayView({ trip, day, onBack }: { trip: Trip; day: DayInfo; onBack: () =
         fitKey={`${day.date}:${day.entries.length}:${day.route.length}`}
       />
       <StatsBar stats={day.stats} />
-      <ReportEditor key={`${trip.id}-${day.date}`} tripId={trip.id} day={day} />
-      <DayPhotos tripId={trip.id} day={day} />
+      {readOnly ? null : (
+        <ReportEditor
+          key={`${trip.id}-${day.date}-${authorId}`}
+          tripId={trip.id}
+          day={day}
+          section={own}
+          ensureAuthor={ensure}
+          label={crew.length > 1 && authorId ? `Tagesbericht · ${nameOf(authorId)}` : 'Tagesbericht'}
+        />
+      )}
+      {others.map((s) => (
+        <SectionCard key={s.authorId} section={s} name={nameOf(s.authorId)} />
+      ))}
+      {readOnly && others.length === 0 ? <p className="muted">Kein Tagesbericht für diesen Tag.</p> : null}
+      {readOnly ? null : (
+        <DayPhotos tripId={trip.id} day={day} own={own} total={allIds.length} allIds={allIds} ensureAuthor={ensure} />
+      )}
+      {dialog}
       <div className="legend">Einträge</div>
       {day.entries.length === 0 ? (
         <p className="muted">An diesem Tag gibt es noch keine Einträge.</p>

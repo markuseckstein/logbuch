@@ -7,9 +7,10 @@ import { requestPersistentStorage } from '../db/storage';
 import { dayNumber, tripDays, type Settings, type Trip } from '../domain';
 import { AppContext, type AppActions, type TabId } from './AppContext';
 import { Icon, type IconName } from './icons';
-import { useSettings, useToday } from './hooks';
+import { SettingsContext, useReadOnly, useSettings, useToday } from './hooks';
 import { ToastProvider } from './toast';
 import { UpdatePrompt } from './UpdatePrompt';
+import { AuthorPromptHost } from './authorPrompt';
 import { EntrySheet } from './components/EntrySheet';
 import { Onboarding } from './screens/Onboarding';
 import { DaysScreen } from './screens/DaysScreen';
@@ -100,12 +101,19 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
   );
   const closeSheet = useCallback(() => setSheet(null), []);
   const live = useLiveRouteState(trip.id);
+  const readOnly = useReadOnly(trip.id);
 
   return (
     <AppContext.Provider value={actions}>
       <LiveRouteContext.Provider value={live}>
         <div id="app">
           <Topbar trip={trip} dark={dark} onToggleTheme={onToggleTheme} />
+          {readOnly ? (
+            <div className="banner">
+              <Icon name="sichtung" size={20} />
+              Logbuch der {trip.boat.name.trim() || trip.name} · nur lesen
+            </div>
+          ) : null}
           {tab === 'today' ? <TodayScreen trip={trip} reports={reports ?? []} /> : null}
           {tab === 'days' ? <DaysScreen trip={trip} /> : null}
           {tab === 'map' ? <MapScreen trip={trip} /> : null}
@@ -128,6 +136,7 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
             ))}
           </nav>
         </div>
+        <AuthorPromptHost trip={trip} />
         {sheet ? <EntrySheet key={sheet.id} entryId={sheet.id} isNew={sheet.isNew} onClose={closeSheet} /> : null}
         {onboarding ? (
           <Onboarding
@@ -163,12 +172,16 @@ function Root() {
 
   const trips = useLiveQuery(() => db.trips.count(), []);
 
-  if (trip === undefined || trips === undefined) return null;
+  if (trip === undefined || trips === undefined || settings === undefined) return null;
   if (trip === null) {
     // trips > 0 -> Aktivierung läuft gerade; sonst Onboarding (nicht abbrechbar).
     return trips > 0 ? null : <Onboarding onDone={() => undefined} />;
   }
-  return <Shell key={trip.id} trip={trip} dark={dark} onToggleTheme={toggle} />;
+  return (
+    <SettingsContext.Provider value={settings}>
+      <Shell key={trip.id} trip={trip} dark={dark} onToggleTheme={toggle} />
+    </SettingsContext.Provider>
+  );
 }
 
 export function App() {
