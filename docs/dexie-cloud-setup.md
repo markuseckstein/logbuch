@@ -13,7 +13,7 @@ npx dexie-cloud whitelist https://markuseckstein.github.io
 npx dexie-cloud whitelist http://localhost:5173   # vite dev
 npx dexie-cloud whitelist http://localhost:4173   # vite preview / Playwright (Cloud-E2E)
 npx dexie-cloud whitelist                         # ohne Argument: Liste prüfen
-npx dexie-cloud import roles.json                 # Rollen admin / member (ergänzt, löscht keine alten Rollen)
+npx dexie-cloud import roles.json                 # Rollen admin / member / viewer (ergänzt, löscht keine alten Rollen)
 ```
 
 Optional für Cloud-E2E-Tests (Demo-Nutzer belegen keine Plätze, Login ohne Mail):
@@ -32,6 +32,10 @@ npx dexie-cloud import e2e/demoUsers.json         # alice@, bob@, carol@, dave@d
   Immer seriell (`workers: 1`, die Läufe teilen sich die Demo-Konten), auch mit `--repeat-each`.
   Eindeutiges Lauf-Kürzel in Törn- und Bootsnamen. Der Test löscht seinen Törn am Ende „für alle“. Hängen gebliebene Test-Realms: `npx dexie-cloud clear-realm <realmId> --yes`
   (`E2E_KEEP=1` lässt den Realm eines fehlgeschlagenen Laufs zur Analyse stehen).
+- `e2e/homeview.cloud.spec.ts` (läuft mit `npm run e2e:cloud`): Daheim-Link erstellen, Konto per
+  `scripts/create-viewer.mjs` freischalten, frischer Browser sieht den Törn live inkl. Foto, Hinweis bei anderem
+  Login, „Link erneuern“ macht den alten Link ungültig. Löscht am Ende seinen Törn und **nur** die selbst angelegten
+  `daheim-…`-Konten (`--delete`).
 - Entwicklungsserver (`npm run dev`): `window.__logbook` = `{ db, repo, cloud }` für manuelle Versuche (nur DEV-Build).
 
 `dexie-cloud.key` nie committen, nie in Client-Code. Die App braucht nur die (öffentliche) Datenbank-URL.
@@ -49,12 +53,29 @@ npx dexie-cloud import e2e/demoUsers.json         # alice@, bob@, carol@, dave@d
 |---|---|---|
 | (Realm-Owner) | Wer den Törn anlegt = **Admin** | `manage: *` über `realm.owner` – Boote, Einladungen, Törndaten, Cover, alle Einträge, Törn für alle löschen |
 | `admin` | (reserviert, z. B. weitere Admins) | `manage: *` |
+| `viewer` | Daheim-Link (Zuschauer-Konto `daheim-<token>@demo.local`) | keine – nur lesen; zusätzlich `permissions: {}` am Mitglied |
 | `member` | Eingeladene Personen | `add` auf entries, photos, dayReports, tracks, trackChunks. Eigene Datensätze ändern/löschen über die Owner-Regel von Dexie Cloud; fremde nur lesen (Spike, Recherche 9.9) |
 
 Beim Einladen setzt die App am Mitglied `roles: ['member']` **und** dieselben Rechte explizit als `permissions`
 (neu importierte globale Rollen wirkten auf dem gehosteten Server zunächst nicht, Recherche 9.9). Die älteren Rollen
 `skipper`/`crew`/`readonly` stehen noch in der Datenbank (der Import löscht keine Rollen), werden aber nicht mehr
 benutzt.
+
+## Daheim-Link freischalten
+
+Jeder Daheim-Link (Törn-Tab → „Daheim-Link“) braucht **einmalig** ein Demo-Konto in der Cloud – Dexie Cloud lässt den
+Demo-Login nur für vorher importierte Adressen zu (Recherche 9.10). Im Repo-Root (wo `dexie-cloud.json` und
+`dexie-cloud.key` liegen):
+
+```sh
+npm run viewer:create -- daheim-<token>@demo.local        # Befehl steht in der Admin-Karte („Befehl kopieren“)
+npm run viewer:create -- --delete daheim-<token>@demo.local   # altes Konto löschen (optional, z. B. nach „Link erneuern“)
+```
+
+Das Skript akzeptiert auch den ganzen Link oder nur den Token. Bis der Link einmal geöffnet wurde, zeigt die
+Admin-Karte den Hinweis „Einmalig freischalten lassen“. Ein erneuerter/abgeschalteter Link zeigt nichts mehr (das
+Mitglied ist entfernt); das alte Demo-Konto bleibt bestehen, bis es gelöscht wird (es sieht nichts).
+Demo-Konten belegen keine Plätze. Wer den Link hat, kann zusehen – Weiterleiten ist ausdrücklich erlaubt.
 
 ## Plan und Datenschutz
 

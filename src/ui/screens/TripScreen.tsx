@@ -9,29 +9,28 @@ import {
   setAuthor, setBoatPhoto, setTripCover, setTripCoverFocus, updateBoat, updateCrewMember, updateTrip,
 } from '../../db/repo';
 import {
-  activeCrew, boatInUse, clampFocus, coverPosition, formatDateLong, isSharedRealm, nameFromEmail, type Boat, type CoverFocus,
+  activeCrew, boatInUse, clampFocus, coverPosition, isSharedRealm, nameFromEmail, type Boat, type CoverFocus,
   type ID, type Trip,
 } from '../../domain';
 import { useApp } from '../AppContext';
 import { BoatChips, BoatShape, boatColor, useBoatSelection } from '../boats';
 import { AccountCard } from '../cloud/CloudCard';
+import { HomeViewCard } from '../cloud/HomeViewCard';
 import { useCloudStatus, useCloudUser, useMyCrewId, usePeople, useTripAccess } from '../cloudHooks';
 import { useTrips } from '../hooks';
 import { Icon } from '../icons';
-import { initials, writeErrorMessage } from '../lib';
+import { initials, tripPeriod, writeErrorMessage } from '../lib';
 import { useToast } from '../toast';
 import { Dialog } from '../components/Dialog';
 import { ExportCard } from '../components/ExportCard';
 import { JoinSheet } from '../components/JoinSheet';
+import { usePhotoViewer } from '../components/PhotoViewer';
 import { BoatFields, TripFields, boatDraftOf, emptyBoatDraft, tripDraftOf, tripPatchOf, validateTrip, type BoatDraft } from '../components/TripFields';
 import { parseDecimal } from '../lib';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-function dateRange(trip: Trip): string {
-  if (!trip.startDate) return '';
-  return trip.endDate ? `${formatDateLong(trip.startDate)} – ${formatDateLong(trip.endDate)}` : formatDateLong(trip.startDate);
-}
+
 
 /** Datei-Auswahl als Button (Galerie/Kamera). */
 function FileButton({ label, busy, onPick, className = 'btn sm' }: { label: string; busy?: boolean; onPick: (f: File) => void; className?: string }) {
@@ -112,6 +111,8 @@ function FocusDialog({ trip, url, onClose }: { trip: Trip; url: string; onClose:
 function CoverHero({ trip, admin }: { trip: Trip; admin: boolean }) {
   const toast = useToast();
   const url = usePhotoUrl(trip.coverPhotoId);
+  const cover = usePhotoViewer(trip.coverPhotoId ? [{ id: trip.coverPhotoId, caption: trip.name }] : []);
+  const openCover = cover.open;
   const [busy, setBusy] = useState(false);
   const [focusing, setFocusing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -138,14 +139,16 @@ function CoverHero({ trip, admin }: { trip: Trip; admin: boolean }) {
   const title = (
     <div className="hero-t">
       <h2 id="screen-title">{trip.name}</h2>
-      <div>{[dateRange(trip), trip.area].filter(Boolean).join(' · ')}</div>
+      <div>{[tripPeriod(trip), trip.area].filter(Boolean).join(' · ')}</div>
     </div>
   );
   return (
     <section aria-label="Cover">
       {trip.coverPhotoId && url ? (
         <div className="hero">
-          <img src={url} alt="" style={{ objectPosition: coverPosition(trip.coverFocus) }} />
+          <button type="button" className="pic-btn" aria-label="Cover-Bild groß anzeigen" onClick={() => openCover(0)}>
+            <img src={url} alt="" style={{ objectPosition: coverPosition(trip.coverFocus) }} />
+          </button>
           {title}
         </div>
       ) : (
@@ -188,6 +191,7 @@ function CoverHero({ trip, admin }: { trip: Trip; admin: boolean }) {
         <p className="muted" style={{ marginTop: 8 }}>Das Cover wird mit allen Mitgliedern des Törns geteilt.</p>
       ) : null}
       {focusing && url ? <FocusDialog trip={trip} url={url} onClose={() => setFocusing(false)} /> : null}
+      {cover.viewer}
     </section>
   );
 }
@@ -268,7 +272,19 @@ function BoatSvg({ boat }: { boat: Pick<Boat, 'colorIndex'> }) {
 
 function BoatPhoto({ boat }: { boat: Boat }) {
   const url = usePhotoUrl(boat.photoId);
-  return <div className="boatpic">{url ? <img src={url} alt={`Foto ${boat.name}`} /> : <BoatSvg boat={boat} />}</div>;
+  const { open, viewer } = usePhotoViewer(boat.photoId ? [{ id: boat.photoId, caption: boat.name }] : []);
+  return (
+    <div className="boatpic">
+      {url ? (
+        <button type="button" className="pic-btn" aria-label={`Foto ${boat.name} groß anzeigen`} onClick={() => open(0)}>
+          <img src={url} alt={`Foto ${boat.name}`} />
+        </button>
+      ) : (
+        <BoatSvg boat={boat} />
+      )}
+      {viewer}
+    </div>
+  );
 }
 
 function BoatCard({
@@ -689,7 +705,7 @@ function TripList({ trips, activeId }: { trips: readonly Trip[]; activeId: strin
             <TripThumb trip={t} />
             <span className="triplist-name">
               <b>{t.name}</b>
-              <span className="dmeta">{dateRange(t) || 'ohne Datum'}</span>
+              <span className="dmeta">{tripPeriod(t) || 'ohne Datum'}</span>
             </span>
             {t.id === activeId ? (
               <span className="role">Aktiv</span>
@@ -798,6 +814,7 @@ export function TripScreen({ trip }: { trip: Trip }) {
   const access = useTripAccess(trip.id);
   const admin = access.admin;
   const cloud = useCloudStatus();
+  const signedIn = useCloudUser()?.isLoggedIn === true;
   const { boats } = useBoatSelection();
   const entries = useEntries(trip.id) ?? [];
   const tracks = useTracks(trip.id) ?? [];
@@ -836,6 +853,7 @@ export function TripScreen({ trip }: { trip: Trip }) {
         </div>
       ) : null}
       <PeopleCard trip={trip} boats={boats} people={people} admin={admin} />
+      {admin && signedIn ? <HomeViewCard trip={trip} /> : null}
       <TripDataCard key={`data-${trip.id}`} trip={trip} admin={admin} />
       {trips ? <TripList trips={trips} activeId={trip.id} /> : null}
       <ExportCard trip={trip} />

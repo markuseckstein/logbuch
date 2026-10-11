@@ -2,6 +2,7 @@ import type { FixError } from '../device';
 import { NotPermittedError } from '../db/repo';
 import {
   ENTRY_TYPE_LABELS,
+  formatDateLong,
   dayNumber,
   dayRoute,
   dayStats,
@@ -210,4 +211,16 @@ export function selectionDayStats(
   for (const id of boatIds) distanceNm += dayStats(entries.filter((e) => e.boatId === id), trackByBoat(id)).distanceNm;
   const writers = new Set(entries.flatMap((e) => (e.authorId ? [e.authorId] : []))).size;
   return { stats: { distanceNm, underwayMin: 0, entryCount: entries.length }, writers };
+}
+
+/** Zeitraum des Törns („12. Okt. – 19. Okt.“) bzw. leer. */
+export function tripPeriod(trip: Pick<Trip, 'startDate' | 'endDate'>): string {
+  if (!trip.startDate) return '';
+  return trip.endDate ? `${formatDateLong(trip.startDate)} – ${formatDateLong(trip.endDate)}` : formatDateLong(trip.startDate);
+}
+
+/** Bildunterschrift im Vollbild: Teile mit „ · “ verbunden (z. B. Zeit · Boot · Autor), leer = keine. */
+export function photoCaption(parts: readonly (string | undefined)[]): string | undefined {
+  const s = parts.filter((p): p is string => !!p && p.trim() !== '').join(' · ');
+  return s || undefined;
 }

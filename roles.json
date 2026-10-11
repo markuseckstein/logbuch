@@ -4,15 +4,29 @@
       "displayName": "Admin",
       "description": "Hat den Törn angelegt: Boote, Einladungen, alle Einträge",
       "sortOrder": 1,
-      "permissions": { "manage": "*" }
+      "permissions": {
+        "manage": "*"
+      }
     },
     "member": {
       "displayName": "Mitglied",
       "description": "Schreibt im Törn mit: eigene Einträge, Tagesberichte, Fotos, Tracks (fremde nur lesen)",
       "sortOrder": 2,
       "permissions": {
-        "add": ["entries", "photos", "dayReports", "tracks", "trackChunks"]
+        "add": [
+          "entries",
+          "photos",
+          "dayReports",
+          "tracks",
+          "trackChunks"
+        ]
       }
+    },
+    "viewer": {
+      "displayName": "Daheim",
+      "description": "Zuschauer über den Daheim-Link: sieht den ganzen Törn live, schreibt nichts",
+      "sortOrder": 3,
+      "permissions": {}
     }
   }
 }

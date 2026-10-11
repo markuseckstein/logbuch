@@ -2,6 +2,7 @@ import { useId } from 'react';
 import type { ID } from '../../domain';
 import { Icon } from '../icons';
 import { PhotoImage } from './PhotoImage';
+import { usePhotoViewer } from './PhotoViewer';
 
 interface PhotoPickerProps {
   maxCount: number;
@@ -14,14 +15,16 @@ interface PhotoPickerProps {
   countText?: string;
   /** Aktuelle Gesamtzahl für die Sperre bei Erreichen des Limits (Standard: eigene Fotos). */
   totalCount?: number;
+  /** Bildunterschrift im Vollbild. */
+  caption?: string | undefined;
 }
 
-function Tile({ photoId, index, onRemove }: { photoId: ID; index: number; onRemove: () => void }) {
+function Tile({ photoId, index, onOpen, onRemove }: { photoId: ID; index: number; onOpen: () => void; onRemove: () => void }) {
   return (
     <div className="slotwrap">
-      <div className="slot filled">
+      <button type="button" className="slot filled" aria-label={`Foto ${index + 1} groß anzeigen`} onClick={onOpen}>
         <PhotoImage photoId={photoId} alt={`Foto ${index + 1}`} />
-      </div>
+      </button>
       <button className="slot-x" type="button" aria-label={`Foto ${index + 1} entfernen`} onClick={onRemove}>
         <span>
           <Icon name="x" size={16} />
@@ -32,8 +35,9 @@ function Tile({ photoId, index, onRemove }: { photoId: ID; index: number; onRemo
 }
 
 /** Galerie (Mehrfachauswahl) + Kamera, Vorschau-Raster der vorhandenen Fotos mit Entfernen. */
-export function PhotoPicker({ maxCount, photoIds, onAdd, onRemove, progress, countText, totalCount }: PhotoPickerProps) {
+export function PhotoPicker({ maxCount, photoIds, onAdd, onRemove, progress, countText, totalCount, caption }: PhotoPickerProps) {
   const uid = useId();
+  const { open, viewer } = usePhotoViewer(photoIds.map((id) => ({ id, caption })));
   const full = (totalCount ?? photoIds.length) >= maxCount;
   const disabled = full || progress !== undefined;
   const pick = (files: FileList | null, input: HTMLInputElement): void => {
@@ -77,10 +81,11 @@ export function PhotoPicker({ maxCount, photoIds, onAdd, onRemove, progress, cou
       {photoIds.length > 0 ? (
         <div className="photogrid">
           {photoIds.map((id, i) => (
-            <Tile key={id} photoId={id} index={i} onRemove={() => void onRemove(id)} />
+            <Tile key={id} photoId={id} index={i} onOpen={() => open(i)} onRemove={() => void onRemove(id)} />
           ))}
         </div>
       ) : null}
+      {viewer}
     </div>
   );
 }

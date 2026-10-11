@@ -13,3 +13,4 @@ export * from './tracks';
 export * from './ids';
 export * from './syncRejections';
 export * from './join';
+export * from './homeView';

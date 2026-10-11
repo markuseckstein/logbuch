@@ -4,6 +4,7 @@ import {
 } from '../domain/access';
 import { activeBoats, boatInUse, clampFocus, nextColorIndex } from '../domain/boats';
 import { localDate } from '../domain/days';
+import { isViewerEmail } from '../domain/homeView';
 import { dayReportId, timeOrderedId } from '../domain/ids';
 import { mergeRecords, mergeTrip, remapPhotoIds, withoutCloudFields, type MergeStats } from '../domain/merge';
 import { assembleTracks, chunkPoints, TRACK_CHUNK_SIZE } from '../domain/tracks';
@@ -124,6 +125,8 @@ export interface TripAccess extends Me {
 export async function tripAccess(db: LogbookDB, tripId: ID): Promise<TripAccess> {
   const user = db.cloudUser();
   if (!user) return { admin: true, canWrite: true };
+  // Daheim-Link: reiner Zuschauer, egal was eine Mitgliedschaft hergibt
+  if (isViewerEmail(user.email)) return { userId: user.userId, admin: false, canWrite: false, viewer: true };
   const trip = await db.trips.get(tripId);
   if (!trip || !isSharedRealm(trip.realmId)) return { userId: user.userId, admin: true, canWrite: true };
   // just shared by me, the realm row has no owner yet (the server sets it): my own trip

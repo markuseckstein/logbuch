@@ -11,7 +11,7 @@ import { useMyCrewId, useTripAccess } from '../cloudHooks';
 import { useReadOnly, useTripDays } from '../hooks';
 import { Icon } from '../icons';
 import {
-  authorName, boatLayers, currentTzOffsetMin, groupTrackPoints, initials, num1, sectionPhotoIds, selectionDayStats,
+  authorName, boatLayers, currentTzOffsetMin, groupTrackPoints, initials, num1, photoCaption, sectionPhotoIds, selectionDayStats,
   writeErrorMessage, type DayInfo,
 } from '../lib';
 import { useEnsureAuthor } from '../useEnsureAuthor';
@@ -160,7 +160,7 @@ function ReportSection({ tripId, day, section, authorId, name, mine, admin, edit
         <>
           {section.title?.trim() ? <p><b>{section.title.trim()}</b></p> : null}
           {section.text.trim() ? <p>{section.text}</p> : null}
-          <PhotoGrid photoIds={section.photoIds} />
+          <PhotoGrid photoIds={section.photoIds} caption={photoCaption([`Tag ${day.no}`, name, time ? `${time} Uhr` : undefined])} />
           {editable ? (
             <div className="rep-act">
               <button className="btn sm" type="button" onClick={startEdit}>
@@ -213,6 +213,7 @@ function DayPhotos({
         onAdd={onAdd}
         onRemove={onRemove}
         progress={progress}
+        caption={photoCaption([`Tag ${day.no}`, 'Meine Fotos'])}
       />
     </section>
   );

@@ -11,9 +11,13 @@ import './ui/app.css';
 import { deleteLegacyDb } from './db/legacy';
 import { App } from './ui/App';
 import { captureJoinFromUrl } from './ui/cloud/joinState';
+import { captureHomeViewFromUrl } from './ui/homeView/state';
 
 void deleteLegacyDb();
 captureJoinFromUrl();
+captureHomeViewFromUrl();
+// Daheim-Link in einen schon offenen Tab eingefügt: nur der Hash ändert sich, kein Neuladen
+window.addEventListener('hashchange', captureHomeViewFromUrl);
 
 // Nur im Entwicklungsserver: Zugriff für manuelle Spikes/Debugging (nie im Produktions-Build).
 if (import.meta.env.DEV) {

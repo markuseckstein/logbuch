@@ -51,3 +51,40 @@ Kein Splash. Referenz-Prototyp nur lokal (zeigt echte Personen, nicht ins Repo).
 - Törn-Übersicht/-Wechsler: Liste der Törns mit Cover-Thumbnail (Platzhalter-Icon ohne Cover), Zeitraum, aktiver Törn markiert, „Neuen Törn anlegen …“.
 - Onboarding Schritt 1: optionales Feld „Cover-Bild (optional)“ mit Vorschau/Ändern/Entfernen.
 - Export: Cover und Fokus im Export v4 (`trip.coverPhotoId`, Foto in `images/`); GPX unverändert.
+
+## Daheim-Link (Nachtrag 2026-10-11)
+Daheimgebliebene (3–5, u. a. Oma) sehen den Törn live – Karte, Einträge, Tagesberichte, Fotos – nur über einen
+kryptischen Link, ohne E-Mail/Code, ohne etwas ändern zu können. Weiterleiten ist akzeptiert. Spike und Begründung:
+`docs/research/dexie-cloud-integration.md` 9.10.
+- **Konto:** pro Törn ein Dexie-Cloud-Demo-Konto `daheim-<token>@demo.local`, `<token>` = 128 Bit Zufall als 26
+  Zeichen Base32 (`domain/homeView.ts`). Realm-Mitglied `{email, name: 'Daheim', roles: ['viewer'], permissions: {},
+  invite: false}` – **keine** Person (`CrewMember`), erscheint nicht in der Mitgliederliste. Der Token wird nicht
+  zusätzlich am Trip gespeichert: er steckt in der E-Mail des Mitglieds (Realm-Mitglieder sehen die Mitgliederzeilen,
+  also auch den Link – akzeptiert).
+- **Einmalig freischalten:** Dexie Cloud erlaubt Demo-Login nur für importierte Adressen. Der Admin (bzw. wer
+  `dexie-cloud.key` hat) führt einmal je Link `npm run viewer:create -- daheim-<token>@demo.local` aus. Die Admin-Karte
+  zeigt den Befehl („Einmalig freischalten lassen“, „Befehl kopieren“), bis der Link einmal geöffnet wurde.
+- **Admin-UI** (Törn-Tab, nur Admin angemeldet): Karte „Daheim-Link“: „Daheim-Link erstellen“ → Link
+  `<App-URL>#daheim=<token>` mit QR-Code, „Link teilen“, Status „geöffnet“; „Link erneuern“ (altes Mitglied raus, neuer
+  Token; Bestätigung in der UI) und „Daheim-Link abschalten“ (Bestätigung in der UI).
+- **Zuschauer:** Link öffnen → Token in localStorage, Hash aus der Adresse entfernt (auch bei `hashchange` in einem
+  offenen Tab). Nicht angemeldet → automatischer Demo-Login. Als anderes Zuschauer-Konto (alter Link) angemeldet →
+  stiller Wechsel. Als **echtes** Konto angemeldet → Hinweis „Du bist angemeldet als <E-Mail>. Die Daheim-Ansicht in
+  diesem Browser öffnen meldet dich ab.“ mit „Trotzdem öffnen“ / „Abbrechen“. Einladung wird automatisch angenommen.
+- **Ansicht „Daheim“** (`ui/homeView/`): eigene, vereinfachte Oberfläche, große Schrift, keine Tab-Leiste, keine
+  Bearbeiten-/Anlegen-/Export-/Einladen-Elemente. Kopf mit Cover, Törnname, Zeitraum; „Zuletzt aktualisiert vor …“
+  (jüngste Änderung an Einträgen/Berichten/Tracks); Karte mit allen Booten (Farbe/Form, letzte Position hervorgehoben);
+  Tage absteigend mit Tagesberichten (Name, Uhrzeit), Einträgen (Boot-Badge, Autor) und Fotos (antippen = Vollbild).
+  „Törn wird geladen …“; nach Abgleich ohne Törn bzw. wenn der Link (noch) nicht freigeschaltet ist: „Dieser
+  Daheim-Link ist nicht mehr gültig. Frag die Crew nach dem neuen Link.“
+- **Rechte:** Rolle `viewer` in `roles.json` ohne Rechte; `tripAccess` liefert für Zuschauer `viewer: true`,
+  `canWrite: false`; `canEditRecord` ist für Zuschauer immer false. Der Server lehnt Schreibversuche ab.
+
+## Foto-Vollbild (Nachtrag 2026-10-11)
+Ein gemeinsamer Viewer (`ui/components/PhotoViewer.tsx`) für Crew-App und Daheim-Ansicht: Foto antippen (Timeline-
+Vorschau, Eintrag ansehen/bearbeiten, Tagesbericht, eigene Tagesfotos, Cover, Bootsfoto) öffnet das Originalbild
+vollflächig auf Schwarz (`object-fit: contain`). Wischen links/rechts bzw. Pfeile blättern durch die Fotos desselben
+Eintrags/Abschnitts, Zähler „2 / 5“, Bildunterschrift (Zeit · Boot · Autor bzw. Tag · Name · Uhrzeit). Pinch- und
+Doppeltipp-Zoom (gezoomt verschiebt Wischen das Bild). Schließen: X, nach unten wischen, Esc, Zurück-Geste (eigener
+History-Eintrag). „Teilen/Speichern“: Web Share mit Datei, sonst Download. Im Bearbeiten-Sheet bleibt „Entfernen“ ein
+eigener Knopf.

@@ -1,6 +1,7 @@
 import { usePhotoImage } from '../../db/hooks';
 import type { ID } from '../../domain';
 import { Icon } from '../icons';
+import { usePhotoViewer } from './PhotoViewer';
 
 /** Foto aus dem lokalen Speicher; fehlt das Bild (Export ohne Fotos), erscheint die Platzhalter-Kachel. */
 export function PhotoImage({ photoId, alt }: { photoId: ID; alt: string }) {
@@ -18,18 +19,23 @@ export function PhotoImage({ photoId, alt }: { photoId: ID; alt: string }) {
   return url ? <img src={url} alt={alt} /> : null;
 }
 
-/** Nur-Lese-Raster (fremde Abschnitte, fremdes Logbuch). */
-export function PhotoGrid({ photoIds }: { photoIds: readonly ID[] }) {
+/**
+ * Nur-Lese-Raster (fremde Abschnitte, Eintrag ansehen, Daheim-Ansicht); antippen öffnet das Foto im Vollbild,
+ * Wischen blättert durch die Fotos dieses Rasters.
+ */
+export function PhotoGrid({ photoIds, caption, className }: { photoIds: readonly ID[]; caption?: string | undefined; className?: string }) {
+  const { open, viewer } = usePhotoViewer(photoIds.map((id) => ({ id, caption })));
   if (photoIds.length === 0) return null;
   return (
-    <div className="photogrid">
+    <div className={className ? `photogrid ${className}` : 'photogrid'}>
       {photoIds.map((id, i) => (
         <div key={id} className="slotwrap">
-          <div className="slot filled">
+          <button type="button" className="slot filled" aria-label={`Foto ${i + 1} groß anzeigen`} onClick={() => open(i)}>
             <PhotoImage photoId={id} alt={`Foto ${i + 1}`} />
-          </div>
+          </button>
         </div>
       ))}
+      {viewer}
     </div>
   );
 }

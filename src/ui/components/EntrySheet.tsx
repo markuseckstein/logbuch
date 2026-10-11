@@ -19,7 +19,9 @@ import {
 import { ENTRY_ICON, Icon, SKY_ICON } from '../icons';
 import { BoatChips, boatColor } from '../boats';
 import { useMyCrewId, useTripAccessState } from '../cloudHooks';
-import { ENTRY_TYPES, FIX_ERROR_LABEL, authorName, fromLocalInput, parseDecimal, toLocalInput, writeErrorMessage } from '../lib';
+import {
+  ENTRY_TYPES, FIX_ERROR_LABEL, authorName, fromLocalInput, parseDecimal, photoCaption, toLocalInput, writeErrorMessage,
+} from '../lib';
 import { usePhotoImport } from '../photoImport';
 import { useToast } from '../toast';
 import { BeaufortBar } from './BeaufortBar';
@@ -101,7 +103,7 @@ function EntryView({
         <b>Nur ansehen</b>
         {originText(by, boat)}. Fremde Einträge kannst du nicht ändern oder löschen.
       </div>
-      <EntryReadOnly entry={entry} />
+      <EntryReadOnly entry={entry} caption={photoCaption([formatTime(entry.time, entry.tzOffsetMin), boat?.name, by])} />
     </Sheet>
   );
 }
@@ -176,7 +178,7 @@ function PositionSection({ entry }: { entry: LogEntry }) {
   );
 }
 
-function EntryPhotos({ entry }: { entry: LogEntry }) {
+function EntryPhotos({ entry, caption }: { entry: LogEntry; caption?: string | undefined }) {
   const toast = useToast();
   const { onAdd, progress } = usePhotoImport({ kind: 'entry', entry });
   const onRemove = async (photoId: ID): Promise<void> => {
@@ -193,6 +195,7 @@ function EntryPhotos({ entry }: { entry: LogEntry }) {
       onAdd={onAdd}
       onRemove={onRemove}
       progress={progress}
+      caption={caption}
     />
   );
 }
@@ -374,7 +377,7 @@ function EntryForm({
       </label>
       <fieldset>
         <legend>Fotos (bis zu {MAX_PHOTOS_PER_ENTRY})</legend>
-        <EntryPhotos entry={entry} />
+        <EntryPhotos entry={entry} caption={photoCaption([formatTime(entry.time, entry.tzOffsetMin), boats.find((b) => b.id === boatId)?.name, by])} />
       </fieldset>
     </Sheet>
   );

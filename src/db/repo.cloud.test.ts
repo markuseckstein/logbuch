@@ -163,6 +163,21 @@ describe('access in a shared trip', () => {
     expect(await tripAccess(db, trip.id)).toEqual({ userId: 'bob', admin: true, canWrite: true });
   });
 
+  it('viewer (Daheim-Link) may neither write nor edit, even if a membership would grant it', async () => {
+    const { trip, realmId, boatId, aliceEntry } = await sharedTrip();
+    const email = 'daheim-aaaaaaaaaaaaaaaaaaaaaaaaaa@demo.local';
+    await db.members.put({ id: 'mmb-v', realmId, userId: email, email, roles: ['viewer'], permissions: MEMBER_PERMISSIONS, accepted: new Date() } as never);
+    db.cloudUser = () => ({ userId: email, email });
+    expect(await tripAccess(db, trip.id)).toEqual({ userId: email, admin: false, canWrite: false, viewer: true });
+    expect(await canEdit(db, { ...aliceEntry, owner: undefined })).toBe(false);
+    await expect(createEntry(db, trip.id, { boatId, time: 2, tzOffsetMin: 0 })).rejects.toBeInstanceOf(NotPermittedError);
+    await expect(updateEntry(db, aliceEntry.id, { text: 'x' })).rejects.toBeInstanceOf(NotPermittedError);
+    expect(await listWritableTripIds(db)).toEqual([]);
+    // auch ein noch nicht geteilter Törn (lokal angekommen) gehört dem Zuschauer nicht
+    const local = await createTrip(db, tripInput('L', ['B']));
+    expect((await tripAccess(db, local.id)).admin).toBe(false);
+  });
+
   it('local mode: everything allowed', async () => {
     const trip = await createTrip(db, tripInput('T', ['B']));
     expect(await tripAccess(db, trip.id)).toEqual({ admin: true, canWrite: true });

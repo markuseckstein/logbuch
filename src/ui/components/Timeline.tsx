@@ -12,14 +12,22 @@ import {
 import { ENTRY_ICON, Icon, SKY_ICON } from '../icons';
 import { BoatBadge, boatColor } from '../boats';
 import { useMyCrewId } from '../cloudHooks';
-import { authorName } from '../lib';
+import { authorName, photoCaption } from '../lib';
 import { PhotoImage } from './PhotoImage';
+import { usePhotoViewer } from './PhotoViewer';
 import { sectorIndex } from './WindRose';
 
-function Thumb({ photoId }: { photoId: ID }) {
+/** Thumbnails eines Eintrags (eigene Buttons neben dem Eintrag): antippen öffnet das Foto im Vollbild. */
+function Thumbs({ photoIds, caption }: { photoIds: readonly ID[]; caption: string | undefined }) {
+  const { open, viewer } = usePhotoViewer(photoIds.map((id) => ({ id, caption })));
   return (
-    <span className="thumb">
-      <PhotoImage photoId={photoId} alt="Foto" />
+    <span className="thumbs tl-thumbs">
+      {photoIds.map((id, i) => (
+        <button key={id} type="button" className="thumb" aria-label={`Foto ${i + 1} groß anzeigen`} onClick={() => open(i)}>
+          <PhotoImage photoId={id} alt="Foto" />
+        </button>
+      ))}
+      {viewer}
     </span>
   );
 }
@@ -101,15 +109,9 @@ export function Timeline({ entries, onOpen, showBoat = false }: TimelineProps) {
                 ) : null}
                 <span className="pos">{e.position ? formatPosition(e.position) : 'ohne Position'}</span>
                 {e.text ? <span className="tl-text">{e.text}</span> : null}
-                {e.photoIds.length ? (
-                  <span className="thumbs">
-                    {e.photoIds.map((id) => (
-                      <Thumb key={id} photoId={id} />
-                    ))}
-                  </span>
-                ) : null}
               </span>
             </button>
+            {e.photoIds.length ? <Thumbs photoIds={e.photoIds} caption={photoCaption([time, boat?.name, author])} /> : null}
           </li>
         );
       })}

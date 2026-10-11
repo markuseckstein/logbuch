@@ -16,6 +16,8 @@ export interface MapLayer {
   label?: string;
   routes: readonly MapRoute[];
   entries: readonly LogEntry[];
+  /** Letzte bekannte Position, hervorgehoben (Daheim-Ansicht). */
+  last?: LatLon | undefined;
 }
 
 export interface ChartMapProps {
@@ -168,6 +170,7 @@ export function ChartMap({ layers, onOpenEntry, fitKey, label, compact = false, 
       for (const f of ls) {
         for (const r of f.routes) for (const p of r.points) pts.push([p.lat, p.lon]);
         for (const e of f.entries) if (e.position) pts.push([e.position.lat, e.position.lon]);
+        if (f.last) pts.push([f.last.lat, f.last.lon]);
       }
       if (pts.length === 0) {
         const c = fb ?? KIEL_BAY;
@@ -235,6 +238,20 @@ export function ChartMap({ layers, onOpenEntry, fitKey, label, compact = false, 
         })
           .on('click', () => openRef.current?.(e.id))
           .addTo(s.data);
+        count++;
+      }
+      if (f.last) {
+        // Halo + großes, gefülltes Bootssymbol: „hier ist das Boot jetzt“
+        L.circleMarker([f.last.lat, f.last.lon], { radius: 20, color, weight: 2, opacity: 0.9, fillColor: color, fillOpacity: 0.18, interactive: false })
+          .addTo(s.data);
+        L.marker([f.last.lat, f.last.lon], {
+          icon: L.divIcon({ className: 'boat-mk boat-last', html: markerSvg(style, color, color, 28), iconSize: [28, 28], iconAnchor: [14, 14] }),
+          keyboard: false,
+          interactive: false,
+          title: `Letzte Position${f.label ? ` · ${f.label}` : ''}`,
+          zIndexOffset: 1000,
+        }).addTo(s.data);
+        anchor = [f.last.lat, f.last.lon];
         count++;
       }
       if (anchor && f.label) {

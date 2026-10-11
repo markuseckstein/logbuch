@@ -362,3 +362,53 @@ legend em.req{font-style:normal;color:var(--magenta);letter-spacing:.04em;margin
 .join-link{font-size:13px;overflow-wrap:anywhere;color:var(--ink-2);margin:0}
 .join-screen{display:flex;flex-direction:column;justify-content:center;min-height:100dvh}
 .join-screen h1{font-size:24px;line-height:1.2;margin:0}
+
+/* Fotos antippbar (Vollbild) */
+.pic-btn{display:block;position:absolute;inset:0;width:100%;height:100%;cursor:zoom-in}
+.hero .hero-t{pointer-events:none}
+button.slot{cursor:zoom-in;padding:0;border-style:solid}
+button.thumb{display:block;padding:0;cursor:zoom-in}
+.tl-thumbs{position:relative;z-index:1;margin:-6px 0 0 96px;padding-bottom:10px;flex-wrap:wrap}
+
+/* Vollbild-Fotoansicht (immer dunkel) */
+.pv{position:fixed;inset:0;z-index:80;background:#000;color:#fff;display:flex;flex-direction:column;overscroll-behavior:contain}
+.pv-top{display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top,0px)) 8px 8px 16px;position:relative;z-index:2}
+.pv-count{flex:1;font:600 15px var(--font-mono)}
+.pv-btn{width:48px;height:48px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.35)}
+.pv-btn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.pv-stage{position:relative;flex:1;min-height:0;overflow:hidden;touch-action:none;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none}
+.pv-stage img{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain;transform-origin:center center;will-change:transform;-webkit-user-drag:none}
+.pv-prev,.pv-next{position:absolute;top:50%;margin-top:-24px;z-index:2}
+.pv-prev{left:8px}.pv-next{right:8px}
+.pv-msg{color:#ddd}
+.pv-cap{margin:0;padding:10px 16px calc(14px + env(safe-area-inset-bottom,0px));font:500 15px var(--font-mono);color:#eee;text-align:center;overflow-wrap:anywhere}
+
+/* Daheim-Ansicht: einfach, groß, nur lesen */
+#app.home{padding-bottom:32px}
+.home{font-size:19px}
+.home .muted{font-size:17px}
+.home h1{font-size:26px}
+.home .hero .hero-t h1{font-size:28px;color:#fff;overflow-wrap:anywhere}
+.home .hero.empty-cover .hero-t h1{color:var(--ink)}
+.home .hero .hero-t div{font-size:15px}
+.home .hero-t{pointer-events:none}
+.home-pad{padding:16px}
+.home-updated{display:flex;align-items:center;gap:8px;margin:0;font-weight:600;color:var(--ok)}
+.home-boats{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 18px}
+.home-boats li{display:flex;align-items:center;gap:8px}
+.home-day h2{font-size:22px}
+.home-day .rep-h b{font-size:19px}
+.home-entries{list-style:none;margin:0;padding:0}
+.home-entry{padding:12px 0;border-top:1px solid var(--line)}
+.home-entry-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.home-entry-h .num{font-weight:600;font-size:17px}
+.home-entry-h .who{font-size:15px}
+.home-entry p{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.home-entry .photogrid,.home-day .rep .photogrid{margin-top:10px}
+.home-photos{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+.join-screen.home{max-width:480px;margin:0 auto}
+
+/* Admin: Daheim-Link */
+.cmd{display:block;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);font:500 13px var(--font-mono);overflow-wrap:anywhere;user-select:all}
+.note>*+*{margin-top:8px}
+.note p{margin:0}

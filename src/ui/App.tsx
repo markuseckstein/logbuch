@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useActiveTrip, useBoats, useDayReports, useEntries, useTripCrew } from '../db/hooks';
-import { getSettings, listTrips, setActiveTrip, setTheme } from '../db/repo';
+import { getSettings, listTrips, setActiveTrip } from '../db/repo';
 import { requestPersistentStorage } from '../db/storage';
-import { dayNumber, tripDays, type Settings, type Trip } from '../domain';
+import { dayNumber, isViewerEmail, tripDays, type Trip } from '../domain';
 import { AppContext, type AppActions, type TabId } from './AppContext';
 import { Icon, type IconName } from './icons';
-import { SettingsContext, useReadOnly, useSettings, useToday } from './hooks';
+import { SettingsContext, useReadOnly, useSettings, useTheme, useToday } from './hooks';
 import { ToastProvider } from './toast';
 import { UpdatePrompt } from './UpdatePrompt';
 import { AuthorPromptHost } from './authorPrompt';
@@ -22,9 +22,11 @@ import { CloudLoginHost } from './cloud/LoginHost';
 import { JoinScreen, JoinWatcher, JoiningBanner, JoiningScreen, useJoinGate } from './cloud/Join';
 import { RejectedChangesBanner, RejectionWatcher } from './cloud/RejectedChangesBanner';
 import { SyncIndicator } from './cloud/SyncIndicator';
-import { WritableTripsContext, useMyCrewId, useWritableTripIds } from './cloudHooks';
+import { WritableTripsContext, useCloudUser, useMyCrewId, useWritableTripIds } from './cloudHooks';
 import { BoatSelectionContext, BoatSwitch, useBoatSelectionState } from './boats';
 import { CloudAdopter } from './cloud/CloudAdopter';
+import { HomeViewApp } from './homeView/HomeViewApp';
+import { useHomeViewToken } from './homeView/state';
 
 const TABS: readonly { id: TabId; label: string; icon: IconName }[] = [
   { id: 'today', label: 'Heute', icon: 'tab-heute' },
@@ -32,19 +34,6 @@ const TABS: readonly { id: TabId; label: string; icon: IconName }[] = [
   { id: 'map', label: 'Karte', icon: 'tab-karte' },
   { id: 'trip', label: 'Törn', icon: 'tab-toern' },
 ];
-
-const prefersDark = (): boolean =>
-  typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
-
-function useTheme(theme: Settings['theme'] | undefined): { dark: boolean; toggle: () => void } {
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'light' || theme === 'dark') root.dataset['theme'] = theme;
-    else delete root.dataset['theme'];
-  }, [theme]);
-  const dark = theme === 'dark' || (theme !== 'light' && prefersDark());
-  return { dark, toggle: () => void setTheme(db, dark ? 'light' : 'dark') };
-}
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
@@ -209,14 +198,28 @@ function Root() {
   );
 }
 
+/** Daheim-Link: Link geöffnet (Token gemerkt) oder als Zuschauer-Konto angemeldet. */
+function useHomeViewMode(): { on: boolean; token: string | undefined } {
+  const token = useHomeViewToken();
+  const email = useCloudUser()?.email;
+  return { on: token !== undefined || isViewerEmail(email), token };
+}
+
 export function App() {
+  const homeView = useHomeViewMode();
   return (
     <ToastProvider>
-      <Root />
-      <JoinWatcher />
-      <RejectionWatcher />
-      <CloudAdopter />
-      <CloudLoginHost />
+      {homeView.on ? (
+        <HomeViewApp key={homeView.token ?? ''} />
+      ) : (
+        <>
+          <Root />
+          <JoinWatcher />
+          <RejectionWatcher />
+          <CloudAdopter />
+          <CloudLoginHost />
+        </>
+      )}
       <UpdatePrompt />
     </ToastProvider>
   );

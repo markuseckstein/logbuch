@@ -1,6 +1,7 @@
 import { buildJoinUrl, type Trip } from '../../domain';
 import type { PersonInfo } from '../../db/cloud';
 import { Icon } from '../icons';
+import { shareLink } from '../share';
 import { useToast } from '../toast';
 import { QrCode } from './QrCode';
 import { Sheet } from './Sheet';
@@ -27,23 +28,8 @@ export function JoinSheet({
   const toast = useToast();
   const url = joinUrlFor(trip.id, person?.email);
   const nobody = person === undefined && !people.some((p) => !p.self && p.email);
-  const share = async (): Promise<void> => {
-    const data = { title: `Logbuch: ${trip.name}`, text: `Tritt dem Törn „${trip.name}“ bei:`, url };
-    if (typeof navigator.share === 'function') {
-      try {
-        await navigator.share(data);
-        return;
-      } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') return;
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      toast('Link in die Zwischenablage kopiert');
-    } catch {
-      toast('Link konnte nicht kopiert werden – bitte markieren und kopieren');
-    }
-  };
+  const share = (): Promise<void> =>
+    shareLink({ title: `Logbuch: ${trip.name}`, text: `Tritt dem Törn „${trip.name}“ bei:`, url }, toast);
   return (
     <Sheet
       title={person ? `QR-Code für ${person.name}` : 'Zum Törn einladen'}

@@ -600,6 +600,36 @@ Befunde:
 gleich, sobald die Rolle wirkt. Admin = Realm-Owner (`manage: *` über `realm.owner`), keine Rolle nötig. Die UI
 prüft zusätzlich `canEditRecord` (`domain/access.ts`), damit fremde Einträge gar nicht erst geändert werden.
 
+### 9.10 Spike Daheim-Link: Zuschauer per Demo-Konto (2026-10-11, echte DB `z8c8mdzxf`, Addon 4.4.15)
+
+Frage: Können 3–5 Daheimgebliebene den Törn live sehen – nur über einen kryptischen Link, ohne E-Mail/Code? Ansatz:
+pro Törn ein Demo-Konto `daheim-<token>@demo.local` (Login `grant_type: 'demo'`, laut Preisseite ohne Seats,
+unbegrenzt), Mitglied im Törn-Realm mit Rolle `viewer` ohne Rechte. Skript im Scratchpad (nicht im Repo), Playwright
+gegen `vite dev` (`window.__logbook`), Admin = alice (Demo), dazu zwei frische Browser-Kontexte.
+
+| Frage | Ergebnis |
+|---|---|
+| (a) Demo-Login mit einer **nicht** importierten `@demo.local`-Adresse | **Nein.** `POST /token` antwortet 403 `Demo user '<email>' not found.`; das Addon zeigt das als `message-alert` (`GENERIC_ERROR`) über `userInteraction`, `login()` bleibt hängen, bis der Hinweis geschlossen wird, und scheitert dann. |
+| (b) Demo-Nutzer per CLI anlegen, dann einloggen | **Ja.** `npx dexie-cloud import <datei>.json` mit `{"demoUsers": {"<email>": {}}}` (≈ 2 s), danach sofort Login ohne Code; Lizenz `demo`, `userType: 'demo'`, Refresh-Token läuft bis 2107. Löschen: gleiche Datei mit `null` statt `{}` – danach wieder 403 „not found“; andere Demo-Nutzer bleiben (Export `--demoUsers` geprüft). |
+| (c) Mitglied mit `roles: ['viewer']`, `permissions: {}`, `invite: false` | **Sieht alles, live, schreibt nichts.** Einladung erscheint in `db.cloud.invites`, nach `accept()` kommen Trip, Einträge und Foto-Blob (eager) in < 1 s; neuer Eintrag des Admins nach ≈ 0,5 s beim Zuschauer (WebSocket). Schreibversuche am Repo vorbei (`entries.add`, fremden Eintrag ändern, Trip umbenennen) lehnt der Server ab (`PermissionsDeniedError … not authorized to add entries / update …`), lokal zurückgerollt. Die Rolle `viewer` war beim Test noch nicht importiert – ohne Rechte ist das gleichgültig. |
+| (d) Mitglied entfernen | **Daten verschwinden lokal** ohne Neuladen nach ≈ 2 s (Trip, Einträge, Fotos = 0; Realm fehlt in `db.realms`); nach Neuladen ebenfalls leer. Das Konto selbst bleibt gültig (Login geht weiter), sieht aber nichts mehr. |
+
+Weitere Befunde:
+- Der Rettungsmechanismus für abgelehnte Änderungen (9.8) sendet Schreibversuche eines Zuschauers immer wieder (auch
+  nach dem Entfernen) – in der Zuschauer-Oberfläche läuft er deshalb nicht (`RejectionWatcher` nicht eingebunden),
+  und das Repo blockiert Zuschauer vorher (`tripAccess` → `viewer`, `canEditRecord` immer false).
+- Ein abgebrochener Spike-Lauf ließ einen Realm stehen (`clear-realm` aufgeräumt).
+- Sicherheit: Wer den Link kennt, kennt das Konto (Demo-Login ohne Geheimnis). Schutz allein über 128 Bit Zufall im
+  Token; der Token steht nur im URL-Hash (nicht in Server-Logs). Weiterleiten ist akzeptiert; „Link erneuern“ macht
+  den alten wertlos (Mitglied entfernt, Daten verschwinden). Mitglieder des Realms sehen die Mitgliederzeilen und damit
+  auch die Zuschauer-Adresse (= den Link).
+
+**Entscheidung:** Weil (a) nicht geht, braucht jeder neue Daheim-Link **einen einmaligen CLI-Schritt**: Die App erzeugt
+Token, Link und Realm-Mitglied; `npm run viewer:create -- <email>` (`scripts/create-viewer.mjs`, nutzt
+`dexie-cloud.key` über die CLI) legt das Demo-Konto an. Die Admin-Karte zeigt den Befehl, bis der Link einmal geöffnet
+wurde (Mitgliedschaft `accepted`). Ein noch nicht freigeschalteter Link zeigt beim Zuschauer „nicht mehr gültig“ mit
+„Erneut versuchen“. Cloud-E2E (`e2e/homeview.cloud.spec.ts`) legt seine Zufallskonten selbst an und löscht genau diese.
+
 ## 10. Quellenverzeichnis
 
 - Doku (abgerufen 2026-10-11): `https://dexie.org/docs/cloud/` Unterseiten `dexie-cloud-addon`, `db.cloud.configure()`, `DexieCloudOptions`, `best-practices`, `consistency`, `access-control`, `Realm`, `Role`, `Member`, `DBPermissionSet`, `db.members`, `db.realms`, `db.roles`, `db.cloud.permissions()`, `db.cloud.invites`, `db.cloud.login()`, `db.cloud.logout()`, `db.cloud.currentUser`, `db.cloud.syncState`, `SyncState`, `db.cloud.webSocketStatus`, `db.cloud.sync()`, `authentication`, `add-demo-users`, `cli`, `limits`, `rest-api`, `blob-offloading`, `gdpr-compliance`, `custom-emails`, `quickstart`; Preise: `https://dexie.org/cloud/pricing`.

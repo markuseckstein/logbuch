@@ -55,3 +55,66 @@ test('Mehrfachauswahl, Duplikate pro Tag (Eintrag und Tagesbericht)', async ({ p
   await expect(toast(page)).toContainText('Foto entfernt');
   await expect(day.getByText('0 / 15')).toBeVisible();
 });
+
+test('Foto im Eintrag groß öffnen, wischen, schließen (X, Wischen, Esc, Zurück)', async ({ page }) => {
+  await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({ status: 200, body: '' }));
+  await onboard(page, { trip: 'Bildertörn' });
+  await page.getByRole('button', { name: /Eintrag jetzt/ }).click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByLabel('Galerie').setInputFiles([fx('photo-1.png'), fx('photo-2.png'), fx('photo-3.png')]);
+  await expect(sheet.getByText('3 / 5')).toBeVisible();
+  await sheet.getByRole('button', { name: 'Speichern' }).click();
+  await expect(sheet).toBeHidden();
+
+  // Timeline-Vorschau antippen → Vollbild mit Zähler und Bildunterschrift (Zeit · Autor)
+  await page.locator('.tl-thumbs').getByRole('button', { name: 'Foto 1 groß anzeigen' }).click();
+  const viewer = page.getByRole('dialog', { name: /^Foto \d \/ 3$/ });
+  await expect(viewer).toHaveAccessibleName('Foto 1 / 3');
+  await expect(viewer).toContainText('Anna');
+  const img = viewer.locator('img');
+  await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+
+  // nach links wischen → nächstes Foto, Pfeil → drittes
+  const stage = viewer.getByTestId('photo-viewer-stage');
+  const box = (await stage.boundingBox())!;
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(cx + 120, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx - 20, cy + 5, { steps: 5 });
+  await page.mouse.move(cx - 120, cy + 5, { steps: 5 });
+  await page.mouse.up();
+  await expect(viewer).toHaveAccessibleName('Foto 2 / 3');
+  await viewer.getByRole('button', { name: 'Nächstes Foto' }).click();
+  await expect(viewer).toHaveAccessibleName('Foto 3 / 3');
+
+  // nach unten wischen schließt
+  await page.mouse.move(cx, cy - 100);
+  await page.mouse.down();
+  await page.mouse.move(cx, cy, { steps: 5 });
+  await page.mouse.move(cx, cy + 120, { steps: 5 });
+  await page.mouse.up();
+  await expect(viewer).toBeHidden();
+
+  // im Bearbeiten-Sheet: Foto antippen öffnet den Viewer, Entfernen bleibt ein eigener Knopf
+  await page.getByRole('button', { name: /Eintrag \d\d:\d\d .* öffnen/ }).click();
+  const edit = page.getByRole('dialog', { name: /Eintrag/ });
+  await edit.getByRole('button', { name: 'Foto 2 groß anzeigen' }).click();
+  await expect(viewer).toHaveAccessibleName('Foto 2 / 3');
+  await page.keyboard.press('Escape'); // schließt nur den Viewer
+  await expect(viewer).toBeHidden();
+  await expect(edit.getByRole('button', { name: 'Foto 2 entfernen' })).toBeVisible();
+
+  // Zurück-Geste (Browser zurück) schließt den Viewer, das Sheet bleibt offen
+  await edit.getByRole('button', { name: 'Foto 3 groß anzeigen' }).click();
+  await expect(viewer).toBeVisible();
+  await page.goBack();
+  await expect(viewer).toBeHidden();
+  await expect(edit.getByRole('button', { name: 'Foto 3 entfernen' })).toBeVisible();
+
+  // X schließt
+  await edit.getByRole('button', { name: 'Foto 1 groß anzeigen' }).click();
+  await viewer.getByRole('button', { name: 'Foto schließen' }).click();
+  await expect(viewer).toBeHidden();
+  await expect(edit).toBeVisible();
+});

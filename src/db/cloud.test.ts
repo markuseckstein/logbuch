@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tiedRealmId } from '../domain/access';
 import type { LogbookDB } from './db';
 import {
-  CloudNotSignedInError, adoptOwnTrips, cloudStatus, inviteToTrip, isDemoEmail, leaveTrip, listPeople, login, logout,
-  memberStatus, removePerson, shareTripToCloud, watchSyncRejections,
+  CloudNotSignedInError, adoptOwnTrips, cloudStatus, createHomeView, disableHomeView, getHomeView, inviteToTrip, isDemoEmail,
+  leaveTrip, listPeople, login, logout, memberStatus, removePerson, renewHomeView, shareTripToCloud, watchSyncRejections,
 } from './cloud';
 import { listRescued, resubmitRescued } from './syncRejections';
-import { DuplicateEmailError, createEntry, createTrip, getDeviceId, getSettings, listCrew, loadTripData } from './repo';
+import { DuplicateEmailError, NotPermittedError, createEntry, createTrip, getDeviceId, getSettings, listCrew, loadTripData } from './repo';
 import { boatIds, dispose, firstBoat, freshDb, tripInput } from './test-helpers';
 
 let db: LogbookDB;
@@ -173,6 +173,65 @@ describe('people and invitations', () => {
     await leaveTrip(db, trip.id);
     expect(await db.members.where('email').equals('bob@demo.local').count()).toBe(0);
     expect(await db.members.count()).toBe(1);
+  });
+});
+
+describe('Daheim-Link (viewer account)', () => {
+  async function shared() {
+    signIn();
+    const trip = await createTrip(db, { ...tripInput('T', ['A']), founder: { name: 'Alice' } });
+    await ownRealm(trip.id);
+    return trip;
+  }
+  const viewerRows = async (tripId: string) =>
+    (await db.members.where('realmId').equals(tiedRealmId(tripId)).toArray()).filter((m) => m.email?.startsWith('daheim-'));
+
+  it('admin creates a realm member daheim-<token>@demo.local, role viewer, no rights, no mail – but no person', async () => {
+    const trip = await shared();
+    expect(await getHomeView(db, trip.id)).toBeUndefined();
+    const token = await createHomeView(db, trip.id);
+    expect(token).toMatch(/^[a-z2-7]{26}$/);
+    const rows = await viewerRows(trip.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      email: `daheim-${token}@demo.local`, name: 'Daheim', roles: ['viewer'], permissions: {}, invite: false,
+    });
+    expect((await listCrew(db, trip.id)).map((c) => c.name)).toEqual(['Alice']);
+    expect((await listPeople(db, trip.id)).map((p) => p.name)).toEqual(['Alice']);
+    expect(await getHomeView(db, trip.id)).toEqual({ token, email: `daheim-${token}@demo.local`, opened: false });
+    // idempotent: a second call keeps the link
+    expect(await createHomeView(db, trip.id)).toBe(token);
+    expect(await viewerRows(trip.id)).toHaveLength(1);
+  });
+
+  it('opened once the viewer accepted the membership (automatically on first open)', async () => {
+    const trip = await shared();
+    const token = await createHomeView(db, trip.id);
+    await db.members.where('email').equals(`daheim-${token}@demo.local`).modify({ accepted: new Date() });
+    expect((await getHomeView(db, trip.id))?.opened).toBe(true);
+  });
+
+  it('renew replaces the member (old link dead), disable removes it', async () => {
+    const trip = await shared();
+    const old = await createHomeView(db, trip.id);
+    const fresh = await renewHomeView(db, trip.id);
+    expect(fresh).not.toBe(old);
+    expect((await viewerRows(trip.id)).map((m) => m.email)).toEqual([`daheim-${fresh}@demo.local`]);
+    await disableHomeView(db, trip.id);
+    expect(await viewerRows(trip.id)).toEqual([]);
+    expect(await getHomeView(db, trip.id)).toBeUndefined();
+    expect((await listPeople(db, trip.id)).map((p) => p.name)).toEqual(['Alice']);
+  });
+
+  it('only the admin of a shared trip', async () => {
+    const trip = await createTrip(db, tripInput('T', ['A']));
+    await expect(createHomeView(db, trip.id)).rejects.toBeInstanceOf(CloudNotSignedInError);
+    const s = await shared();
+    await db.realms.update(tiedRealmId(s.id), { owner: 'carol' });
+    await db.trips.update(s.id, { owner: 'carol' });
+    await expect(createHomeView(db, s.id)).rejects.toBeInstanceOf(NotPermittedError);
+    await expect(renewHomeView(db, s.id)).rejects.toBeInstanceOf(NotPermittedError);
+    await expect(disableHomeView(db, s.id)).rejects.toBeInstanceOf(NotPermittedError);
   });
 });
 

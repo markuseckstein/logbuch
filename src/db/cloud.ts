@@ -1,10 +1,11 @@
 import type { DBRealmMember } from 'dexie-cloud-addon';
 import { MEMBER_PERMISSIONS, tiedRealmId, isSharedRealm } from '../domain/access';
 import { nameFromEmail } from '../domain/boats';
+import { VIEWER_NAME, VIEWER_ROLE, createHomeViewToken, isViewerEmail, viewerEmail, viewerToken } from '../domain/homeView';
 import type { CrewMember, ID } from '../domain/types';
 import type { LogbookDB } from './db';
 import {
-  addCrewMember, canManageTrip, getAuthor, getDeviceId, listCrew, moveTripToRealm, normalizeEmail, removeCrewMember, resetDeviceIdCache,
+  NotPermittedError, addCrewMember, canManageTrip, getAuthor, getDeviceId, listCrew, moveTripToRealm, normalizeEmail, removeCrewMember, resetDeviceIdCache,
   updateCrewMember,
 } from './repo';
 import { MAX_AUTO_ATTEMPTS, listRescued, recordSyncExchange, resubmitRescued, wrapSyncFetch } from './syncRejections';
@@ -232,6 +233,82 @@ export async function removePerson(db: LogbookDB, crewId: ID): Promise<void> {
       await db.members.where('[email+realmId]').equals([c.email, trip.realmId!]).delete();
     }
   });
+}
+
+// ---------- Daheim-Link (Zuschauer ohne Anmeldung, docs/toern-modell.md) ----------
+
+export interface HomeViewInfo {
+  token: string;
+  /** Demo-Konto des Zuschauers: daheim-<token>@demo.local. */
+  email: string;
+  /** Der Link wurde geöffnet (Mitgliedschaft automatisch angenommen) – dann ist er auch freigeschaltet. */
+  opened: boolean;
+}
+
+/**
+ * Der aktuelle Daheim-Link eines Törns. Der Token steckt in der E-Mail des Zuschauer-Mitglieds; Mitglieder des
+ * Realms sehen die Mitgliederzeilen ebenfalls (also auch den Link) – akzeptiert, Weiterleiten ist ohnehin erlaubt.
+ */
+export async function getHomeView(db: LogbookDB, tripId: ID): Promise<HomeViewInfo | undefined> {
+  const trip = await db.trips.get(tripId);
+  if (!trip || !isSharedRealm(trip.realmId)) return undefined;
+  const rows = (await db.members.where('realmId').equals(trip.realmId!).toArray()).filter((m) => isViewerEmail(m.email));
+  const row = rows[0];
+  const token = viewerToken(row?.email);
+  if (!row || !token) return undefined;
+  return { token, email: viewerEmail(token), opened: !!row.accepted };
+}
+
+async function assertHomeViewAdmin(db: LogbookDB, tripId: ID): Promise<string> {
+  requireUser(db);
+  const realmId = await shareTripToCloud(db, tripId);
+  if (!(await canManageTrip(db, tripId))) throw new NotPermittedError(`manage home view of ${tripId}`);
+  return realmId;
+}
+
+function viewerRow(db: LogbookDB, realmId: string, token: string): DBRealmMember {
+  return {
+    ...memberIdFields(db), realmId, email: viewerEmail(token), name: VIEWER_NAME, roles: [VIEWER_ROLE],
+    // ausdrücklich keine Rechte (wie bei member zusätzlich am Mitglied, Spike 9.9); keine Dexie-Mail
+    permissions: {},
+    invite: false,
+  } as DBRealmMember;
+}
+
+const randomBytes = (b: Uint8Array<ArrayBuffer>): Uint8Array => crypto.getRandomValues(b);
+
+async function replaceViewer(db: LogbookDB, realmId: string, token: string | undefined): Promise<void> {
+  await db.transaction('rw', [db.members], async () => {
+    await db.members.where('realmId').equals(realmId).filter((m) => isViewerEmail(m.email)).delete();
+    if (token) await db.members.add(viewerRow(db, realmId, token));
+  });
+}
+
+/**
+ * Admin: Daheim-Link anlegen – Realm-Mitglied `daheim-<token>@demo.local` mit Rolle `viewer` ohne Rechte, keine
+ * Person (CrewMember). Besteht schon einer, bleibt er. Das Demo-Konto selbst legt `npm run viewer:create` an.
+ */
+export async function createHomeView(db: LogbookDB, tripId: ID): Promise<string> {
+  const realmId = await assertHomeViewAdmin(db, tripId);
+  const existing = await getHomeView(db, tripId);
+  if (existing) return existing.token;
+  const token = createHomeViewToken(randomBytes);
+  await replaceViewer(db, realmId, token);
+  return token;
+}
+
+/** Admin: neuer Link; das alte Zuschauer-Mitglied wird entfernt (alter Link zeigt danach nichts mehr). */
+export async function renewHomeView(db: LogbookDB, tripId: ID): Promise<string> {
+  const realmId = await assertHomeViewAdmin(db, tripId);
+  const token = createHomeViewToken(randomBytes);
+  await replaceViewer(db, realmId, token);
+  return token;
+}
+
+/** Admin: Daheim-Link abschalten. */
+export async function disableHomeView(db: LogbookDB, tripId: ID): Promise<void> {
+  const realmId = await assertHomeViewAdmin(db, tripId);
+  await replaceViewer(db, realmId, undefined);
 }
 
 async function sharedRealmOf(db: LogbookDB, tripId: ID): Promise<string> {

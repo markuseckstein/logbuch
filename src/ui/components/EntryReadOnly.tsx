@@ -9,7 +9,7 @@ import {
 import { PhotoGrid } from './PhotoImage';
 
 /** Nur-Lese-Ansicht eines Eintrags (fremdes Logbuch). */
-export function EntryReadOnly({ entry }: { entry: LogEntry }) {
+export function EntryReadOnly({ entry, caption }: { entry: LogEntry; caption?: string | undefined }) {
   const wind = formatWind(entry.windDirDeg, entry.windBft);
   const facts: [string, string][] = [
     ['Zeit', formatTime(entry.time, entry.tzOffsetMin)],
@@ -31,7 +31,7 @@ export function EntryReadOnly({ entry }: { entry: LogEntry }) {
         ))}
       </dl>
       {entry.text ? <p className="section-text" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{entry.text}</p> : null}
-      <PhotoGrid photoIds={entry.photoIds} />
+      <PhotoGrid photoIds={entry.photoIds} caption={caption} />
     </>
   );
 }

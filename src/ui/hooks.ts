@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useDayReports, useEntries, useTracks } from '../db/hooks';
-import { getSettings, listTrips } from '../db/repo';
+import { getSettings, listTrips, setTheme } from '../db/repo';
 import { localDate, type ID, type LatLon, type LogEntry, type Settings, type Track, type Trip } from '../domain';
 import { buildDays, currentTzOffsetMin, groupTrackPoints, type DayInfo } from './lib';
 import { useWritableTripIds } from './cloudHooks';
@@ -84,4 +84,18 @@ export function useReadOnly(tripId: string | undefined): boolean {
 export function useAuthorId(tripId: string | undefined): string | undefined {
   const settings = useSettings();
   return tripId ? settings?.authorByTrip[tripId] : undefined;
+}
+
+const prefersDark = (): boolean =>
+  typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+
+/** Tag/Nachtfahrt: gespeicherte Wahl als `data-theme`, sonst System. */
+export function useTheme(theme: Settings['theme'] | undefined): { dark: boolean; toggle: () => void } {
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light' || theme === 'dark') root.dataset['theme'] = theme;
+    else delete root.dataset['theme'];
+  }, [theme]);
+  const dark = theme === 'dark' || (theme !== 'light' && prefersDark());
+  return { dark, toggle: () => void setTheme(db, dark ? 'light' : 'dark') };
 }

@@ -12,7 +12,8 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "e2e": "playwright test",
-    "e2e:cloud": "E2E_CLOUD=1 playwright test"
+    "e2e:cloud": "E2E_CLOUD=1 playwright test",
+    "viewer:create": "node scripts/create-viewer.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.3.0",

@@ -122,15 +122,18 @@ export interface Me {
   userId?: string;
   /** Admin des Törns (Realm-Owner bzw. eigener, nicht geteilter Törn). */
   admin: boolean;
+  /** Zuschauer über den Daheim-Link: sieht alles, ändert nie etwas. */
+  viewer?: boolean;
 }
 
 const UNSYNCED_OWNER = 'unauthorized';
 
 /**
- * Darf ich diesen Datensatz ändern/löschen? Lokal alles; angemeldet der Admin alles, sonst nur eigene
- * (Owner). Noch nicht synchronisierte Datensätze (ohne Owner) gehören diesem Gerät.
+ * Darf ich diesen Datensatz ändern/löschen? Zuschauer (Daheim-Link) nie; lokal alles; angemeldet der Admin alles,
+ * sonst nur eigene (Owner). Noch nicht synchronisierte Datensätze (ohne Owner) gehören diesem Gerät.
  */
 export function canEditRecord(record: { owner?: string | undefined }, me: Me): boolean {
+  if (me.viewer) return false;
   if (me.userId === undefined || me.admin) return true;
   return record.owner === undefined || record.owner === UNSYNCED_OWNER || record.owner === me.userId;
 }
