@@ -19,7 +19,6 @@ h2{font-size:22px}
 .muted{color:var(--ink-2);font-size:15px}
 /* map */
 .mapframe{border:1px solid var(--ink);padding:3px;background:var(--surface);border-radius:2px}
-.mapframe svg{display:block;width:100%;height:auto;border:1px solid var(--ink)}
 .mk{cursor:pointer}
 .mk:focus-visible circle.ring{stroke-width:4}
 .mk:focus-visible{outline:none}
@@ -174,3 +173,23 @@ label.btn:has(input:focus-visible),.btn:focus-within{outline:3px solid var(--mag
 .mini-empty{margin:0;padding:12px;border:1px dashed var(--line);border-radius:6px;text-align:center}
 .sr-only:focus-visible~.slot{outline:3px solid var(--magenta);outline-offset:2px}
 .slotwrap input:focus-visible~.slot{outline:3px solid var(--magenta);outline-offset:2px}
+
+/* Karte (Leaflet) */
+.chartmap{height:min(62vh,460px);min-height:260px;background:var(--water-deep);border:1px solid var(--ink);position:relative;z-index:0;font:inherit}
+.chartmap.compact{height:220px;min-height:0}
+.chartmap .leaflet-tile-pane{filter:var(--tile-filter,none)}
+.chartmap .leaflet-container,.chartmap.leaflet-container{background:var(--water-deep);font-family:var(--font-sans)}
+.chartmap .leaflet-control-attribution{font-size:11px;background:color-mix(in srgb,var(--surface) 85%,transparent);color:var(--ink)}
+.chartmap .leaflet-control-attribution a{color:var(--magenta)}
+.chartmap .leaflet-bar a{width:36px;height:36px;line-height:36px}
+.chips-row{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;padding-bottom:4px}
+.chips-row .chip{flex:none}
+.list-plain{list-style:none;margin:0;padding:0}
+.list-plain li{display:flex;align-items:center;gap:10px;min-height:56px;border-bottom:1px solid var(--line)}
+.list-plain li:last-child{border-bottom:0}
+.list-plain .grow{flex:1;min-width:0;display:flex;flex-direction:column}
+.report-text{min-height:160px}
+.crumb{display:flex;flex-direction:column;gap:2px}
+/* Toast über einem offenen Sheet: oben statt unten, damit der Footer frei bleibt */
+body:has(.sheet) .toast{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px));transform:translateY(-12px)}
+body:has(.sheet) .toast.show{transform:none}

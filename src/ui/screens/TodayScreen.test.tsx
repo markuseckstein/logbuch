@@ -7,6 +7,7 @@ import { db } from '../../db/db';
 import { makeActions, renderUi, seedTrip, useCleanDb } from '../test-utils';
 import { TodayScreen } from './TodayScreen';
 
+vi.mock('../components/ChartMap', () => ({ ChartMap: () => null }));
 vi.mock('../../device', () => ({ captureFix: vi.fn() }));
 
 const mockFix = (result: FixResult): void => {
@@ -30,7 +31,9 @@ describe('TodayScreen – Eintrag jetzt', () => {
     expect(entries[0]?.position).toBeUndefined();
     expect(entries[0]?.tripId).toBe(trip.id);
     expect(entries[0]?.tzOffsetMin).toBe(-new Date().getTimezoneOffset());
-    expect(screen.getByRole('status')).toHaveTextContent(/Eintrag \d\d:\d\d gespeichert · ohne Position \(GPS: Zugriff verweigert\)/);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      /Eintrag \d\d:\d\d gespeichert · ohne Position \(GPS: Zugriff verweigert\)/,
+    );
     expect(actions.openEntry).toHaveBeenCalledWith(entries[0]?.id, true);
   });
 

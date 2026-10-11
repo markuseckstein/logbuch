@@ -12,7 +12,9 @@ import { ToastProvider } from './toast';
 import { UpdatePrompt } from './UpdatePrompt';
 import { EntrySheet } from './components/EntrySheet';
 import { Onboarding } from './screens/Onboarding';
-import { PlaceholderScreen } from './screens/Placeholder';
+import { DaysScreen } from './screens/DaysScreen';
+import { MapScreen } from './screens/MapScreen';
+import { LiveRouteContext, useLiveRoute, useLiveRouteState } from './live';
 import { TodayScreen } from './screens/TodayScreen';
 import { TripScreen } from './screens/TripScreen';
 
@@ -36,6 +38,27 @@ function useTheme(theme: Settings['theme'] | undefined): { dark: boolean; toggle
   return { dark, toggle: () => void setTheme(db, dark ? 'light' : 'dark') };
 }
 
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+function RecIndicator() {
+  const { active, startedAt } = useLiveRoute();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  if (!active || startedAt === undefined) return null;
+  const sec = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const text = `${Math.floor(sec / 3600)}:${pad2(Math.floor(sec / 60) % 60)}:${pad2(sec % 60)}`;
+  return (
+    <div className="rec" role="status" aria-label={`Live-Route wird aufgezeichnet, ${text}`}>
+      <i aria-hidden="true" />
+      REC {text}
+    </div>
+  );
+}
+
 function Topbar({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onToggleTheme: () => void }) {
   const entries = useEntries(trip.id);
   const reports = useDayReports(trip.id);
@@ -48,6 +71,7 @@ function Topbar({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTo
         <b>Logbuch</b>
         <span>{n >= 1 ? `${trip.name} · Tag ${n}` : trip.name}</span>
       </div>
+      <RecIndicator />
       <button
         className="icon-btn"
         type="button"
@@ -75,47 +99,46 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
     [],
   );
   const closeSheet = useCallback(() => setSheet(null), []);
+  const live = useLiveRouteState(trip.id);
 
   return (
     <AppContext.Provider value={actions}>
-      <div id="app">
-        <Topbar trip={trip} dark={dark} onToggleTheme={onToggleTheme} />
-        {tab === 'today' ? <TodayScreen trip={trip} reports={reports ?? []} /> : null}
-        {tab === 'days' ? (
-          <PlaceholderScreen title="Törn-Tage" hint="Alle Tage des Törns mit Distanz, Einträgen und Tagesbericht." />
+      <LiveRouteContext.Provider value={live}>
+        <div id="app">
+          <Topbar trip={trip} dark={dark} onToggleTheme={onToggleTheme} />
+          {tab === 'today' ? <TodayScreen trip={trip} reports={reports ?? []} /> : null}
+          {tab === 'days' ? <DaysScreen trip={trip} /> : null}
+          {tab === 'map' ? <MapScreen trip={trip} /> : null}
+          {tab === 'trip' ? <TripScreen trip={trip} /> : null}
+          <nav className="tabbar" aria-label="Hauptnavigation">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className="tab"
+                aria-current={t.id === tab ? 'page' : undefined}
+                onClick={() => {
+                  setTab(t.id);
+                  window.scrollTo(0, 0);
+                }}
+              >
+                <Icon name={t.icon} size={24} />
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        {sheet ? <EntrySheet key={sheet.id} entryId={sheet.id} isNew={sheet.isNew} onClose={closeSheet} /> : null}
+        {onboarding ? (
+          <Onboarding
+            onCancel={() => setOnboarding(false)}
+            onDone={() => {
+              setOnboarding(false);
+              setTab('today');
+            }}
+          />
         ) : null}
-        {tab === 'map' ? (
-          <PlaceholderScreen title="Törnkarte" hint="Route und Einträge auf der Seekarte." />
-        ) : null}
-        {tab === 'trip' ? <TripScreen trip={trip} /> : null}
-        <nav className="tabbar" aria-label="Hauptnavigation">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className="tab"
-              aria-current={t.id === tab ? 'page' : undefined}
-              onClick={() => {
-                setTab(t.id);
-                window.scrollTo(0, 0);
-              }}
-            >
-              <Icon name={t.icon} size={24} />
-              {t.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-      {sheet ? <EntrySheet key={sheet.id} entryId={sheet.id} isNew={sheet.isNew} onClose={closeSheet} /> : null}
-      {onboarding ? (
-        <Onboarding
-          onCancel={() => setOnboarding(false)}
-          onDone={() => {
-            setOnboarding(false);
-            setTab('today');
-          }}
-        />
-      ) : null}
+      </LiveRouteContext.Provider>
     </AppContext.Provider>
   );
 }

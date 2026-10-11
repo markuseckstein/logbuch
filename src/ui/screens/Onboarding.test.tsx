@@ -7,7 +7,12 @@ import { renderUi, useCleanDb } from '../test-utils';
 import { Onboarding } from './Onboarding';
 
 vi.mock('../../device', () => ({
-  resizeImage: vi.fn(async () => ({ blob: new Blob(['x'], { type: 'image/jpeg' }), width: 10, height: 10, mime: 'image/jpeg' })),
+  resizeImage: vi.fn(async () => ({
+    blob: new Blob(['x'], { type: 'image/jpeg' }),
+    width: 10,
+    height: 10,
+    mime: 'image/jpeg',
+  })),
 }));
 
 describe('Onboarding', () => {

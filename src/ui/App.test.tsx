@@ -5,6 +5,7 @@ import { db } from '../db/db';
 import { App } from './App';
 import { seedTrip, useCleanDb } from './test-utils';
 
+vi.mock('./components/ChartMap', () => ({ ChartMap: () => null }));
 vi.mock('./UpdatePrompt', () => ({ UpdatePrompt: () => null }));
 vi.mock('../device', () => ({ captureFix: vi.fn(), resizeImage: vi.fn() }));
 

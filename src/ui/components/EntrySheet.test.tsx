@@ -7,7 +7,12 @@ import { EntrySheet } from './EntrySheet';
 
 vi.mock('../../device', () => ({
   captureFix: vi.fn(() => ({ first: Promise.resolve({ error: 'denied' }), stop: vi.fn() })),
-  resizeImage: vi.fn(async () => ({ blob: new Blob(['x'], { type: 'image/jpeg' }), width: 10, height: 10, mime: 'image/jpeg' })),
+  resizeImage: vi.fn(async () => ({
+    blob: new Blob(['x'], { type: 'image/jpeg' }),
+    width: 10,
+    height: 10,
+    mime: 'image/jpeg',
+  })),
 }));
 
 async function setup() {

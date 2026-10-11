@@ -7,6 +7,7 @@ import { useApp } from '../AppContext';
 import { useTrips } from '../hooks';
 import { useToast } from '../toast';
 import { BoatPicture } from '../components/BoatPicture';
+import { ExportCard } from '../components/ExportCard';
 import { CrewEditor } from '../components/CrewEditor';
 import {
   BoatFields,
@@ -140,10 +141,7 @@ export function TripScreen({ trip }: { trip: Trip }) {
       <TripDataCard key={`data-${trip.id}`} trip={trip} />
       <BoatCard key={`boat-${trip.id}`} trip={trip} />
       <CrewCard trip={trip} />
-      <section className="card" aria-label="Export">
-        <div className="legend">Export</div>
-        <p className="muted">Export (ZIP, JSON, GPX) und Import kommen in Teil 2.</p>
-      </section>
+      <ExportCard trip={trip} />
       <button className="btn block" type="button" onClick={startOnboarding}>
         Neuen Törn anlegen …
       </button>

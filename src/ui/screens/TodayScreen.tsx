@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { captureFix } from '../../device';
 import { db } from '../../db/db';
-import { useEntries } from '../../db/hooks';
+import { useEntries, useTracks } from '../../db/hooks';
 import { createEntry, setEntryPosition } from '../../db/repo';
 import {
   dayNumber,
@@ -18,9 +18,9 @@ import {
 import { useApp } from '../AppContext';
 import { useToday } from '../hooks';
 import { Icon } from '../icons';
-import { FIX_ERROR_LABEL, currentTzOffsetMin } from '../lib';
+import { FIX_ERROR_LABEL, currentTzOffsetMin, groupTrackPoints } from '../lib';
 import { useToast } from '../toast';
-import { MiniRoute } from '../components/MiniRoute';
+import { ChartMap } from '../components/ChartMap';
 import { StatsBar } from '../components/StatsBar';
 import { Timeline } from '../components/Timeline';
 
@@ -41,8 +41,12 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
     () => groupEntriesByDay(entries ?? []).find((g) => g.date === today)?.entries ?? [],
     [entries, today],
   );
-  const stats = dayStats(todays);
-  const route = dayRoute(todays);
+  const tracks = useTracks(trip.id);
+  const trackToday = useMemo(() => groupTrackPoints(tracks ?? [], currentTzOffsetMin()).byDate[today], [tracks, today]);
+  const stats = useMemo(() => dayStats(todays, trackToday), [todays, trackToday]);
+  const route = useMemo(() => dayRoute(todays, trackToday), [todays, trackToday]);
+  const routes = useMemo(() => [{ id: 'today', points: route }], [route]);
+  const lastKnown = useMemo(() => [...(entries ?? [])].reverse().find((e) => e.position)?.position, [entries]);
   const days = tripDays(trip, entries ?? [], reports);
   const dayNo = dayNumber(trip, today, days);
 
@@ -89,14 +93,24 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
           <small>{busy ? 'GPS-Fix, bitte kurz warten' : '1 Tap · GPS und Uhrzeit'}</small>
         </span>
       </button>
-      <MiniRoute points={route} label="Schematische Route der heutigen Einträge" />
+      <ChartMap
+        compact
+        label="Karte der heutigen Route"
+        routes={routes}
+        entries={todays}
+        onOpenEntry={(id) => openEntry(id)}
+        fitKey={`${today}:${todays.length}:${route.length}`}
+        {...(lastKnown ? { fallback: lastKnown } : {})}
+      />
       <StatsBar stats={stats} />
       <div className="legend">
         {dayNo >= 1 ? `Tag ${dayNo} · ` : ''}
         {formatDateLong(today)}
       </div>
       {todays.length === 0 ? (
-        <p className="muted">Heute noch kein Eintrag. Tippe auf „Eintrag jetzt“, um Position und Uhrzeit festzuhalten.</p>
+        <p className="muted">
+          Heute noch kein Eintrag. Tippe auf „Eintrag jetzt“, um Position und Uhrzeit festzuhalten.
+        </p>
       ) : (
         <Timeline entries={[...todays].reverse()} onOpen={(id) => openEntry(id)} />
       )}
