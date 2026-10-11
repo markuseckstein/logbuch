@@ -36,8 +36,12 @@ function InteractionDialog({ ui }: { ui: DXCUserInteraction }) {
             <span>{label(name, f)}</span>
             <input
               type={f.type === 'password' ? 'password' : 'text'}
-              inputMode={name === 'otp' ? 'numeric' : name === 'email' ? 'email' : undefined}
+              // Der Code enthält Buchstaben und Ziffern – keine Zifferntastatur, keine Autokorrektur.
+              inputMode={name === 'email' ? 'email' : 'text'}
               autoComplete={name === 'otp' ? 'one-time-code' : name === 'email' ? 'email' : 'off'}
+              autoCapitalize={name === 'otp' ? 'characters' : 'off'}
+              autoCorrect="off"
+              spellCheck={false}
               value={values[name] ?? ''}
               onChange={(e) => setValues({ ...values, [name]: e.target.value })}
             />
