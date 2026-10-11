@@ -1,48 +1,158 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
+import { useActiveTrip, useDayReports, useEntries } from '../db/hooks';
+import { getSettings, listTrips, setActiveTrip, setTheme } from '../db/repo';
+import { requestPersistentStorage } from '../db/storage';
+import { dayNumber, tripDays, type Settings, type Trip } from '../domain';
+import { AppContext, type AppActions, type TabId } from './AppContext';
+import { Icon, type IconName } from './icons';
+import { useSettings, useToday } from './hooks';
+import { ToastProvider } from './toast';
 import { UpdatePrompt } from './UpdatePrompt';
+import { EntrySheet } from './components/EntrySheet';
+import { Onboarding } from './screens/Onboarding';
+import { PlaceholderScreen } from './screens/Placeholder';
+import { TodayScreen } from './screens/TodayScreen';
+import { TripScreen } from './screens/TripScreen';
 
-const TABS = [
-  { id: 'today', label: 'Heute', hint: 'Position festhalten und Eintrag schreiben.' },
-  { id: 'days', label: 'Törn-Tage', hint: 'Alle Tage des Törns mit Distanz und Einträgen.' },
-  { id: 'map', label: 'Karte', hint: 'Route und Einträge auf der Seekarte.' },
-  { id: 'trip', label: 'Törn', hint: 'Boot, Crew, Export und Import.' },
-] as const;
+const TABS: readonly { id: TabId; label: string; icon: IconName }[] = [
+  { id: 'today', label: 'Heute', icon: 'tab-heute' },
+  { id: 'days', label: 'Törn-Tage', icon: 'tab-tage' },
+  { id: 'map', label: 'Karte', icon: 'tab-karte' },
+  { id: 'trip', label: 'Törn', icon: 'tab-toern' },
+];
 
-type TabId = (typeof TABS)[number]['id'];
+const prefersDark = (): boolean =>
+  typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
 
-export function App() {
+function useTheme(theme: Settings['theme'] | undefined): { dark: boolean; toggle: () => void } {
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light' || theme === 'dark') root.dataset['theme'] = theme;
+    else delete root.dataset['theme'];
+  }, [theme]);
+  const dark = theme === 'dark' || (theme !== 'light' && prefersDark());
+  return { dark, toggle: () => void setTheme(db, dark ? 'light' : 'dark') };
+}
+
+function Topbar({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onToggleTheme: () => void }) {
+  const entries = useEntries(trip.id);
+  const reports = useDayReports(trip.id);
+  const today = useToday();
+  const days = tripDays(trip, entries ?? [], reports ?? []);
+  const n = dayNumber(trip, today, days);
+  return (
+    <header className="topbar">
+      <div className="brand">
+        <b>Logbuch</b>
+        <span>{n >= 1 ? `${trip.name} · Tag ${n}` : trip.name}</span>
+      </div>
+      <button
+        className="icon-btn"
+        type="button"
+        aria-label="Darstellung wechseln (Tag / Nachtfahrt)"
+        onClick={onToggleTheme}
+      >
+        <Icon name={dark ? 'sonne' : 'moon'} />
+      </button>
+    </header>
+  );
+}
+
+function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onToggleTheme: () => void }) {
+  const reports = useDayReports(trip.id);
   const [tab, setTab] = useState<TabId>('today');
-  const current = TABS.find((t) => t.id === tab) ?? TABS[0];
+  const [sheet, setSheet] = useState<{ id: string; isNew: boolean } | null>(null);
+  const [onboarding, setOnboarding] = useState(false);
+
+  const actions = useMemo<AppActions>(
+    () => ({
+      openEntry: (id, isNew = false) => setSheet({ id, isNew }),
+      goTo: setTab,
+      startOnboarding: () => setOnboarding(true),
+    }),
+    [],
+  );
+  const closeSheet = useCallback(() => setSheet(null), []);
 
   return (
-    <div id="app">
-      <header className="topbar">
-        <div className="brand">
-          <b>Logbuch</b>
-          <span>Segel-Logbuch</span>
-        </div>
-      </header>
-      <main className="screen" aria-labelledby="screen-title">
-        <div className="legend">{current.label}</div>
-        <h2 id="screen-title">{current.label}</h2>
-        <div className="card">
-          <p className="muted">{current.hint} (Platzhalter)</p>
-        </div>
-      </main>
-      <nav className="tabbar" aria-label="Hauptnavigation">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className="tab"
-            aria-current={t.id === tab ? 'page' : undefined}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+    <AppContext.Provider value={actions}>
+      <div id="app">
+        <Topbar trip={trip} dark={dark} onToggleTheme={onToggleTheme} />
+        {tab === 'today' ? <TodayScreen trip={trip} reports={reports ?? []} /> : null}
+        {tab === 'days' ? (
+          <PlaceholderScreen title="Törn-Tage" hint="Alle Tage des Törns mit Distanz, Einträgen und Tagesbericht." />
+        ) : null}
+        {tab === 'map' ? (
+          <PlaceholderScreen title="Törnkarte" hint="Route und Einträge auf der Seekarte." />
+        ) : null}
+        {tab === 'trip' ? <TripScreen trip={trip} /> : null}
+        <nav className="tabbar" aria-label="Hauptnavigation">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className="tab"
+              aria-current={t.id === tab ? 'page' : undefined}
+              onClick={() => {
+                setTab(t.id);
+                window.scrollTo(0, 0);
+              }}
+            >
+              <Icon name={t.icon} size={24} />
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+      {sheet ? <EntrySheet key={sheet.id} entryId={sheet.id} isNew={sheet.isNew} onClose={closeSheet} /> : null}
+      {onboarding ? (
+        <Onboarding
+          onCancel={() => setOnboarding(false)}
+          onDone={() => {
+            setOnboarding(false);
+            setTab('today');
+          }}
+        />
+      ) : null}
+    </AppContext.Provider>
+  );
+}
+
+function Root() {
+  const trip = useActiveTrip();
+  const settings = useSettings();
+  const { dark, toggle } = useTheme(settings?.theme);
+
+  useEffect(() => {
+    void requestPersistentStorage();
+  }, []);
+
+  // Kein aktiver Törn, aber Törns vorhanden (z. B. nach Löschen): ersten aktivieren.
+  useEffect(() => {
+    if (trip !== null) return;
+    void (async () => {
+      const [first] = await listTrips(db);
+      if (first && !(await getSettings(db)).activeTripId) await setActiveTrip(db, first.id);
+    })();
+  }, [trip]);
+
+  const trips = useLiveQuery(() => db.trips.count(), []);
+
+  if (trip === undefined || trips === undefined) return null;
+  if (trip === null) {
+    // trips > 0 -> Aktivierung läuft gerade; sonst Onboarding (nicht abbrechbar).
+    return trips > 0 ? null : <Onboarding onDone={() => undefined} />;
+  }
+  return <Shell key={trip.id} trip={trip} dark={dark} onToggleTheme={toggle} />;
+}
+
+export function App() {
+  return (
+    <ToastProvider>
+      <Root />
       <UpdatePrompt />
-    </div>
+    </ToastProvider>
   );
 }
