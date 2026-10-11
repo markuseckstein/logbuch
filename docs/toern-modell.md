@@ -40,3 +40,11 @@ Entscheidung 2026-10-11: UI nach Prototyp **D „Boot-Schalter“** (`prototypes
 
 ## Entfällt im Code
 `domain/merge.ts`-Ownership-Teile, `setTripOwnership`, `writableTripIds`, `ReadOnlyTripError` für fremde Boote, `setFlotilla`, `listFlotillaTrips`, Flottillen-UI (Törn-Tab, Import-Dialog, Karten-Schalter), Rolle `readonly`, `e2e/flotilla.spec.ts` (ersetzt durch neues Mehrboot-E2E).
+
+## Cover-Bild pro Törn (Nachtrag 2026-10-11)
+Kein Splash. Referenz-Prototyp nur lokal (zeigt echte Personen, nicht ins Repo).
+- `Trip.coverPhotoId?: ID` (Foto in `photos`, synchronisiert im Törn-Realm) + `Trip.coverFocus?: { x: number; y: number }` (0..100, `object-position`).
+- Törn-Tab oben: Hero 16:9 mit Cover, Törnname, Zeitraum, Revier (Verlauf für Lesbarkeit). Admin (bzw. lokal jeder): „Cover ändern“ (Galerie/Kamera, Verkleinern wie andere Fotos), „Ausschnitt anpassen“ (ganzes Bild mit 16:9-Rahmen, Tipp setzt Fokuspunkt), „Entfernen“ (Bestätigung in der UI). Hinweis „Das Cover wird mit allen Mitgliedern des Törns geteilt“. Ohne Cover: Platzhalter-Karte „Cover-Bild hinzufügen“ (für Nicht-Admins nur Titel).
+- Törn-Übersicht/-Wechsler: Liste der Törns mit Cover-Thumbnail (Platzhalter-Icon ohne Cover), Zeitraum, aktiver Törn markiert, „Neuen Törn anlegen …“.
+- Onboarding Schritt 1: optionales Feld „Cover-Bild (optional)“ mit Vorschau/Ändern/Entfernen.
+- Export: Cover und Fokus im Export v4 (`trip.coverPhotoId`, Foto in `images/`); GPX unverändert.
