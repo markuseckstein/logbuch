@@ -104,3 +104,6 @@ Gilt für jede Variante außer reinem Dexie Cloud (dort teils eingebaut), und f�
 - Dexie Cloud: Datenstandort, AVV, Verhalten von Blob-Offloading auf Android-Chrome im Feld testen (Spike mit zwei Geräten).
 - Seat-Zählung: Preisseite widersprüchlich; Pro-Preis bei Buchung verifizieren.
 - Cloudant-Lite-Verfügbarkeit 2026 nicht bestätigt.
+
+## Nachtrag 2026-10-11 (Nutzer)
+LTE-Datenvolumen auf See ist unkritisch. Fotos werden daher sofort mit synchronisiert; die Regel "nur WLAN / auf Knopfdruck" entfällt. Konnektivität unterwegs ist also eher "meist online mit Lücken" als "meist offline" – Offline-first bleibt trotzdem nötig (Funklöcher, Ausland).
