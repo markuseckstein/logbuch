@@ -15,6 +15,7 @@ export interface ExportedPhoto {
   mime: string;
   width: number;
   height: number;
+  hash?: string;
   createdAt: number;
 }
 
@@ -67,7 +68,8 @@ export async function buildLogbookJson(
 ): Promise<LogbookJsonV1> {
   const photos: ExportedPhoto[] = [];
   for (const p of bundle.photos) {
-    const base = { id: p.id, mime: p.mime, width: p.width, height: p.height, createdAt: p.createdAt };
+    const base = { id: p.id, mime: p.mime, width: p.width, height: p.height,
+      ...(p.hash ? { hash: p.hash } : {}), createdAt: p.createdAt };
     if (opts.photoMode === 'file') {
       photos.push({ ...base, file: `images/${p.id}.${extensionForMime(p.mime)}` });
     } else {

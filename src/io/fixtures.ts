@@ -24,10 +24,11 @@ export function sampleBundle(): TripBundle {
       },
     ],
     photos: [
-      { id: 'p1', tripId: 'trip-1', blob: new Blob([new Uint8Array([1, 2, 3, 255])], { type: 'image/jpeg' }), mime: 'image/jpeg', width: 4, height: 3, createdAt: 7 },
+      { id: 'p1', tripId: 'trip-1', blob: new Blob([new Uint8Array([1, 2, 3, 255])], { type: 'image/jpeg' }), mime: 'image/jpeg', width: 4, height: 3, hash: 'hash-p1', createdAt: 7 },
+      { id: 'p3', tripId: 'trip-1', blob: new Blob([new Uint8Array([5, 6])], { type: 'image/jpeg' }), mime: 'image/jpeg', width: 3, height: 3, hash: 'hash-p3', createdAt: 9 },
       { id: 'p2', tripId: 'trip-1', blob: new Blob([new Uint8Array([9, 8, 7])], { type: 'image/webp' }), mime: 'image/webp', width: 2, height: 2, createdAt: 8 },
     ],
-    dayReports: [{ tripId: 'trip-1', date: '2026-08-10', title: 'Tag 3', text: 'Schön.', updatedAt: 9 }],
+    dayReports: [{ tripId: 'trip-1', date: '2026-08-10', title: 'Tag 3', text: 'Schön.', photoIds: ['p3'], updatedAt: 9 }],
     tracks: [
       { id: 'k1', tripId: 'trip-1', name: 'Tag 3', source: 'live', createdAt: 10, points: [{ lat: 54, lon: 10, time: 1000 }, { lat: 54.1, lon: 10.1, ele: 3 }] },
     ],

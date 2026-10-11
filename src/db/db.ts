@@ -24,6 +24,13 @@ export class LogbookDB extends Dexie {
       tracks: 'id, tripId',
       settings: 'key',
     });
+    this.version(2)
+      .stores({ photos: 'id, tripId, hash' })
+      .upgrade((tx) =>
+        tx.table('dayReports').toCollection().modify((r: { photoIds?: ID[] }) => {
+          r.photoIds ??= [];
+        }),
+      );
   }
 }
 

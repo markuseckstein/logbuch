@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { captureFix } from '../../device';
 import { db } from '../../db/db';
-import { deleteEntry, setEntryPosition, updateEntry } from '../../db/repo';
+import { MAX_PHOTOS_PER_ENTRY, deleteEntry, removePhotoFromEntry, setEntryPosition, updateEntry } from '../../db/repo';
 import {
   ENTRY_TYPE_LABELS,
   SEA_STATE_LABELS,
@@ -15,9 +15,10 @@ import {
 } from '../../domain';
 import { ENTRY_ICON, Icon, SKY_ICON } from '../icons';
 import { ENTRY_TYPES, FIX_ERROR_LABEL, fromLocalInput, parseDecimal, toLocalInput } from '../lib';
+import { usePhotoImport } from '../photoImport';
 import { useToast } from '../toast';
 import { BeaufortBar } from './BeaufortBar';
-import { PhotoSlots } from './PhotoSlots';
+import { PhotoPicker } from './PhotoPicker';
 import { Sheet } from './Sheet';
 import { WindRose } from './WindRose';
 
@@ -108,6 +109,27 @@ function PositionSection({ entry }: { entry: LogEntry }) {
       </details>
       {error ? <div className="err" role="alert">{error}</div> : null}
     </div>
+  );
+}
+
+function EntryPhotos({ entry }: { entry: LogEntry }) {
+  const toast = useToast();
+  const { onAdd, progress } = usePhotoImport({ kind: 'entry', entry });
+  const onRemove = async (photoId: ID): Promise<void> => {
+    try {
+      await removePhotoFromEntry(db, entry.id, photoId);
+    } catch {
+      toast('Foto konnte nicht entfernt werden');
+    }
+  };
+  return (
+    <PhotoPicker
+      maxCount={MAX_PHOTOS_PER_ENTRY}
+      photoIds={entry.photoIds}
+      onAdd={onAdd}
+      onRemove={onRemove}
+      progress={progress}
+    />
   );
 }
 
@@ -261,8 +283,8 @@ function EntryForm({ entry, isNew, onClose }: { entry: LogEntry; isNew: boolean;
         />
       </label>
       <fieldset>
-        <legend>Fotos (bis zu 3)</legend>
-        <PhotoSlots entryId={entry.id} photoIds={entry.photoIds} />
+        <legend>Fotos (bis zu {MAX_PHOTOS_PER_ENTRY})</legend>
+        <EntryPhotos entry={entry} />
       </fieldset>
     </Sheet>
   );

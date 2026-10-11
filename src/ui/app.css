@@ -193,3 +193,12 @@ label.btn:has(input:focus-visible),.btn:focus-within{outline:3px solid var(--mag
 /* Toast über einem offenen Sheet: oben statt unten, damit der Footer frei bleibt */
 body:has(.sheet) .toast{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px));transform:translateY(-12px)}
 body:has(.sheet) .toast.show{transform:none}
+
+/* Foto-Auswahl (Galerie/Kamera) */
+.photopicker{display:flex;flex-direction:column;gap:10px}
+.photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.photo-actions input:disabled+label.btn{opacity:.5;cursor:not-allowed}
+.photo-actions input:focus-visible+label.btn{outline:3px solid var(--magenta);outline-offset:2px}
+.photo-count{font:500 12px var(--font-mono)}
+.photogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
+.photogrid .slot{border-style:solid}

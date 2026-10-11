@@ -61,7 +61,7 @@ export interface LogEntry {
   seaState?: 'calm' | 'slight' | 'moderate' | 'rough' | 'very-rough';
   pressureHpa?: number;
   tempC?: number;
-  photoIds: ID[]; // max 3
+  photoIds: ID[]; // max 5
   createdAt: number;
   updatedAt: number;
 }
@@ -73,6 +73,7 @@ export interface Photo {
   mime: string;
   width: number;
   height: number;
+  hash?: string; // SHA-256 (hex) der Original-Datei, fuer Duplikaterkennung pro Tag
   createdAt: number;
 }
 
@@ -81,6 +82,7 @@ export interface DayReport {
   date: string; // YYYY-MM-DD lokal
   title?: string;
   text: string;
+  photoIds: ID[]; // max 15
   updatedAt: number;
 }
 

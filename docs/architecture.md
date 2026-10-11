@@ -35,22 +35,26 @@ interface LogEntry { id: ID; tripId: ID;
   sky?: 'sunny'|'partly-cloudy'|'cloudy'|'rain'|'thunderstorm'|'fog';
   seaState?: 'calm'|'slight'|'moderate'|'rough'|'very-rough';
   pressureHpa?: number; tempC?: number;
-  photoIds: ID[];          // max 3
+  photoIds: ID[];          // max 5 (MAX_PHOTOS_PER_ENTRY)
   createdAt: number; updatedAt: number }
-interface Photo { id: ID; tripId: ID; blob: Blob; mime: string; width: number; height: number; createdAt: number }
-interface DayReport { tripId: ID; date: string /*YYYY-MM-DD lokal*/; title?: string; text: string; updatedAt: number }
+interface Photo { id: ID; tripId: ID; blob: Blob; mime: string; width: number; height: number;
+  hash?: string /* SHA-256 (hex) der ORIGINAL-Datei, vor dem Verkleinern; Duplikaterkennung */; createdAt: number }
+interface DayReport { tripId: ID; date: string /*YYYY-MM-DD lokal*/; title?: string; text: string;
+  photoIds: ID[] /* max 15 (MAX_PHOTOS_PER_DAY_REPORT); Altdaten ohne Feld = [] */; updatedAt: number }
 interface TrackPoint { lat: number; lon: number; time?: number; ele?: number }
 interface Track { id: ID; tripId: ID; name: string; source: 'gpx'|'live'; points: TrackPoint[]; createdAt: number }
 interface Settings { activeTripId?: ID; theme: 'system'|'light'|'dark' }
 ```
 - **Tag** eines Eintrags = lokales Datum aus `time + tzOffsetMin`. Ein Törntag existiert, sobald es einen Eintrag oder Tagesbericht an diesem Datum gibt (plus Zeitraum des Törns, falls gesetzt).
+- **Foto-Limits und Deduplizierung**: max. 5 Fotos je Eintrag, max. 15 je Tagesbericht. Pro Kalendertag (Eintragstag wie oben bzw. Berichtsdatum) wird ein Foto nur einmal gespeichert – egal ob an einem Eintrag oder im Tagesbericht, auch innerhalb einer Mehrfachauswahl. Erkennung über `Photo.hash`; Planung in der reinen Funktion `planPhotoAdds` (`domain/photos.ts`), Hash über `device/hashBlob`, Orchestrierung in `ui/photoImport.ts` (Hash → Plan → Verkleinern nur der akzeptierten, nacheinander → atomar speichern → Toast). Repo: `addPhotosToEntry`, `addPhotosToDayReport`, `removePhotoFromDayReport`, `dayPhotoHashes`.
+- **DB-Schema**: Dexie Version 2 (Index `photos.hash`; Upgrade setzt `dayReports.photoIds = []`).
 - **Route eines Tages** = Track-Punkte dieses Tages, falls vorhanden, sonst Positionen der Einträge in Zeitreihenfolge. Distanz in sm (Haversine, R = 3440.065 sm).
 
 ## Exportformat (v1)
 ZIP `logbuch-<trip-slug>-<YYYY-MM-DD>.zip`:
 ```
-logbook.json      { format: "segel-logbuch", version: 1, exportedAt: ISO, trip, entries[], dayReports[], tracks[], photos: [{id, file: "images/<id>.jpg", mime, width, height}] }
+logbook.json      { format: "segel-logbuch", version: 1, exportedAt: ISO, trip, entries[], dayReports[], tracks[], photos: [{id, file: "images/<id>.jpg", mime, width, height, hash?}] }, dayReports[]: {tripId, date, title?, text, photoIds[], updatedAt}
 images/<id>.jpg   (level 0, keine Rekompression)
 route.gpx         Track(s) + Einträge als Waypoints
 ```
-Alle Zeitstempel im JSON zusätzlich als ISO-String mit Offset (`timeIso`) für Menschen/Booklet-Tools. Import akzeptiert genau dieses Format (Version prüfen) und ersetzt/legt den Törn an (IDs bleiben). Variante „Einzel-JSON“: gleiches Schema, Fotos mit `dataUrl` statt `file`.
+Alle Zeitstempel im JSON zusätzlich als ISO-String mit Offset (`timeIso`) für Menschen/Booklet-Tools. Die Felder `photos[].hash` und `dayReports[].photoIds` sind additiv (Version bleibt 1); beim Import fehlende Felder werden toleriert (`photoIds` → `[]`, kein `hash`). Import akzeptiert genau dieses Format (Version prüfen) und ersetzt/legt den Törn an (IDs bleiben). Variante „Einzel-JSON“: gleiches Schema, Fotos mit `dataUrl` statt `file`.

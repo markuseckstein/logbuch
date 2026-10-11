@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { db } from '../../db/db';
-import { upsertDayReport } from '../../db/repo';
+import { MAX_PHOTOS_PER_DAY_REPORT, removePhotoFromDayReport, upsertDayReport } from '../../db/repo';
 import { formatDateLong, type Trip } from '../../domain';
 import { useApp } from '../AppContext';
 import { useTripDays } from '../hooks';
 import { Icon } from '../icons';
 import { num1, type DayInfo } from '../lib';
+import { usePhotoImport } from '../photoImport';
 import { useToast } from '../toast';
+import { PhotoPicker } from '../components/PhotoPicker';
 import { ChartMap } from '../components/ChartMap';
 import { StatsBar } from '../components/StatsBar';
 import { Timeline } from '../components/Timeline';
@@ -69,6 +71,32 @@ export function ReportEditor({ tripId, day }: { tripId: string; day: DayInfo }) 
   );
 }
 
+function DayPhotos({ tripId, day }: { tripId: string; day: DayInfo }) {
+  const toast = useToast();
+  const photoIds = day.report?.photoIds ?? [];
+  const { onAdd, progress } = usePhotoImport({ kind: 'report', tripId, date: day.date, photoIds });
+  const onRemove = async (photoId: string): Promise<void> => {
+    try {
+      await removePhotoFromDayReport(db, tripId, day.date, photoId);
+      toast('Foto entfernt');
+    } catch {
+      toast('Foto konnte nicht entfernt werden');
+    }
+  };
+  return (
+    <section className="card" aria-label="Fotos des Tages">
+      <div className="legend">Fotos des Tages</div>
+      <PhotoPicker
+        maxCount={MAX_PHOTOS_PER_DAY_REPORT}
+        photoIds={photoIds}
+        onAdd={onAdd}
+        onRemove={onRemove}
+        progress={progress}
+      />
+    </section>
+  );
+}
+
 function DayView({ trip, day, onBack }: { trip: Trip; day: DayInfo; onBack: () => void }) {
   const { openEntry } = useApp();
   const routes = useMemo(() => [{ id: day.date, points: day.route }], [day]);
@@ -94,6 +122,7 @@ function DayView({ trip, day, onBack }: { trip: Trip; day: DayInfo; onBack: () =
       />
       <StatsBar stats={day.stats} />
       <ReportEditor key={`${trip.id}-${day.date}`} tripId={trip.id} day={day} />
+      <DayPhotos tripId={trip.id} day={day} />
       <div className="legend">Einträge</div>
       {day.entries.length === 0 ? (
         <p className="muted">An diesem Tag gibt es noch keine Einträge.</p>

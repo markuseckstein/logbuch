@@ -11,7 +11,7 @@ Private „Urlaubs-Logbuch“-App für einen Segeltörn. Keine gesetzlichen Anfo
 - **Törn**: Reise mit Name, Zeitraum (von/bis), Revier (optional), Boot, Crew. Mehrere Törns möglich, einer ist aktiv.
 - **Boot**: Name, Typ/Modell, Länge, Heimathafen, Rufzeichen/MMSI (optional), Foto (optional).
 - **Crew**: Liste von Namen, optional Rolle (Skipper, Co-Skipper, Crew).
-- **Logeintrag**: Zeitstempel + Position (lat/lon, Genauigkeit), automatisch erfasst. Optional: Typ, Text, Wetter, Wind, 0–3 Fotos.
+- **Logeintrag**: Zeitstempel + Position (lat/lon, Genauigkeit), automatisch erfasst. Optional: Typ, Text, Wetter, Wind, 0–5 Fotos (Galerie mit Mehrfachauswahl oder Kamera).
   - **Eintragstyp**: Eintrag (Standard), Ablegen, Anlegen/Hafen, Ankern/Ankerplatz, Boje, Segel setzen, Segel bergen, Motor an, Motor aus, Ereignis/Sichtung, Sonstiges.
   - **Wind**: Richtung (16-teilige Rose), Stärke in Beaufort (0–12), optional Knoten.
   - **Wetter**: Bewölkung/Wetterlage (Sonne, leicht bewölkt, bewölkt, Regen, Gewitter, Nebel), Seegang (glatt…sehr grob), Luftdruck hPa, Temperatur °C – alles optional.
@@ -28,6 +28,7 @@ Private „Urlaubs-Logbuch“-App für einen Segeltörn. Keine gesetzlichen Anfo
 6. **GPX-Import**: Track-Datei importieren, an Törn hängen.
 
 ## Nicht-funktional
+- Tagesbericht: bis zu 15 Fotos (gleiche Galerie/Kamera-Auswahl). Ein Foto wird pro Kalendertag nur einmal gespeichert (Eintrag oder Tagesbericht, Erkennung per SHA-256 der Originaldatei); Nutzer-Feedback per Toast.
 - Fotos clientseitig verkleinern (max. ~2000px lange Kante, JPEG ~0,85), EXIF-Orientierung beachten.
 - Koordinaten-Anzeige nautisch (54°19,123′N 010°08,456′E), Distanzen in Seemeilen.
 - Tests: TDD für Domänenlogik (Distanzen, Export/Import, GPX-Parsing, Tageszuordnung), E2E-Smoke-Tests mit Playwright.

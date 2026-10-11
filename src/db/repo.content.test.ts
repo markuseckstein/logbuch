@@ -79,21 +79,21 @@ describe('photos', () => {
     expect(stored?.blob).toBeDefined();
   });
 
-  it('rejects a fourth photo with MaxPhotosError', async () => {
+  it('rejects a sixth photo with MaxPhotosError', async () => {
     const e = await createEntry(db, tripId, { time: 1, tzOffsetMin: 0 });
-    for (let i = 0; i < 3; i++) await addPhotoToEntry(db, e.id, photo());
+    for (let i = 0; i < 5; i++) await addPhotoToEntry(db, e.id, photo());
     await expect(addPhotoToEntry(db, e.id, photo())).rejects.toBeInstanceOf(MaxPhotosError);
-    expect(await db.photos.count()).toBe(3);
-    expect((await listEntries(db, tripId))[0]?.photoIds).toHaveLength(3);
+    expect(await db.photos.count()).toBe(5);
+    expect((await listEntries(db, tripId))[0]?.photoIds).toHaveLength(5);
   });
 
   it('removePhotoFromEntry deletes photo and unlinks it, allowing a new one', async () => {
     const e = await createEntry(db, tripId, { time: 1, tzOffsetMin: 0 });
     const ps = [];
-    for (let i = 0; i < 3; i++) ps.push(await addPhotoToEntry(db, e.id, photo()));
+    for (let i = 0; i < 5; i++) ps.push(await addPhotoToEntry(db, e.id, photo()));
     await removePhotoFromEntry(db, e.id, ps[1]!.id);
     expect(await getPhoto(db, ps[1]!.id)).toBeUndefined();
-    expect((await listEntries(db, tripId))[0]?.photoIds).toEqual([ps[0]!.id, ps[2]!.id]);
+    expect((await listEntries(db, tripId))[0]?.photoIds).toEqual([ps[0]!.id, ps[2]!.id, ps[3]!.id, ps[4]!.id]);
     await expect(addPhotoToEntry(db, e.id, photo())).resolves.toBeDefined();
   });
 

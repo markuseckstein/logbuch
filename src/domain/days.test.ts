@@ -12,7 +12,7 @@ const entry = (time: number, tzOffsetMin = 120, id = String(time)): LogEntry => 
   createdAt: time,
   updatedAt: time,
 });
-const report = (date: string): DayReport => ({ tripId: 't', date, text: 'x', updatedAt: 0 });
+const report = (date: string): DayReport => ({ tripId: 't', date, text: 'x', photoIds: [], updatedAt: 0 });
 const trip = (extra: Partial<Trip> = {}): Trip => ({
   id: 't',
   name: 'T',

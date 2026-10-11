@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import { localDate } from '../domain/days';
 import type {
   DayReport, ID, LogEntry, Photo, Position, Settings, Track, TrackPoint, Trip, TripBundle,
 } from '../domain/types';
@@ -124,11 +125,12 @@ export async function deleteEntry(db: LogbookDB, id: ID): Promise<void> {
 
 // ---------- Photos ----------
 
-export const MAX_PHOTOS_PER_ENTRY = 3;
+export const MAX_PHOTOS_PER_ENTRY = 5;
+export const MAX_PHOTOS_PER_DAY_REPORT = 15;
 
 export class MaxPhotosError extends Error {
-  constructor() {
-    super(`An entry can have at most ${MAX_PHOTOS_PER_ENTRY} photos`);
+  constructor(max = MAX_PHOTOS_PER_ENTRY) {
+    super(`At most ${max} photos allowed`);
     this.name = 'MaxPhotosError';
   }
 }
@@ -142,6 +144,7 @@ export interface PhotoInput {
   mime: string;
   width: number;
   height: number;
+  hash?: string;
 }
 
 export async function addPhotoToEntry(db: LogbookDB, entryId: ID, input: PhotoInput): Promise<Photo> {
@@ -153,6 +156,69 @@ export async function addPhotoToEntry(db: LogbookDB, entryId: ID, input: PhotoIn
     await db.photos.add(photo);
     await db.entries.update(entryId, { photoIds: [...entry.photoIds, photo.id], updatedAt: Date.now() });
     return photo;
+  });
+}
+
+/** Adds several photos atomically (all or none). */
+export async function addPhotosToEntry(db: LogbookDB, entryId: ID, inputs: readonly PhotoInput[]): Promise<Photo[]> {
+  return db.transaction('rw', db.entries, db.photos, async () => {
+    const entry = await db.entries.get(entryId);
+    if (!entry) throw new Error(`Entry not found: ${entryId}`);
+    if (entry.photoIds.length + inputs.length > MAX_PHOTOS_PER_ENTRY) throw new MaxPhotosError(MAX_PHOTOS_PER_ENTRY);
+    const now = Date.now();
+    const photos: Photo[] = inputs.map((input, i) => ({
+      ...input, id: crypto.randomUUID(), tripId: entry.tripId, createdAt: now + i,
+    }));
+    await db.photos.bulkAdd(photos);
+    await db.entries.update(entryId, {
+      photoIds: [...entry.photoIds, ...photos.map((p) => p.id)],
+      updatedAt: Math.max(now, entry.updatedAt + 1),
+    });
+    return photos;
+  });
+}
+
+export async function addPhotosToDayReport(
+  db: LogbookDB, tripId: ID, date: string, inputs: readonly PhotoInput[],
+): Promise<Photo[]> {
+  return db.transaction('rw', db.dayReports, db.photos, async () => {
+    const report = (await db.dayReports.get([tripId, date])) ?? { tripId, date, text: '', photoIds: [], updatedAt: 0 };
+    if (report.photoIds.length + inputs.length > MAX_PHOTOS_PER_DAY_REPORT) {
+      throw new MaxPhotosError(MAX_PHOTOS_PER_DAY_REPORT);
+    }
+    const now = Date.now();
+    const photos: Photo[] = inputs.map((input, i) => ({ ...input, id: crypto.randomUUID(), tripId, createdAt: now + i }));
+    await db.photos.bulkAdd(photos);
+    await db.dayReports.put({
+      ...report, photoIds: [...report.photoIds, ...photos.map((p) => p.id)], updatedAt: Math.max(now, report.updatedAt + 1),
+    });
+    return photos;
+  });
+}
+
+export async function removePhotoFromDayReport(db: LogbookDB, tripId: ID, date: string, photoId: ID): Promise<void> {
+  await db.transaction('rw', db.dayReports, db.photos, async () => {
+    const report = await db.dayReports.get([tripId, date]);
+    if (!report) throw new Error(`Day report not found: ${date}`);
+    await db.photos.delete(photoId);
+    await db.dayReports.put({
+      ...report, photoIds: report.photoIds.filter((p) => p !== photoId),
+      updatedAt: Math.max(Date.now(), report.updatedAt + 1),
+    });
+  });
+}
+
+/** Hashes of all photos attached to entries of that calendar day or to its report. */
+export async function dayPhotoHashes(db: LogbookDB, tripId: ID, date: string): Promise<Set<string>> {
+  return db.transaction('r', db.entries, db.photos, db.dayReports, async () => {
+    const entries = await listEntries(db, tripId);
+    const report = await db.dayReports.get([tripId, date]);
+    const ids = new Set<ID>(report?.photoIds ?? []);
+    for (const e of entries) if (localDate(e.time, e.tzOffsetMin) === date) e.photoIds.forEach((id) => ids.add(id));
+    const photos = await db.photos.bulkGet([...ids]);
+    const hashes = new Set<string>();
+    for (const p of photos) if (p?.hash) hashes.add(p.hash);
+    return hashes;
   });
 }
 
@@ -191,9 +257,12 @@ export async function getDayReport(db: LogbookDB, tripId: ID, date: string): Pro
 export async function upsertDayReport(
   db: LogbookDB, tripId: ID, date: string, input: { title?: string; text: string },
 ): Promise<DayReport> {
-  const report: DayReport = { tripId, date, ...input, updatedAt: Date.now() };
-  await db.dayReports.put(report);
-  return report;
+  return db.transaction('rw', db.dayReports, async () => {
+    const existing = await db.dayReports.get([tripId, date]);
+    const report: DayReport = { tripId, date, ...input, photoIds: existing?.photoIds ?? [], updatedAt: Date.now() };
+    await db.dayReports.put(report);
+    return report;
+  });
 }
 
 export async function listDayReports(db: LogbookDB, tripId: ID): Promise<DayReport[]> {

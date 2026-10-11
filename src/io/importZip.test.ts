@@ -23,6 +23,16 @@ describe('importZip', () => {
     expect('timeIso' in out.entries[0]!).toBe(false);
   });
 
+  it('tolerates exports without hash and dayReport photoIds (older files)', async () => {
+    const json = JSON.parse(JSON.stringify({ format: 'segel-logbuch', version: 1, trip: sampleBundle().trip, entries: [],
+      dayReports: [{ tripId: 'trip-1', date: '2026-08-10', text: 'x', updatedAt: 1 }],
+      photos: [{ id: 'q', dataUrl: 'data:image/jpeg;base64,AQID', mime: 'image/jpeg', width: 1, height: 1, createdAt: 1 }] }));
+    const out = await importJson(JSON.stringify(json));
+    expect(out.dayReports[0]!.photoIds).toEqual([]);
+    expect(out.photos[0]!.hash).toBeUndefined();
+    expect('hash' in out.photos[0]!).toBe(false);
+  });
+
   it('accepts an ArrayBuffer', async () => {
     const blob = await exportZip(sampleBundle());
     const bytes = await blobToBytes(blob);

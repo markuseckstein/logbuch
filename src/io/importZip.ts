@@ -1,5 +1,5 @@
 import { strFromU8, unzipSync } from 'fflate';
-import type { LogEntry, Photo } from '../domain/types';
+import type { DayReport, LogEntry, Photo } from '../domain/types';
 import { blobToBytes } from './blob';
 import type { TripBundle } from './bundle';
 import type { ExportedEntry, ExportedPhoto, LogbookJsonV1 } from './exportZip';
@@ -29,7 +29,9 @@ function validate(raw: unknown): LogbookJsonV1 {
   }
   return {
     ...(raw as unknown as LogbookJsonV1),
-    dayReports: Array.isArray(raw.dayReports) ? (raw.dayReports as LogbookJsonV1['dayReports']) : [],
+    dayReports: Array.isArray(raw.dayReports)
+      ? (raw.dayReports as Partial<DayReport>[]).map((r) => ({ ...r, photoIds: r.photoIds ?? [] }) as DayReport)
+      : [],
     tracks: Array.isArray(raw.tracks) ? (raw.tracks as LogbookJsonV1['tracks']) : [],
   };
 }
@@ -67,6 +69,7 @@ function toBundle(json: LogbookJsonV1, loadPhoto: (p: ExportedPhoto) => Blob): T
     mime: p.mime,
     width: p.width,
     height: p.height,
+    ...(p.hash ? { hash: p.hash } : {}),
     createdAt: p.createdAt,
   }));
   return { trip: json.trip, entries, photos, dayReports: json.dayReports, tracks: json.tracks };
