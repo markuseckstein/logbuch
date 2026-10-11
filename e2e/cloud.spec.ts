@@ -1,8 +1,10 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { onboard } from './helpers';
 
 /**
  * Cloud-Sync gegen die echte Dexie-Cloud-Datenbank (nur `npm run e2e:cloud`, braucht VITE_DEXIE_CLOUD_URL
  * und die Demo-Nutzer aus e2e/demoUsers.json). Login mit @demo.local-Adressen ohne E-Mail-Code.
+ * Törn-Modell v2: Alice (Admin) legt einen Törn mit zwei Booten an und lädt Bob und Carol mit Boot-Vorschlag ein.
  */
 test.skip(!process.env['E2E_CLOUD_URL'], 'Keine Dexie-Cloud-URL konfiguriert (VITE_DEXIE_CLOUD_URL)');
 test.use({ serviceWorkers: 'block' });
@@ -13,13 +15,10 @@ const PNG = Buffer.from(
 );
 const SYNC = { timeout: 45_000 };
 
-async function phone(browser: Browser): Promise<Page> {
-  const context = await browser.newContext({
-    geolocation: { latitude: 54.3185, longitude: 10.1407, accuracy: 10 },
-    permissions: ['geolocation'],
-  });
+async function phone(browser: Browser, at = { latitude: 54.3185, longitude: 10.1407 }): Promise<Page> {
+  const context = await browser.newContext({ geolocation: { ...at, accuracy: 10 }, permissions: ['geolocation'] });
   const page = await context.newPage();
-  // Diagnose: vom Server abgelehnte Änderungen (werden lokal zurückgerollt) im Testlog zeigen
+  // Diagnose: vom Server abgelehnte Änderungen (werden lokal gesichert und erneut gesendet) im Testlog zeigen
   page.on('response', async (r) => {
     if (!r.url().endsWith('/sync')) return;
     try {
@@ -36,134 +35,139 @@ async function phone(browser: Browser): Promise<Page> {
 }
 
 const tab = (page: Page, name: string) => page.getByRole('navigation').getByRole('button', { name, exact: true });
-const syncCard = (page: Page) => page.getByRole('region', { name: 'Synchronisation' });
+const account = (page: Page) => page.getByRole('region', { name: 'Konto' });
+const boatSwitch = (page: Page) => page.getByRole('radiogroup', { name: 'Boot wählen' });
+const people = (page: Page) => page.getByRole('list', { name: 'Personen' });
 
-async function signIn(page: Page, email: string, from: 'card' | 'onboarding'): Promise<void> {
-  if (from === 'card') await syncCard(page).getByRole('button', { name: 'Anmelden' }).click();
-  else await page.getByRole('button', { name: 'Mit Cloud-Konto anmelden' }).click();
+async function signIn(page: Page, email: string, from: 'account' | 'onboarding'): Promise<void> {
+  if (from === 'account') await account(page).getByRole('button', { name: 'Anmelden' }).click();
+  else await page.getByRole('button', { name: 'Ich wurde eingeladen – anmelden' }).click();
   const dlg = page.getByRole('dialog', { name: 'Mit Cloud-Konto anmelden' });
   await dlg.getByLabel('E-Mail-Adresse').fill(email);
   await dlg.getByRole('button', { name: 'Code anfordern' }).click();
 }
 
-async function acceptInvite(page: Page, boat: string): Promise<void> {
-  const banner = page.getByRole('region', { name: 'Einladung' }).filter({ hasText: boat });
+async function acceptInvite(page: Page, trip: string): Promise<void> {
+  const banner = page.getByRole('region', { name: 'Einladung' }).filter({ hasText: trip });
   await expect(banner).toBeVisible(SYNC);
-  await expect(banner).toContainText(`lädt dich in das Logbuch der ${boat} ein`);
+  await expect(banner).toContainText(`lädt dich in den Törn „${trip}“ ein`);
   await banner.getByRole('button', { name: 'Annehmen' }).click();
 }
 
-async function entryWithText(page: Page, text: string, photo = false): Promise<void> {
-  await page.getByRole('button', { name: /Eintrag jetzt/ }).click();
+async function invite(page: Page, email: string, boat: string): Promise<void> {
+  const card = page.getByRole('region', { name: 'Person einladen' });
+  await card.getByLabel('E-Mail-Adresse').fill(email);
+  await card.getByRole('radio', { name: boat }).click();
+  await card.getByRole('button', { name: 'Einladung senden' }).click();
+  await expect(card.getByLabel('E-Mail-Adresse')).toHaveValue('');
+}
+
+/** Ein-Tipp-Eintrag für das gewählte Boot, Text ergänzen. */
+async function entryWithText(page: Page, boat: string, text: string): Promise<void> {
+  await page.getByRole('button', { name: `Eintrag jetzt · ${boat}` }).click(SYNC);
   const sheet = page.getByRole('dialog');
   await expect(sheet).toBeVisible();
-  if (photo) {
-    await sheet.getByLabel('Galerie').setInputFiles(['e2e/fixtures/photo-1.png']);
-    await expect(sheet.getByText('1 / 5')).toBeVisible();
-  }
   await sheet.getByLabel('Text').fill(text);
   await sheet.getByRole('button', { name: 'Speichern' }).click();
   await expect(sheet).toBeHidden();
   await expect(page.locator('.tl-item', { hasText: text })).toBeVisible();
 }
 
-test('Cloud: Skipper teilt, Crew schreibt mit, anderes Boot liest nur, Foto kommt an', async ({ browser }) => {
+test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, beide schreiben, fremde Einträge nur ansehen, Foto kommt an', async ({ browser }) => {
   const run = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-  const boat = `Seeschwalbe ${run}`;
   const trip = `Cloud-Törn ${run}`;
+  const [b1, b2] = [`Seeschwalbe ${run}`, `Möwe ${run}`];
 
-  // --- Alice (Skipper, Boot 1)
+  // --- Alice (Admin): Törn lokal mit zwei Booten, erster Eintrag mit Foto, dann Anmeldung
   const alice = await phone(browser);
-  await alice.goto('/');
-  await alice.getByLabel('Name des Törns').fill(trip);
-  await alice.getByRole('button', { name: 'Weiter' }).click();
-  await alice.getByLabel('Bootsname').fill(boat);
-  await alice.getByRole('button', { name: 'Weiter' }).click();
-  for (const name of ['Alice', 'Bob']) {
-    await alice.getByLabel('Name', { exact: true }).fill(name);
-    await alice.getByRole('button', { name: 'Crew hinzufügen' }).click();
-  }
-  await alice.getByRole('button', { name: 'Törn anlegen' }).click();
-  await expect(alice.locator('.brand span')).toContainText(trip);
-  await alice.getByRole('button', { name: /Eintrag jetzt/ }).click();
+  await onboard(alice, { trip, boats: [b1, b2], founder: 'Alice' });
+  await alice.getByRole('button', { name: `Eintrag jetzt · ${b1}` }).click();
   await alice.getByRole('dialog').getByLabel('Galerie').setInputFiles(['e2e/fixtures/photo-1.png']);
+  await expect(alice.getByRole('dialog').getByText('1 / 5')).toBeVisible();
   await alice.getByRole('dialog').getByLabel('Text').fill('Ablegen in Kiel');
   await alice.getByRole('dialog').getByRole('button', { name: 'Speichern' }).click();
   await expect(alice.locator('.tl-item', { hasText: 'Ablegen in Kiel' })).toBeVisible();
 
   await tab(alice, 'Törn').click();
-  await signIn(alice, 'alice@demo.local', 'card');
-  await expect(syncCard(alice)).toContainText('Angemeldet als alice@demo.local', SYNC);
-  await syncCard(alice).getByRole('button', { name: 'Logbuch in die Cloud bringen' }).click();
-  const members = syncCard(alice).getByRole('list', { name: 'Mitglieder' });
-  await syncCard(alice).getByLabel('E-Mail einladen').fill('bob@demo.local');
-  await syncCard(alice).getByLabel('Name (optional)').fill('Bob');
-  await syncCard(alice).getByRole('button', { name: 'Als Crew einladen (schreibt mit)' }).click();
-  await expect(members).toContainText('bob@demo.local');
-  await expect(syncCard(alice).getByLabel('E-Mail einladen')).toHaveValue('');
-  await syncCard(alice).getByLabel('E-Mail einladen').fill('carol@demo.local');
-  await syncCard(alice).getByRole('button', { name: 'Anderes Boot einladen (nur lesen)' }).click();
-  await expect(members).toContainText('Crew (schreibt mit)');
-  await expect(members).toContainText('Anderes Boot (nur lesen)');
-  await expect(members.getByText('eingeladen')).toHaveCount(2);
+  await signIn(alice, 'alice@demo.local', 'account');
+  await expect(account(alice)).toContainText('Cloud-Konto · alice@demo.local', SYNC);
+  await expect(account(alice).getByText('Admin')).toBeVisible();
+  await invite(alice, 'bob@demo.local', b1);
+  await invite(alice, 'carol@demo.local', b2);
+  await expect(people(alice)).toContainText('bob@demo.local · Vorschlag: ' + b1);
+  await expect(people(alice)).toContainText('carol@demo.local · Vorschlag: ' + b2);
+  await expect(people(alice).getByText('eingeladen')).toHaveCount(2, SYNC);
   await expect(alice.getByRole('img', { name: 'Cloud: synchronisiert' })).toBeVisible(SYNC);
 
   let failed = true;
   try {
-    // --- Bob (Crew, gleiches Boot): leeres Handy, Anmeldung aus dem Onboarding
+    // --- Bob: leeres Handy, Anmeldung vom Startbildschirm, Einladung annehmen
     const bob = await phone(browser);
     await bob.goto('/');
     await signIn(bob, 'bob@demo.local', 'onboarding');
-    await acceptInvite(bob, boat);
-    const who = bob.getByRole('dialog', { name: 'Wer schreibt auf diesem Gerät?' });
-    await expect(who).toBeVisible(SYNC);
-    await who.getByRole('button', { name: /Bob/ }).click();
-    await expect(bob.locator('.brand span')).toContainText(trip);
+    await acceptInvite(bob, trip);
+    await expect(bob.locator('.brand span')).toContainText(trip, SYNC);
+    // Boot-Schalter steht auf dem vorgeschlagenen Boot
+    await expect(boatSwitch(bob).getByRole('radio', { name: b1 })).toHaveAttribute('aria-checked', 'true', SYNC);
     await expect(bob.locator('.tl-item', { hasText: 'Ablegen in Kiel' })).toBeVisible(SYNC);
-    // Foto (Blob-Offloading) kommt an
+    // Alices Eintrag: nur ansehen, Foto (Blob-Offloading) kommt an
     await bob.locator('.tl-item', { hasText: 'Ablegen in Kiel' }).click();
-    const img = bob.getByRole('dialog').locator('img').first();
+    const view = bob.getByRole('dialog');
+    await expect(view.getByRole('note')).toContainText('Nur ansehen');
+    await expect(view.getByRole('note')).toContainText(`Eintrag von Alice · ${b1}`);
+    await expect(view.getByRole('button', { name: 'Speichern' })).toHaveCount(0);
+    const img = view.locator('img').first();
     await expect(img).toBeVisible(SYNC);
     await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth), SYNC).toBeGreaterThan(0);
-    await bob.getByRole('dialog').getByRole('button', { name: 'Speichern' }).click();
-    await entryWithText(bob, 'Bob übernimmt das Ruder');
+    await view.getByRole('button', { name: 'Fertig' }).click();
+    await entryWithText(bob, b1, 'Bob übernimmt das Ruder');
+    // Mitglied: kein Einladen, kein Boot anlegen
+    await tab(bob, 'Törn').click();
+    await expect(bob.getByText('Nur der Admin lädt Personen ein und legt Boote an.')).toBeVisible();
+    await expect(bob.getByRole('region', { name: 'Person einladen' })).toHaveCount(0);
 
-    // Alice sieht Bobs Eintrag nach dem Sync
-    await tab(alice, 'Heute').click();
-    await expect(alice.locator('.tl-item', { hasText: 'Bob übernimmt das Ruder' })).toBeVisible(SYNC);
-
-    // --- Carol (anderes Boot, nur lesen)
-    const carol = await phone(browser);
+    // --- Carol: anderes Boot vorgeschlagen
+    const carol = await phone(browser, { latitude: 54.42, longitude: 10.25 });
     await carol.goto('/');
     await signIn(carol, 'carol@demo.local', 'onboarding');
-    await acceptInvite(carol, boat);
-    await expect(carol.getByText(`Logbuch der ${boat} · nur lesen`)).toBeVisible(SYNC);
-    await expect(carol.locator('.tl-item', { hasText: 'Bob übernimmt das Ruder' })).toBeVisible(SYNC);
-    await expect(carol.getByRole('button', { name: /Eintrag jetzt/ })).toHaveCount(0);
-    await carol.locator('.tl-item', { hasText: 'Ablegen in Kiel' }).click();
-    await expect(carol.getByRole('dialog').getByRole('button', { name: 'Speichern' })).toHaveCount(0);
-    await carol.getByRole('dialog').getByRole('button', { name: 'Fertig' }).click();
-    await tab(carol, 'Törn').click();
-    await expect(carol.getByLabel('Name des Törns')).toBeDisabled();
+    await acceptInvite(carol, trip);
+    await expect(boatSwitch(carol).getByRole('radio', { name: b2 })).toHaveAttribute('aria-checked', 'true', SYNC);
+    await entryWithText(carol, b2, 'Carol auf der Möwe');
 
-    // Mitgliederliste beim Skipper: beide angenommen
+    // Bob sieht Carols Eintrag (bei „Alle“), kann ihn aber nicht ändern
+    await tab(bob, 'Heute').click();
+    await boatSwitch(bob).getByRole('radio', { name: 'Alle' }).click();
+    await expect(bob.locator('.tl-item', { hasText: 'Carol auf der Möwe' })).toBeVisible(SYNC);
+    await bob.locator('.tl-item', { hasText: 'Carol auf der Möwe' }).click();
+    await expect(bob.getByRole('dialog').getByRole('note')).toContainText(`Nur ansehen`);
+    await expect(bob.getByRole('dialog').getByRole('button', { name: 'Löschen' })).toHaveCount(0);
+    await bob.getByRole('dialog').getByRole('button', { name: 'Fertig' }).click();
+
+    // Alice (Admin) sieht beide, darf fremde Einträge bearbeiten; Mitgliederliste: angenommen
+    await tab(alice, 'Heute').click();
+    await boatSwitch(alice).getByRole('radio', { name: 'Alle' }).click();
+    await expect(alice.locator('.tl-item', { hasText: 'Bob übernimmt das Ruder' })).toBeVisible(SYNC);
+    await expect(alice.locator('.tl-item', { hasText: 'Carol auf der Möwe' })).toBeVisible(SYNC);
+    await alice.locator('.tl-item', { hasText: 'Carol auf der Möwe' }).click();
+    await expect(alice.getByRole('dialog').getByRole('note')).toContainText('Admin-Bearbeitung');
+    await alice.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click();
     await tab(alice, 'Törn').click();
-    await expect(members.getByText('angenommen')).toHaveCount(3, SYNC);
+    await expect(people(alice).getByText('angenommen')).toHaveCount(3, SYNC);
     failed = false;
   } finally {
     if (process.env['E2E_KEEP'] && failed) {
-      console.warn('KEEP realm of', boat);
+      console.warn('KEEP realm of', trip);
       return;
     }
-    // Aufräumen (best effort, verdeckt keinen Testfehler): Logbuch für alle löschen (Realm samt Mitgliedern)
+    // Aufräumen (best effort, verdeckt keinen Testfehler): Törn für alle löschen (Realm samt Mitgliedern)
     try {
       await tab(alice, 'Törn').click({ timeout: 5000 });
-      await alice.getByRole('button', { name: 'Logbuch für alle löschen' }).click({ timeout: 5000 });
+      await alice.getByRole('button', { name: 'Törn für alle löschen' }).click({ timeout: 5000 });
       await alice.getByRole('dialog').getByRole('button', { name: 'Für alle löschen' }).click({ timeout: 5000 });
       await expect(alice.locator('.toast')).toContainText('für alle gelöscht', { timeout: 5000 });
       await alice.waitForTimeout(3000); // Löschung hochladen
     } catch {
-      console.warn(`Aufräumen fehlgeschlagen – Realm von „${boat}“ ggf. per CLI löschen (dexie-cloud clear-realm)`);
+      console.warn(`Aufräumen fehlgeschlagen – Realm von „${trip}“ bleibt stehen`);
     }
   }
 });

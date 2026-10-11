@@ -1,7 +1,8 @@
 # Dexie Cloud einrichten (Stufe 2: automatischer Sync)
 
-Ohne Cloud-URL läuft die App rein lokal (wie bisher, inkl. Datei-Teilen). Mit URL kann man sich per E-Mail-Code
-anmelden; Logbücher, die „in die Cloud gebracht“ wurden, synchronisieren automatisch. Hintergrund:
+Ohne Cloud-URL läuft die App rein lokal (wie bisher, inkl. Datei-Export/-Import). Mit URL kann man sich per
+E-Mail-Code anmelden; jeder Törn ist dann ein eigener Realm (`rlm~<tripId>`) und synchronisiert automatisch mit allen
+eingeladenen Personen (Törn-Modell v2, `docs/toern-modell.md`). Hintergrund:
 `docs/research/dexie-cloud-integration.md`, Datenmodell: `docs/architecture.md`.
 
 ## Einmalig (im Repo-Root)
@@ -12,7 +13,7 @@ npx dexie-cloud whitelist https://markuseckstein.github.io
 npx dexie-cloud whitelist http://localhost:5173   # vite dev
 npx dexie-cloud whitelist http://localhost:4173   # vite preview / Playwright (Cloud-E2E)
 npx dexie-cloud whitelist                         # ohne Argument: Liste prüfen
-npx dexie-cloud import roles.json                 # Rollen skipper / crew / readonly
+npx dexie-cloud import roles.json                 # Rollen admin / member (ergänzt, löscht keine alten Rollen)
 ```
 
 Optional für Cloud-E2E-Tests (Demo-Nutzer belegen keine Plätze, Login ohne Mail):
@@ -26,9 +27,10 @@ npx dexie-cloud import e2e/demoUsers.json         # alice@, bob@, carol@, dave@d
 - `npm test`, `npm run e2e`: immer lokaler Modus (Vitest setzt `VITE_DEXIE_CLOUD_URL` leer; die lokale E2E baut
   mit leerer URL nach `dist-local` und läuft auf Port 4175).
 - `npm run e2e:cloud`: baut mit der URL aus `.env.local` (Port 4173, muss in der Whitelist stehen) und führt
-  `e2e/cloud.spec.ts` aus (Alice teilt, Bob schreibt mit, Carol liest nur, Foto-Sync). Ohne URL wird übersprungen.
+  `e2e/cloud.spec.ts` aus (Alice legt als Admin einen Törn mit zwei Booten an, lädt Bob und Carol mit Boot-Vorschlag
+  ein, beide schreiben, fremde Einträge nur ansehen, Foto-Sync). Ohne URL wird übersprungen.
   Immer seriell (`workers: 1`, die Läufe teilen sich die Demo-Konten), auch mit `--repeat-each`.
-  Der Test löscht sein Logbuch am Ende „für alle“. Hängen gebliebene Test-Realms: `npx dexie-cloud clear-realm <realmId> --yes`
+  Eindeutiges Lauf-Kürzel in Törn- und Bootsnamen. Der Test löscht seinen Törn am Ende „für alle“. Hängen gebliebene Test-Realms: `npx dexie-cloud clear-realm <realmId> --yes`
   (`E2E_KEEP=1` lässt den Realm eines fehlgeschlagenen Laufs zur Analyse stehen).
 - Entwicklungsserver (`npm run dev`): `window.__logbook` = `{ db, repo, cloud }` für manuelle Versuche (nur DEV-Build).
 
@@ -45,9 +47,14 @@ npx dexie-cloud import e2e/demoUsers.json         # alice@, bob@, carol@, dave@d
 
 | Rolle | Wer | Rechte |
 |---|---|---|
-| `skipper` | Ersteller des Logbuchs (zusätzlich Realm-Owner) | `manage: *` – alles, Mitglieder einladen/entfernen, Logbuch für alle löschen |
-| `crew` | Mitsegler desselben Boots („Crew – schreibt mit“) | anlegen in crewMembers, entries, photos, dayReports, tracks, trackChunks; ändern in trips, crewMembers, entries, dayReports, tracks, trackChunks. Kein hartes Löschen fremder Datensätze (Löschen = `deletedAt`) |
-| `readonly` | Crew anderer Boote der Flottille („Anderes Boot – nur lesen“) | keine (nur lesen) |
+| (Realm-Owner) | Wer den Törn anlegt = **Admin** | `manage: *` über `realm.owner` – Boote, Einladungen, Törndaten, Cover, alle Einträge, Törn für alle löschen |
+| `admin` | (reserviert, z. B. weitere Admins) | `manage: *` |
+| `member` | Eingeladene Personen | `add` auf entries, photos, dayReports, tracks, trackChunks. Eigene Datensätze ändern/löschen über die Owner-Regel von Dexie Cloud; fremde nur lesen (Spike, Recherche 9.9) |
+
+Beim Einladen setzt die App am Mitglied `roles: ['member']` **und** dieselben Rechte explizit als `permissions`
+(neu importierte globale Rollen wirkten auf dem gehosteten Server zunächst nicht, Recherche 9.9). Die älteren Rollen
+`skipper`/`crew`/`readonly` stehen noch in der Datenbank (der Import löscht keine Rollen), werden aber nicht mehr
+benutzt.
 
 ## Plan und Datenschutz
 
@@ -58,8 +65,10 @@ npx dexie-cloud import e2e/demoUsers.json         # alice@, bob@, carol@, dave@d
 
 ## Bedienung (Kurzfassung)
 
-1. Skipper: Törn-Tab → „Synchronisation“ → Anmelden (E-Mail → Code) → „Logbuch in die Cloud bringen“.
-2. Skipper lädt ein: E-Mail + „Als Crew einladen (schreibt mit)“ bzw. „Anderes Boot einladen (nur lesen)“.
-3. Eingeladene: App öffnen → Anmelden mit genau dieser E-Mail → Banner „… lädt dich in das Logbuch der … ein“ → Annehmen.
-   Crew wählt danach „Ich bin …“ (wird mit dem Konto verknüpft und gilt auf allen eigenen Geräten).
-4. Flottille: jedes Boot lädt die Skipper der anderen Boote als „Anderes Boot (nur lesen)“ ein; `trip.flotilla` wie in Stufe 1.
+1. Admin: Törn anlegen (Onboarding: Törn → Boote → Crew). Anmelden im Onboarding oder später im Törn-Tab („Konto“ →
+   Anmelden, E-Mail → Code). Lokal angelegte Törns kommen nach der Anmeldung automatisch in ihren Realm.
+2. Admin lädt ein: Törn-Tab → „Person einladen“: E-Mail + optional Boot-Vorschlag. Ohne Anmeldung wird die Einladung
+   vorgemerkt und nach der Anmeldung gesendet. Mitgliederliste: Status, Vorschlag ändern, erneut senden, entfernen.
+3. Eingeladene: App öffnen → „Ich wurde eingeladen – anmelden“ mit genau dieser E-Mail → Banner „… lädt dich in den
+   Törn … ein“ → Annehmen. Der Boot-Schalter steht danach auf dem vorgeschlagenen Boot; Schreiben geht, sobald der
+   Server die Mitgliedschaft bestätigt hat.

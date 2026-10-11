@@ -1,3 +1,9 @@
+> **Überholt (2026-10-11).** Die Flottille als Gruppe getrennter Boot-Logbücher wurde durch das
+> **Törn-Modell v2** ersetzt: ein Törn = ein Realm mit mehreren Booten, Rollen admin/member, Boot-Schalter.
+> Maßgeblich: `docs/toern-modell.md` (Spezifikation) und `docs/architecture.md`. `trip.flotilla`,
+> `writableTripIds`, Ownership-Frage beim Import und die Rollen `skipper`/`crew`/`readonly` gibt es nicht mehr.
+> Dieses Dokument bleibt nur als Historie (Merge-Felder, Tombstones und Foto-Dedup gelten weiter).
+
 # Flottille – Stufe 1 (ohne Server)
 
 Ziel: Mehrere Handys pro Boot führen dasselbe Logbuch, Boote sehen sich gegenseitig read-only. Austausch in Stufe 1 per Export-ZIP + Merge-Import (teilen via WhatsApp/Quick Share). Stufe 2 (Dexie Cloud) baut auf demselben Datenmodell auf. Recherche: `docs/research/flotilla-sync.md`.
