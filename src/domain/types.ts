@@ -104,3 +104,12 @@ export interface Settings {
   activeTripId?: ID;
   theme: 'system' | 'light' | 'dark';
 }
+
+/** All data of one trip – unit of export/import and bulk persistence. */
+export interface TripBundle {
+  trip: Trip;
+  entries: LogEntry[];
+  photos: Photo[];
+  dayReports: DayReport[];
+  tracks: Track[];
+}
