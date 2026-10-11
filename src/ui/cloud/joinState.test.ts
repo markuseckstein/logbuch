@@ -13,6 +13,12 @@ describe('captureJoinFromUrl', () => {
     expect(location.search).toBe('?x=2');
     expect(location.hash).toBe('#h');
   });
+  it('remembers the email of a personal link and removes it from the URL', () => {
+    history.replaceState(null, '', '/app/?join=t-1&email=bob%40demo.local&x=2');
+    captureJoinFromUrl();
+    expect(JSON.parse(sessionStorage.getItem('logbook.join') ?? '{}')).toEqual({ tripId: 't-1', email: 'bob@demo.local' });
+    expect(location.search).toBe('?x=2');
+  });
   it('does nothing without parameter', () => {
     history.replaceState(null, '', '/?x=2');
     captureJoinFromUrl();

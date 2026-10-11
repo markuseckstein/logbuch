@@ -266,7 +266,7 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
                 {cloud === 'signed-out' ? (
                   <button className="btn block" type="button" onClick={() => startJoin()}>
                     <Icon name="mail" size={20} />
-                    Ich wurde eingeladen – anmelden
+                    Ich bin eingeladen / wieder anmelden
                   </button>
                 ) : (
                   <p className="muted">Angemeldet – Einladungen werden automatisch angenommen, sobald sie da sind.</p>

@@ -165,6 +165,46 @@ test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, bei
     await alice.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click();
     await tab(alice, 'Törn').click();
     await expect(people(alice).getByText('dabei')).toHaveCount(3, SYNC);
+
+    // --- Bob meldet sich später mit leerem Speicher wieder an (Websitedaten gelöscht): Mitgliedschaft besteht, keine offene Einladung
+    // (a) über seinen persönlichen QR-Link, E-Mail vorausgefüllt
+    await tab(alice, 'Törn').click();
+    const bobRow = people(alice).getByRole('listitem').filter({ hasText: 'bob@demo.local' });
+    await bobRow.getByRole('button', { name: /^QR-Code für/ }).click();
+    const personal = alice.getByRole('dialog', { name: /^QR-Code für/ });
+    await expect(personal.getByText('scannt den Code und meldet sich an – die E-Mail ist schon eingetragen')).toBeVisible();
+    const personalLink = (await personal.getByTestId('join-link').textContent()) ?? '';
+    expect(personalLink).toContain('email=bob%40demo.local');
+    await personal.getByRole('button', { name: 'Schließen' }).click();
+
+    const bob2 = await phone(browser);
+    await bob2.goto(personalLink);
+    await expect(bob2.getByRole('heading', { name: 'Du wurdest zu einem Törn eingeladen' })).toBeVisible();
+    expect(bob2.url()).not.toContain('email=');
+    await bob2.getByRole('main').getByRole('button', { name: 'Anmelden' }).click();
+    const dlg = bob2.getByRole('dialog', { name: 'Mit Cloud-Konto anmelden' });
+    await expect(dlg.getByLabel('E-Mail-Adresse')).toHaveValue('bob@demo.local');
+    await dlg.getByRole('button', { name: 'Code anfordern' }).click();
+    await expect(bob2.locator('.brand span')).toContainText(trip, SYNC);
+    await expect(bob2.locator('.tl-item', { hasText: 'Ablegen in Kiel' })).toBeVisible(SYNC);
+    await expect(bob2.getByText('Keine Einladung gefunden')).toHaveCount(0);
+
+    // (b) ohne Link: Onboarding „Ich bin eingeladen / wieder anmelden“
+    const bob3 = await phone(browser);
+    await bob3.goto('/');
+    await bob3.getByRole('button', { name: 'Ich bin eingeladen / wieder anmelden' }).click();
+    await signIn(bob3, 'bob@demo.local', 'join');
+    await expect(bob3.locator('.brand span')).toContainText(trip, SYNC);
+    await expect(boatSwitch(bob3).getByRole('radio', { name: b1 })).toHaveAttribute('aria-checked', 'true', SYNC);
+    await expect(bob3.locator('.tl-item', { hasText: 'Ablegen in Kiel' })).toBeVisible(SYNC);
+    await expect(bob3.getByText('Keine Einladung gefunden')).toHaveCount(0);
+
+    // (c) Dave ist nirgends eingetragen: „Keine Einladung gefunden“
+    const dave = await phone(browser);
+    await dave.goto('/');
+    await dave.getByRole('button', { name: 'Ich bin eingeladen / wieder anmelden' }).click();
+    await signIn(dave, 'dave@demo.local', 'join');
+    await expect(dave.getByRole('heading', { name: 'Keine Einladung gefunden' })).toBeVisible(SYNC);
     failed = false;
   } finally {
     if (process.env['E2E_KEEP'] && failed) {

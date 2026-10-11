@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildJoinUrl, parseJoinParam, pickJoinTarget } from './join';
+import { buildJoinUrl, decideJoinState, parseJoinEmailParam, parseJoinParam, pickJoinTarget, type JoinInput } from './join';
 
 describe('buildJoinUrl', () => {
   it('joins origin, base path and trip id', () => {
@@ -38,5 +38,55 @@ describe('pickJoinTarget', () => {
   it('is undefined without trip invites', () => {
     expect(pickJoinTarget([{ realmId: 'other' }], 't1')).toBeUndefined();
     expect(pickJoinTarget([], undefined)).toBeUndefined();
+  });
+});
+
+describe('personal join link', () => {
+  it('appends the url-encoded email', () => {
+    expect(buildJoinUrl('https://a.b', '/logbook/', 't1', 'bob+x@demo.local')).toBe(
+      'https://a.b/logbook/?join=t1&email=bob%2Bx%40demo.local',
+    );
+  });
+  it('omits an empty email', () => {
+    expect(buildJoinUrl('https://a.b', '/', 't1', '')).toBe('https://a.b/?join=t1');
+  });
+  it('parses the email parameter', () => {
+    expect(parseJoinEmailParam('?join=t1&email=bob%2Bx%40demo.local')).toBe('bob+x@demo.local');
+    expect(parseJoinEmailParam('?join=t1')).toBeUndefined();
+    expect(parseJoinEmailParam('?email=')).toBeUndefined();
+  });
+});
+
+describe('decideJoinState', () => {
+  const base: JoinInput = { loggedIn: true, synced: true, settled: false, accepting: false, openInvites: 0, tripIds: [], wantedTripId: undefined };
+  it('is signed-out without login', () => {
+    expect(decideJoinState({ ...base, loggedIn: false })).toEqual({ kind: 'signed-out' });
+  });
+  it('accepts open invitations first', () => {
+    expect(decideJoinState({ ...base, openInvites: 1 })).toEqual({ kind: 'accepting' });
+    expect(decideJoinState({ ...base, accepting: true, tripIds: ['t1'] })).toEqual({ kind: 'accepting' });
+  });
+  it('re-login: already member without invitation activates the wanted trip', () => {
+    expect(decideJoinState({ ...base, tripIds: ['t1', 't2'], wantedTripId: 't2' })).toEqual({ kind: 'activate', tripId: 't2' });
+  });
+  it('re-login without wanted trip activates the first trip', () => {
+    expect(decideJoinState({ ...base, tripIds: ['t1', 't2'] })).toEqual({ kind: 'activate', tripId: 't1' });
+  });
+  it('waits for a missing wanted trip while syncing or not settled', () => {
+    expect(decideJoinState({ ...base, synced: false, tripIds: ['t1'], wantedTripId: 'x' })).toEqual({ kind: 'waiting' });
+    expect(decideJoinState({ ...base, tripIds: ['t1'], wantedTripId: 'x' })).toEqual({ kind: 'waiting' });
+  });
+  it('wanted trip missing but other trip present: switch with notice once settled', () => {
+    expect(decideJoinState({ ...base, settled: true, tripIds: ['t1'], wantedTripId: 'x' })).toEqual({
+      kind: 'activate',
+      tripId: 't1',
+      notice: 'not-member',
+    });
+  });
+  it('nothing at all: waiting, then no-invite after sync and wait time', () => {
+    expect(decideJoinState(base)).toEqual({ kind: 'waiting' });
+    expect(decideJoinState({ ...base, synced: false, settled: true })).toEqual({ kind: 'waiting' });
+    expect(decideJoinState({ ...base, settled: true })).toEqual({ kind: 'no-invite' });
+    expect(decideJoinState({ ...base, settled: true, wantedTripId: 'x' })).toEqual({ kind: 'no-invite' });
   });
 });

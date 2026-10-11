@@ -12,9 +12,9 @@ import { useToast } from '../toast';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** E-Mail abfragen und Anmeldung starten; den Code fragt danach das Addon über CloudLoginHost ab. */
-export function SignInDialog({ onClose }: { onClose: () => void }) {
+export function SignInDialog({ onClose, initialEmail = '' }: { onClose: () => void; initialEmail?: string }) {
   const toast = useToast();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [error, setError] = useState<string>();
   const submit = (): void => {
     const e = email.trim();

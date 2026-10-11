@@ -526,9 +526,25 @@ const STATUS: Record<PersonInfo['status'], [string, string]> = {
   rejected: ['abgelehnt', 'st bad'],
 };
 
-function PersonRow({ p, boats, admin, shared }: { p: PersonInfo; boats: readonly Boat[]; admin: boolean; shared: boolean }) {
+function PersonRow({
+  trip,
+  people,
+  p,
+  boats,
+  admin,
+  shared,
+}: {
+  trip: Trip;
+  people: readonly PersonInfo[];
+  p: PersonInfo;
+  boats: readonly Boat[];
+  admin: boolean;
+  shared: boolean;
+}) {
   const toast = useToast();
+  const signedIn = useCloudUser()?.isLoggedIn === true;
   const [confirming, setConfirming] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const boat = boats.find((b) => b.id === p.suggestedBoatId);
   const [label, cls] = STATUS[p.status];
   const setSuggestion = async (id: string): Promise<void> => {
@@ -578,6 +594,11 @@ function PersonRow({ p, boats, admin, shared }: { p: PersonInfo; boats: readonly
               </option>
             ))}
           </select>
+          {signedIn && p.email && !p.self ? (
+            <button className="btn sm" type="button" aria-label={`QR-Code für ${p.name}`} onClick={() => setQrOpen(true)}>
+              QR-Code
+            </button>
+          ) : null}
           {!p.self && !p.admin ? (
             <button className="btn danger sm" type="button" onClick={() => setConfirming(true)}>
               Entfernen
@@ -585,6 +606,7 @@ function PersonRow({ p, boats, admin, shared }: { p: PersonInfo; boats: readonly
           ) : null}
         </div>
       ) : null}
+      {qrOpen ? <JoinSheet trip={trip} people={people} person={p} onClose={() => setQrOpen(false)} /> : null}
       {confirming ? (
         <div className="confirm" role="alertdialog" aria-label="Person entfernen bestätigen">
           <p>{p.name} wirklich aus dem Törn entfernen?</p>
@@ -608,7 +630,7 @@ function PeopleCard({ trip, boats, people, admin }: { trip: Trip; boats: readonl
       {people.length === 0 ? <p className="muted">Noch niemand eingeladen.</p> : null}
       <ul className="people-list" aria-label="Personen">
         {people.map((p) => (
-          <PersonRow key={p.crewId} p={p} boats={boats} admin={admin} shared={shared} />
+          <PersonRow key={p.crewId} trip={trip} people={people} p={p} boats={boats} admin={admin} shared={shared} />
         ))}
       </ul>
       <p className="muted">Das Boot ist nur ein Vorschlag fürs erste Eintragen. Jedes Mitglied, das dabei ist, schreibt auf alle Boote.</p>

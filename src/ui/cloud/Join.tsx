@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { Invite } from 'dexie-cloud-addon';
 import { db } from '../../db/db';
 import { setActiveTrip } from '../../db/repo';
-import { pickJoinTarget } from '../../domain';
+import { decideJoinState, isSharedRealm, pickJoinTarget, type JoinDecision } from '../../domain';
 import { useCloudUser, useInvites, useSyncState } from '../cloudHooks';
 import { Icon } from '../icons';
 import { useToast } from '../toast';
@@ -61,28 +61,64 @@ export function JoinWatcher() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn, invites, retry]);
 
-  const wanted = progress.target ?? join?.tripId;
-  const arrived = useLiveQuery(async () => (wanted ? ((await db.trips.get(wanted)) ?? null) : null), [wanted]);
+  const decision = useJoinDecision();
   useEffect(() => {
-    if (!loggedIn || !arrived || progress.accepting) return;
+    // Nur während eines Beitritts/Wieder-Anmeldens eingreifen; sonst aktiviert die App den ersten Törn selbst.
+    if (decision.kind !== 'activate' || (!join && progress.target === undefined)) return;
     setJoinProgress({ accepting: false });
     clearJoin();
-    void setActiveTrip(db, arrived.id);
-  }, [loggedIn, arrived, progress.accepting]);
+    void setActiveTrip(db, decision.tripId);
+    if (decision.notice === 'not-member') toast('Für diesen Törn bist du nicht eingetragen');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decision.kind, decision.kind === 'activate' ? decision.tripId : undefined, !!join, progress.target]);
   return null;
+}
+
+const SETTLE_MS = 4000;
+
+/**
+ * Entscheidet nach der Anmeldung (siehe `decideJoinState`): Einladungen annehmen, vorhandenen Törn aktivieren
+ * (Wieder-Anmelden mit leerem Speicher) oder „keine Einladung“ melden.
+ */
+function useJoinDecision(): JoinDecision {
+  const join = useJoin();
+  const progress = useJoinProgress();
+  const loggedIn = useCloudUser()?.isLoggedIn === true;
+  const invites = useInvites();
+  const sync = useSyncState();
+  const tripIds = useLiveQuery(async () => (await db.trips.toArray()).filter((t) => isSharedRealm(t.realmId)).map((t) => t.id), []);
+  const synced = sync?.phase === 'in-sync';
+  const idle = synced && invites.length === 0 && !progress.accepting;
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!idle) return;
+    // Einladungen und Törns treffen mit dem ersten Abgleich ein; kurz warten, bevor „keine Einladung“ gemeldet wird
+    const t = setTimeout(() => setSettled(true), SETTLE_MS);
+    return () => {
+      clearTimeout(t);
+      setSettled(false);
+    };
+  }, [idle]);
+  return decideJoinState({
+    loggedIn,
+    synced,
+    settled,
+    accepting: progress.accepting,
+    openInvites: invites.length,
+    tripIds: tripIds ?? [],
+    wantedTripId: progress.target ?? join?.tripId,
+  });
 }
 
 /** Welcher Beitritts-Bildschirm ersetzt gerade die App? */
 export function useJoinGate(tripCount: number): 'sign-in' | 'joining' | undefined {
   const join = useJoin();
   const progress = useJoinProgress();
-  const loggedIn = useCloudUser()?.isLoggedIn === true;
-  const wanted = progress.target ?? join?.tripId;
-  const arrived = useLiveQuery(async () => (wanted ? !!(await db.trips.get(wanted)) : false), [wanted]);
+  const decision = useJoinDecision();
   if (!db.cloudEnabled) return undefined;
-  if (!loggedIn) return join ? 'sign-in' : undefined;
-  if (arrived === undefined) return undefined;
-  if (join && !arrived) return 'joining';
+  if (decision.kind === 'signed-out') return join ? 'sign-in' : undefined;
+  if (decision.kind === 'activate') return undefined;
+  if (join) return 'joining';
   if (progress.accepting && tripCount === 0) return 'joining';
   return undefined;
 }
@@ -101,13 +137,17 @@ export function JoiningBanner() {
 
 /** Beitreten-Bildschirm für Nicht-Angemeldete: Anmelden mit der vom Admin eingetragenen E-Mail. */
 export function JoinScreen() {
+  const join = useJoin();
   const [signingIn, setSigningIn] = useState(false);
   return (
     <main className="screen join-screen" aria-labelledby="join-title">
       <div className="card">
         <div className="legend">Törn beitreten</div>
         <h1 id="join-title">Du wurdest zu einem Törn eingeladen</h1>
-        <p>Melde dich mit der E-Mail-Adresse an, die dein Admin eingetragen hat.</p>
+        <p>
+          Melde dich mit der E-Mail-Adresse an, die dein Admin eingetragen hat. Das klappt auch später jederzeit wieder mit
+          derselben Adresse.
+        </p>
         <button className="btn primary block" type="button" onClick={() => setSigningIn(true)}>
           <Icon name="mail" size={20} />
           Anmelden
@@ -117,7 +157,7 @@ export function JoinScreen() {
           Abbrechen
         </button>
       </div>
-      {signingIn ? <SignInDialog onClose={() => setSigningIn(false)} /> : null}
+      {signingIn ? <SignInDialog onClose={() => setSigningIn(false)} initialEmail={join?.email ?? ''} /> : null}
     </main>
   );
 }
@@ -125,22 +165,9 @@ export function JoinScreen() {
 /** Angemeldet, Törn noch nicht da: „wird geladen“ bzw. – nach dem Abgleich – keine Einladung für diese Adresse. */
 export function JoiningScreen() {
   const user = useCloudUser();
-  const invites = useInvites();
-  const sync = useSyncState();
-  const { accepting } = useJoinProgress();
+  const decision = useJoinDecision();
   const [loggingOut, setLoggingOut] = useState(false);
-  const [settled, setSettled] = useState(false);
-  const idle = sync?.phase === 'in-sync' && invites.length === 0 && !accepting;
-  useEffect(() => {
-    if (!idle) return;
-    // Einladungen treffen mit dem ersten Abgleich ein; kurz warten, bevor „keine Einladung“ gemeldet wird
-    const t = setTimeout(() => setSettled(true), 4000);
-    return () => {
-      clearTimeout(t);
-      setSettled(false);
-    };
-  }, [idle]);
-  const noInvite = idle && settled;
+  const noInvite = decision.kind === 'no-invite';
   const email = user?.email ?? 'diese Adresse';
   return (
     <main className="screen join-screen" aria-labelledby="join-title">

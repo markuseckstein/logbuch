@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { parseJoinParam, type ID } from '../../domain';
+import { parseJoinEmailParam, parseJoinParam, type ID } from '../../domain';
 
 /**
  * Beitritt über Link (`?join=<tripId>`) bzw. „Ich wurde eingeladen“. Bleibt in sessionStorage erhalten, damit er
@@ -8,6 +8,8 @@ import { parseJoinParam, type ID } from '../../domain';
 export interface JoinState {
   /** Törn aus dem Link; fehlt, wenn nur „Ich wurde eingeladen“ gewählt wurde. */
   tripId?: ID;
+  /** E-Mail aus dem persönlichen Link: füllt den Anmelde-Dialog vor. */
+  email?: string;
 }
 
 const KEY = 'logbook.join';
@@ -39,8 +41,8 @@ const set = (s: JoinState | undefined): void => {
 };
 
 /** Beitritt vormerken (Link oder Schaltfläche). */
-export function startJoin(tripId?: ID): void {
-  set(tripId === undefined ? { ...state } : { tripId });
+export function startJoin(tripId?: ID, email?: string): void {
+  set({ ...(tripId === undefined ? state : { tripId }), ...(email ? { email } : {}) });
 }
 
 export function clearJoin(): void {
@@ -50,10 +52,12 @@ export function clearJoin(): void {
 /** `?join=` aus der Adresse übernehmen und aus der URL entfernen. */
 export function captureJoinFromUrl(): void {
   const id = parseJoinParam(location.search);
-  if (id === undefined) return;
-  startJoin(id);
+  const email = parseJoinEmailParam(location.search);
+  if (id === undefined && email === undefined) return;
+  startJoin(id, email);
   const url = new URL(location.href);
   url.searchParams.delete('join');
+  url.searchParams.delete('email');
   history.replaceState(history.state, '', url.pathname + url.search + url.hash);
 }
 
