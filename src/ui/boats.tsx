@@ -148,7 +148,9 @@ interface BoatChooserProps {
 /** Pflichtauswahl „Für welches Boot?“ (Boot-Schalter auf „Alle“). */
 export function BoatChooser({ title, confirmLabel, hint, onConfirm, onCancel }: BoatChooserProps) {
   const { boats, entryDefault } = useBoatSelection();
-  const [boatId, setBoatId] = useState<ID | undefined>(entryDefault);
+  // Vorauswahl folgt `entryDefault` (Einstellungen kommen per liveQuery evtl. erst nach dem Öffnen), bis der Nutzer wählt
+  const [picked, setBoatId] = useState<ID>();
+  const boatId = picked ?? entryDefault;
   const [error, setError] = useState(false);
   return (
     <Dialog title={title} onClose={onCancel}>

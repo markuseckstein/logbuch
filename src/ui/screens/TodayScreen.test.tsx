@@ -126,6 +126,24 @@ describe('TodayScreen – Eintrag jetzt', () => {
     expect(seeschwalbe).toBeDefined();
   });
 
+  it('bei „Alle“: Vorauswahl folgt dem zuletzt gewählten Boot, auch wenn es erst nach dem Öffnen ankommt', async () => {
+    mockFix({ error: 'denied' });
+    const trip = await seedTrip('F', ['Seeschwalbe', 'Möwe']);
+    const [, moewe] = await seedBoats(trip.id);
+    await setBoatSelection(db, trip.id, 'all');
+    const user = userEvent.setup();
+    renderUi(<TodayScreen trip={trip} reports={[]} />);
+    await user.click(await screen.findByRole('button', { name: /Eintrag jetzt/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Neuer Eintrag' });
+    expect(within(dialog).getByRole('radio', { name: 'Seeschwalbe' })).toHaveAttribute('aria-checked', 'true');
+    await setLastBoat(db, trip.id, moewe!.id);
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: 'Möwe' })).toHaveAttribute('aria-checked', 'true'));
+    // eigene Wahl bleibt, auch wenn sich der Vorschlag danach ändert
+    await user.click(within(dialog).getByRole('radio', { name: 'Seeschwalbe' }));
+    await setLastBoat(db, trip.id, moewe!.id);
+    expect(within(dialog).getByRole('radio', { name: 'Seeschwalbe' })).toHaveAttribute('aria-checked', 'true');
+  });
+
   it('bei „Alle“ ohne Vorauswahl: Fehlermeldung statt Speichern', async () => {
     mockFix({ error: 'denied' });
     const trip = await seedTrip('F', ['Seeschwalbe', 'Möwe']);
