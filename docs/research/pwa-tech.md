@@ -111,3 +111,11 @@ Quelle fflate: [GitHub](https://github.com/101arrowz/fflate). **Empfehlung fflat
 8. **TypeScript 7 und Vitest 5 sind neue Hauptversionen**: beim Projekt-Setup Kompatibilität zu Vite 8/Plugins prüfen; Fallback auf vorherige Majors.
 9. **`persist()` nicht garantiert**: erst nach Installation realistisch; Backup-Erinnerung in der UI.
 10. Nicht auf realem Gerät verifiziert (Folgetest): `capture`-Verhalten, GNSS-Kaltstartzeit ohne Netz, `canShare` für ZIP, Verhalten von `watchPosition` bei Screen-off.
+
+## Tatsächlich verwendete Versionen (Projekt-Setup 2026-10-11)
+
+Alle exakt gepinnt (kein `^`/`~`). Wie empfohlen: Vite 8.3.1, React/react-dom 19.3.0, @vitejs/plugin-react 6.1.1, vite-plugin-pwa 1.3.0, workbox-window 7.4.1, Dexie 4.4.6, dexie-react-hooks 4.4.0, Leaflet 1.9.4, @types/leaflet 1.9.22, fflate 0.8.3, Vitest 5.0.2 (läuft mit Vite 8), fake-indexeddb 6.2.5, Playwright 1.63.0.
+
+**Abweichung: TypeScript 6.0.3 statt 7.0.2.** `typescript-eslint` 8.71.1 erlaubt als Peer-Dependency nur `typescript >=4.8.4 <6.1.0`; mit TS 7.0.2 scheitert `npm install` (ERESOLVE). Daher letzte 6.0.x. Bei Update von typescript-eslint auf TS-7-Support kann TS angehoben werden.
+
+Weitere (nicht vorab recherchiert, jeweils aktuelle Version beim Setup): eslint 10.12.0, typescript-eslint 8.71.1, eslint-plugin-react-hooks 7.1.1, jsdom 30.1.2, @testing-library/react 16.3.3, @testing-library/jest-dom 7.0.1, @testing-library/user-event 14.6.7, @fontsource/ibm-plex-mono 5.3.0, @fontsource/source-sans-3 5.3.1, @types/react(-dom) 19.3.0, @types/node 26.6.5.

@@ -1,0 +1,64 @@
+/* Design-Tokens aus Prototyp A "Seekarte": Light = Tag, Dark = Nachtfahrt */
+:root{
+  --bg:#f5f6f2; --surface:#ffffff; --surface-2:#e9f1f4; --water-deep:#ffffff; --water-mid:#e4f0f5; --water-shallow:#c9e1ec;
+  --land:#ecdcae; --land-edge:#8f7840; --ink:#0d2848; --ink-2:#4b5f76; --line:#c5d2db; --grid:#a8739f;
+  --magenta:#b0106a; --on-magenta:#ffffff; --danger:#a3201a; --toast-bg:#0d2848; --toast-ink:#ffffff;
+  --scrim:rgba(13,40,72,.5); --shadow:0 -6px 24px rgba(13,40,72,.22);
+  --font-mono:"IBM Plex Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --font-sans:"Source Sans 3","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#120e0c; --surface:#1d1613; --surface-2:#271d18; --water-deep:#15110f; --water-mid:#1b1e1c; --water-shallow:#242d2b;
+    --land:#3b2e1c; --land-edge:#7a6236; --ink:#e3c28f; --ink-2:#a58d6b; --line:#3d3029; --grid:#7a5069;
+    --magenta:#e07a98; --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
+    --scrim:rgba(0,0,0,.7); --shadow:0 -6px 24px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#120e0c; --surface:#1d1613; --surface-2:#271d18; --water-deep:#15110f; --water-mid:#1b1e1c; --water-shallow:#242d2b;
+  --land:#3b2e1c; --land-edge:#7a6236; --ink:#e3c28f; --ink-2:#a58d6b; --line:#3d3029; --grid:#7a5069;
+  --magenta:#e07a98; --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
+  --scrim:rgba(0,0,0,.7); --shadow:0 -6px 24px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.4 var(--font-sans);overflow-x:hidden}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:3px solid var(--magenta);outline-offset:2px}
+.mono,.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+h1,h2,h3{margin:0;font-weight:700;line-height:1.2}
+h2{font-size:22px}
+
+/* Layout */
+#app{max-width:480px;margin:0 auto;min-height:100%;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg);border-bottom:3px double var(--ink)}
+.topbar .brand{flex:1;min-width:0}
+.brand b{display:block;font:600 13px var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
+.brand span{display:block;font-size:14px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.screen{padding:16px}
+.screen>*+*{margin-top:16px}
+.legend{display:flex;align-items:center;gap:10px;font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.legend::after{content:"";flex:1;border-top:1px solid var(--line)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px}
+.card>*+*{margin-top:12px}
+.muted{color:var(--ink-2);font-size:15px}
+.btn{min-height:44px;padding:8px 16px;border:1px solid var(--ink);border-radius:6px;background:var(--surface);font-weight:600}
+.btn.primary{background:var(--magenta);border-color:var(--magenta);color:var(--on-magenta)}
+
+/* Tab-Leiste */
+.tabbar{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:480px;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tab{min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:600;color:var(--ink-2);border-top:3px solid transparent}
+.tab[aria-current="page"]{color:var(--ink);border-top-color:var(--magenta)}
+
+/* Update-Hinweis */
+.update-toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));max-width:448px;margin:0 auto;z-index:30;display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--toast-bg);color:var(--toast-ink);border-radius:6px;box-shadow:var(--shadow)}
+.update-toast span{flex:1}
+.update-toast button{min-height:44px;padding:0 12px;font-weight:700;text-decoration:underline}
