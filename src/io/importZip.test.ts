@@ -23,14 +23,27 @@ describe('importZip', () => {
     expect('timeIso' in out.entries[0]!).toBe(false);
   });
 
-  it('tolerates exports without hash and dayReport photoIds (older files)', async () => {
-    const json = JSON.parse(JSON.stringify({ format: 'segel-logbuch', version: 1, trip: sampleBundle().trip, entries: [],
-      dayReports: [{ tripId: 'trip-1', date: '2026-08-10', text: 'x', updatedAt: 1 }],
-      photos: [{ id: 'q', dataUrl: 'data:image/jpeg;base64,AQID', mime: 'image/jpeg', width: 1, height: 1, createdAt: 1 }] }));
-    const out = await importJson(JSON.stringify(json));
-    expect(out.dayReports[0]!.photoIds).toEqual([]);
-    expect(out.photos[0]!.hash).toBeUndefined();
-    expect('hash' in out.photos[0]!).toBe(false);
+  it('roundtrips v2 data incl. tombstones, authors and flotilla', async () => {
+    const src = sampleBundle();
+    const out = await importZip(await exportZip(src));
+    expect(out.trip.flotilla).toEqual(src.trip.flotilla);
+    expect(out.entries.find((e) => e.id === 'e3')!.deletedAt).toBe(12);
+    expect(out.dayReports.map((r) => r.authorId)).toEqual(['c1', '']);
+    expect(out.missingPhotos).toEqual([]);
+  });
+
+  it('exports without photos import as missingPhotos (metadata only), references kept', async () => {
+    const src = sampleBundle();
+    const out = await importZip(await exportZip(src, { includePhotos: false }));
+    expect(out.photos).toEqual([]);
+    expect(out.missingPhotos!.map((p) => p.id)).toEqual(['p1', 'p3', 'p2']);
+    expect(out.missingPhotos![0]).toEqual({ id: 'p1', tripId: 'trip-1', mime: 'image/jpeg', width: 4, height: 3, hash: 'hash-p1', createdAt: 7 });
+    expect(out.entries[0]!.photoIds).toEqual(['p1', 'p2']);
+  });
+
+  it('a missing image file is still an error when the photo is not flagged photoOmitted', async () => {
+    const z = await unzipWithout(await exportZip(sampleBundle()), 'images/p2.webp');
+    await expect(importZip(z)).rejects.toThrow(ImportFormatError);
   });
 
   it('accepts an ArrayBuffer', async () => {
@@ -52,7 +65,8 @@ describe('importZip', () => {
   it('rejects wrong format or version with a German message', async () => {
     const mk = (o: object) => new Blob([zipSync({ 'logbook.json': strToU8(JSON.stringify(o)) }) as Uint8Array<ArrayBuffer>]);
     await expect(importZip(mk({ format: 'x', version: 1 }))).rejects.toThrow(/Logbuch/);
-    await expect(importZip(mk({ format: 'segel-logbuch', version: 2 }))).rejects.toThrow(/Version 2/);
+    await expect(importZip(mk({ format: 'segel-logbuch', version: 3 }))).rejects.toThrow(/Version 3/);
+    await expect(importZip(mk({ format: 'segel-logbuch', version: 1 }))).rejects.toThrow(/Version 1/);
   });
 
   it('rejects a missing image file', async () => {

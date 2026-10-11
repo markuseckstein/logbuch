@@ -71,22 +71,23 @@ describe('parseGpx', () => {
 
 function bundle(withTracks: boolean): TripBundle {
   return {
-    trip: { id: 't', name: 'Törn <Ost> & "Co"', boat: { name: 'B' }, crew: [], createdAt: 0, updatedAt: 0 },
+    trip: { id: 't', name: 'Törn <Ost> & "Co"', boat: { name: 'B' }, crew: [], createdAt: 0, updatedAt: 0, updatedBy: 'd' },
     entries: [
       {
         id: 'e1', tripId: 't', time: Date.UTC(2026, 7, 10, 12, 32), tzOffsetMin: 120,
-        position: { lat: 54.1, lon: 10.2 }, type: 'harbour', text: 'a < b & "c"', photoIds: [], createdAt: 0, updatedAt: 0,
+        position: { lat: 54.1, lon: 10.2 }, type: 'harbour', text: 'a < b & "c"', photoIds: [], createdAt: 0, updatedAt: 0, updatedBy: 'd',
       },
-      { id: 'e2', tripId: 't', time: Date.UTC(2026, 7, 10, 13), tzOffsetMin: 120, type: 'note', photoIds: [], createdAt: 0, updatedAt: 0 },
+      { id: 'e2', tripId: 't', time: Date.UTC(2026, 7, 10, 13), tzOffsetMin: 120, type: 'note', photoIds: [], createdAt: 0, updatedAt: 0, updatedBy: 'd' },
       {
         id: 'e3', tripId: 't', time: Date.UTC(2026, 7, 10, 14), tzOffsetMin: 120,
-        position: { lat: 54.2, lon: 10.3 }, type: 'departure', photoIds: [], createdAt: 0, updatedAt: 0,
+        position: { lat: 54.2, lon: 10.3 }, type: 'departure', photoIds: [], createdAt: 0, updatedAt: 0, updatedBy: 'd',
       },
     ],
     photos: [],
+    missingPhotos: [],
     dayReports: [],
     tracks: withTracks
-      ? [{ id: 'k', tripId: 't', name: 'Live & <1>', source: 'live', createdAt: 0,
+      ? [{ id: 'k', tripId: 't', name: 'Live & <1>', source: 'live', createdAt: 0, updatedAt: 0, updatedBy: 'd',
           points: [{ lat: 54, lon: 10, time: 1000, ele: 2 }, { lat: 54.1, lon: 10.1 }] }]
       : [],
   };

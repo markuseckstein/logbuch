@@ -1,5 +1,5 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
-import type { DayReport, LogEntry, Track, Trip } from '../domain/types';
+import type { DayReport, LogEntry, PhotoMeta, Track, Trip } from '../domain/types';
 import { blobToBytes } from './blob';
 import type { TripBundle } from './bundle';
 import { writeGpx } from './gpx';
@@ -17,11 +17,14 @@ export interface ExportedPhoto {
   height: number;
   hash?: string;
   createdAt: number;
+  /** Export without photos: metadata only, no `file`/`dataUrl`; the image can arrive with a later import. */
+  photoOmitted?: true;
 }
 
-export interface LogbookJsonV1 {
+/** Version 2 (Flottille): version stamps, tombstones, authors, flotilla; photos may be omitted. */
+export interface LogbookJsonV2 {
   format: 'segel-logbuch';
-  version: 1;
+  version: 2;
   exportedAt: string;
   trip: Trip;
   entries: ExportedEntry[];
@@ -62,24 +65,35 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(s);
 }
 
+export interface ExportOptions {
+  /** false: photo metadata only (flag `photoOmitted`), no image data. Default true. */
+  includePhotos?: boolean;
+}
+
+function photoBase(p: PhotoMeta) {
+  return { id: p.id, mime: p.mime, width: p.width, height: p.height, ...(p.hash ? { hash: p.hash } : {}), createdAt: p.createdAt };
+}
+
 export async function buildLogbookJson(
   bundle: TripBundle,
-  opts: { photoMode: PhotoMode },
-): Promise<LogbookJsonV1> {
+  opts: { photoMode: PhotoMode } & ExportOptions,
+): Promise<LogbookJsonV2> {
   const photos: ExportedPhoto[] = [];
   for (const p of bundle.photos) {
-    const base = { id: p.id, mime: p.mime, width: p.width, height: p.height,
-      ...(p.hash ? { hash: p.hash } : {}), createdAt: p.createdAt };
-    if (opts.photoMode === 'file') {
+    const base = photoBase(p);
+    if (opts.includePhotos === false) {
+      photos.push({ ...base, photoOmitted: true });
+    } else if (opts.photoMode === 'file') {
       photos.push({ ...base, file: `images/${p.id}.${extensionForMime(p.mime)}` });
     } else {
       const bytes = await blobToBytes(p.blob);
       photos.push({ ...base, dataUrl: `data:${p.mime};base64,${toBase64(bytes)}` });
     }
   }
+  for (const p of bundle.missingPhotos) photos.push({ ...photoBase(p), photoOmitted: true });
   return {
     format: 'segel-logbuch',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     trip: bundle.trip,
     entries: bundle.entries.map((e) => ({ ...e, timeIso: toIsoWithOffset(e.time, e.tzOffsetMin) })),
@@ -89,22 +103,32 @@ export async function buildLogbookJson(
   };
 }
 
-export async function exportZip(bundle: TripBundle): Promise<Blob> {
-  const json = await buildLogbookJson(bundle, { photoMode: 'file' });
+/** Bundle without tombstones, for human-facing outputs (GPX). */
+function liveOnly(bundle: TripBundle): TripBundle {
+  return {
+    ...bundle,
+    entries: bundle.entries.filter((e) => e.deletedAt === undefined),
+    tracks: bundle.tracks.filter((t) => t.deletedAt === undefined),
+  };
+}
+
+export async function exportZip(bundle: TripBundle, opts: ExportOptions = {}): Promise<Blob> {
+  const json = await buildLogbookJson(bundle, { photoMode: 'file', ...opts });
   const files: Zippable = {
     'logbook.json': strToU8(JSON.stringify(json, null, 2)),
-    'route.gpx': strToU8(writeGpx(bundle)),
+    'route.gpx': strToU8(writeGpx(liveOnly(bundle))),
   };
-  for (const [i, p] of bundle.photos.entries()) {
-    const path = json.photos[i]!.file!;
-    files[path] = [await blobToBytes(p.blob), { level: 0 }];
+  const exported = new Map(json.photos.map((p) => [p.id, p]));
+  for (const p of bundle.photos) {
+    const path = exported.get(p.id)?.file;
+    if (path) files[path] = [await blobToBytes(p.blob), { level: 0 }];
   }
   const zipped = zipSync(files, { level: 6 });
   return new Blob([zipped as Uint8Array<ArrayBuffer>], { type: 'application/zip' });
 }
 
-export async function exportJson(bundle: TripBundle): Promise<Blob> {
-  const json = await buildLogbookJson(bundle, { photoMode: 'dataUrl' });
+export async function exportJson(bundle: TripBundle, opts: ExportOptions = {}): Promise<Blob> {
+  const json = await buildLogbookJson(bundle, { photoMode: 'dataUrl', ...opts });
   return new Blob([JSON.stringify(json)], { type: 'application/json' });
 }
 

@@ -20,6 +20,7 @@ const e = (
   photoIds: [],
   createdAt: 0,
   updatedAt: 0,
+  updatedBy: 'd',
 });
 
 const kiel = { lat: 54.3721, lon: 10.1452 };

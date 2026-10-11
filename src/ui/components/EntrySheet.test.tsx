@@ -82,7 +82,7 @@ describe('EntrySheet', () => {
     await user.click(screen.getByRole('button', { name: 'Löschen' }));
     await user.click(screen.getByRole('button', { name: 'Endgültig löschen' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(await db.entries.get(entry.id)).toBeUndefined();
+    expect((await db.entries.get(entry.id))!.deletedAt).toBeDefined(); // Tombstone
   });
 
   it('Escape schließt das Sheet', async () => {

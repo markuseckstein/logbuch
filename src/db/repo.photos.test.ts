@@ -1,4 +1,3 @@
-import Dexie from 'dexie';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LogbookDB } from './db';
 import {
@@ -94,21 +93,5 @@ describe('dayPhotoHashes', () => {
     const e = await createEntry(db, tripId, { time: DAY, tzOffsetMin: 120 });
     await addPhotosToEntry(db, e.id, [{ blob: new Blob(['x']), mime: 'image/jpeg', width: 1, height: 1 }]);
     expect((await dayPhotoHashes(db, tripId, date)).size).toBe(0);
-  });
-});
-
-describe('schema migration v1 -> v2', () => {
-  it('sets photoIds = [] on existing day reports', async () => {
-    const name = `migrate-${Math.random().toString(36).slice(2)}`;
-    const old = new Dexie(name);
-    old.version(1).stores({
-      trips: 'id', entries: 'id, tripId, [tripId+time]', photos: 'id, tripId',
-      dayReports: '[tripId+date], tripId', tracks: 'id, tripId', settings: 'key',
-    });
-    await old.table('dayReports').put({ tripId: 't', date, text: 'alt', updatedAt: 1 });
-    old.close();
-    const upgraded = new LogbookDB(name);
-    expect(await upgraded.dayReports.get(['t', date])).toMatchObject({ text: 'alt', photoIds: [] });
-    await dispose(upgraded);
   });
 });

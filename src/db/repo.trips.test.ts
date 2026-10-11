@@ -71,14 +71,16 @@ describe('trips', () => {
 
 describe('settings', () => {
   it('defaults to theme system without active trip', async () => {
-    expect(await getSettings(db)).toEqual({ theme: 'system' });
+    expect(await getSettings(db)).toMatchObject({ theme: 'system', writableTripIds: [], authorByTrip: {} });
+    expect((await getSettings(db)).activeTripId).toBeUndefined();
   });
 
   it('stores active trip and theme independently', async () => {
     await setActiveTrip(db, 'abc');
     await setTheme(db, 'dark');
-    expect(await getSettings(db)).toEqual({ activeTripId: 'abc', theme: 'dark' });
+    expect(await getSettings(db)).toMatchObject({ activeTripId: 'abc', theme: 'dark' });
     await setActiveTrip(db, undefined);
-    expect(await getSettings(db)).toEqual({ theme: 'dark' });
+    expect(await getSettings(db)).toMatchObject({ theme: 'dark' });
+    expect((await getSettings(db)).activeTripId).toBeUndefined();
   });
 });

@@ -38,7 +38,7 @@ describe('MapScreen – GPX', () => {
     await user.click(screen.getByRole('button', { name: /Track „Kiel-Eckernförde“ löschen/ }));
     expect(await db.tracks.count()).toBe(1);
     await user.click(screen.getByRole('button', { name: 'Endgültig löschen' }));
-    await waitFor(async () => expect(await db.tracks.count()).toBe(0));
+    await waitFor(async () => expect((await db.tracks.toArray())[0]!.deletedAt).toBeDefined()); // Tombstone
   });
 
   it('meldet ungültige Dateien verständlich', async () => {

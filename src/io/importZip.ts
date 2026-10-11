@@ -1,8 +1,8 @@
 import { strFromU8, unzipSync } from 'fflate';
-import type { DayReport, LogEntry, Photo } from '../domain/types';
+import type { LogEntry, Photo, PhotoMeta } from '../domain/types';
 import { blobToBytes } from './blob';
 import type { TripBundle } from './bundle';
-import type { ExportedEntry, ExportedPhoto, LogbookJsonV1 } from './exportZip';
+import type { ExportedEntry, ExportedPhoto, LogbookJsonV2 } from './exportZip';
 
 export class ImportFormatError extends Error {
   constructor(message: string) {
@@ -15,28 +15,26 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function validate(raw: unknown): LogbookJsonV1 {
+/** Only format version 2 (Flottille) is supported. */
+function validate(raw: unknown): LogbookJsonV2 {
   if (!isRecord(raw) || raw.format !== 'segel-logbuch') {
     throw new ImportFormatError('Die Datei ist kein Logbuch-Export.');
   }
-  if (raw.version !== 1) {
+  if (raw.version !== 2) {
     throw new ImportFormatError(
-      `Nicht unterstützte Version ${String(raw.version)} – diese App liest nur Version 1.`,
+      `Nicht unterstützte Version ${String(raw.version)} – diese App liest nur Version 2.`,
     );
   }
-  if (!isRecord(raw.trip) || !Array.isArray(raw.entries) || !Array.isArray(raw.photos)) {
+  if (
+    !isRecord(raw.trip) || !Array.isArray(raw.entries) || !Array.isArray(raw.photos)
+    || !Array.isArray(raw.dayReports) || !Array.isArray(raw.tracks)
+  ) {
     throw new ImportFormatError('Der Logbuch-Export ist unvollständig oder beschädigt.');
   }
-  return {
-    ...(raw as unknown as LogbookJsonV1),
-    dayReports: Array.isArray(raw.dayReports)
-      ? (raw.dayReports as Partial<DayReport>[]).map((r) => ({ ...r, photoIds: r.photoIds ?? [] }) as DayReport)
-      : [],
-    tracks: Array.isArray(raw.tracks) ? (raw.tracks as LogbookJsonV1['tracks']) : [],
-  };
+  return raw as unknown as LogbookJsonV2;
 }
 
-function parseJson(text: string): LogbookJsonV1 {
+function parseJson(text: string): LogbookJsonV2 {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -55,24 +53,26 @@ function dataUrlToBlob(dataUrl: string, mime: string): Blob {
   return new Blob([bytes], { type: mime });
 }
 
-function toBundle(json: LogbookJsonV1, loadPhoto: (p: ExportedPhoto) => Blob): TripBundle {
+function toBundle(json: LogbookJsonV2, loadPhoto: (p: ExportedPhoto) => Blob): TripBundle {
   const tripId = json.trip.id;
   const entries = json.entries.map((e) => {
     const entry: Partial<ExportedEntry> = { ...e };
     delete entry.timeIso;
     return entry as LogEntry;
   });
-  const photos: Photo[] = json.photos.map((p) => ({
-    id: p.id,
-    tripId,
-    blob: loadPhoto(p),
-    mime: p.mime,
-    width: p.width,
-    height: p.height,
-    ...(p.hash ? { hash: p.hash } : {}),
-    createdAt: p.createdAt,
-  }));
-  return { trip: json.trip, entries, photos, dayReports: json.dayReports, tracks: json.tracks };
+  const photos: Photo[] = [];
+  const missingPhotos: PhotoMeta[] = [];
+  for (const p of json.photos) {
+    const meta: PhotoMeta = {
+      id: p.id, tripId, mime: p.mime, width: p.width, height: p.height,
+      ...(p.hash ? { hash: p.hash } : {}), createdAt: p.createdAt,
+    };
+    if (p.photoOmitted) missingPhotos.push(meta);
+    else photos.push({ ...meta, blob: loadPhoto(p) });
+  }
+  return {
+    trip: json.trip, entries, photos, dayReports: json.dayReports, tracks: json.tracks, missingPhotos,
+  };
 }
 
 export async function importZip(input: Blob | ArrayBuffer): Promise<TripBundle> {

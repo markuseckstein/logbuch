@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DayReport, LogEntry, Track, Trip } from '../domain';
 import { buildDays, groupTrackPoints } from './lib';
 
-const trip: Trip = { id: 't', name: 'T', boat: { name: 'B' }, crew: [], createdAt: 0, updatedAt: 0 };
+const trip: Trip = { id: 't', name: 'T', boat: { name: 'B' }, crew: [], createdAt: 0, updatedAt: 0, updatedBy: 'd' };
 const track = (points: Track['points']): Track => ({
   id: 'k',
   tripId: 't',
@@ -10,6 +10,8 @@ const track = (points: Track['points']): Track => ({
   source: 'gpx',
   points,
   createdAt: 0,
+  updatedAt: 0,
+  updatedBy: 'd',
 });
 
 describe('groupTrackPoints', () => {

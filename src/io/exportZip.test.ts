@@ -5,16 +5,16 @@ import { buildLogbookJson, exportFileName, exportJson, exportZip } from './expor
 import { sampleBundle } from './fixtures';
 
 describe('buildLogbookJson', () => {
-  it('has the v1 envelope and timeIso with offset from tzOffsetMin', async () => {
+  it('has the v2 envelope and timeIso with offset from tzOffsetMin', async () => {
     const j = await buildLogbookJson(sampleBundle(), { photoMode: 'file' });
     expect(j.format).toBe('segel-logbuch');
-    expect(j.version).toBe(1);
+    expect(j.version).toBe(2);
     expect(new Date(j.exportedAt).toISOString()).toBe(j.exportedAt);
     expect(j.entries[0]!.timeIso).toBe('2026-08-10T14:32:00+02:00');
     expect(j.entries[1]!.timeIso).toBe('2026-08-10T18:30:00-01:30');
     expect(j.entries[0]!.time).toBe(Date.UTC(2026, 7, 10, 12, 32));
     expect(j.trip.name).toBe('Ostsee Törn Süd');
-    expect(j.dayReports).toHaveLength(1);
+    expect(j.dayReports).toHaveLength(2);
     expect(j.dayReports[0]!.photoIds).toEqual(['p3']);
     expect(j.tracks).toHaveLength(1);
   });
@@ -36,7 +36,43 @@ describe('buildLogbookJson', () => {
   });
 });
 
+describe('buildLogbookJson v2 fields', () => {
+  it('exports version stamps, authors, flotilla and tombstones', async () => {
+    const j = await buildLogbookJson(sampleBundle(), { photoMode: 'file' });
+    expect(j.trip.flotilla).toEqual({ id: 'fl-1', name: 'Ostsee-Flottille' });
+    expect(j.trip.updatedBy).toBe('dev-a');
+    expect(j.trip.crew[1]!.deletedAt).toBe(3);
+    expect(j.entries[0]).toMatchObject({ authorId: 'c1', updatedBy: 'dev-a' });
+    expect(j.entries.find((e) => e.id === 'e3')!.deletedAt).toBe(12);
+    expect(j.dayReports.map((r) => r.authorId)).toEqual(['c1', '']);
+    expect(j.tracks[0]).toMatchObject({ updatedAt: 10, updatedBy: 'dev-a' });
+  });
+
+  it('includePhotos: false lists photo metadata flagged photoOmitted without files', async () => {
+    const j = await buildLogbookJson(sampleBundle(), { photoMode: 'file', includePhotos: false });
+    expect(j.photos).toHaveLength(3);
+    expect(j.photos[0]).toEqual({
+      id: 'p1', photoOmitted: true, mime: 'image/jpeg', width: 4, height: 3, hash: 'hash-p1', createdAt: 7,
+    });
+    expect(j.photos.every((p) => !p.file && !p.dataUrl)).toBe(true);
+  });
+});
+
 describe('exportZip', () => {
+  it('without photos contains no images', async () => {
+    const files = unzipSync(await blobToBytes(await exportZip(sampleBundle(), { includePhotos: false })));
+    expect(Object.keys(files).sort()).toEqual(['logbook.json', 'route.gpx']);
+  });
+
+  it('keeps tombstoned entries and tracks out of route.gpx', async () => {
+    const bundle = sampleBundle();
+    bundle.tracks.push({ ...bundle.tracks[0]!, id: 'k2', name: 'Geloeschter Track', deletedAt: 11, updatedAt: 11 });
+    bundle.entries.push({ ...bundle.entries[0]!, id: 'e4', text: 'GELOESCHT', deletedAt: 99, updatedAt: 99 });
+    const gpx = strFromU8(unzipSync(await blobToBytes(await exportZip(bundle)))['route.gpx']!);
+    expect(gpx).not.toContain('Geloeschter Track');
+    expect(gpx).not.toContain('GELOESCHT');
+  });
+
   it('contains logbook.json, uncompressed images and route.gpx', async () => {
     const blob = await exportZip(sampleBundle());
     expect(blob.type).toBe('application/zip');

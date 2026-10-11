@@ -10,6 +10,7 @@ describe('domain/types', () => {
       crew: [],
       createdAt: 0,
       updatedAt: 0,
+      updatedBy: 'd',
     };
     const entry: LogEntry = {
       id: 'e1',
@@ -20,6 +21,7 @@ describe('domain/types', () => {
       photoIds: [],
       createdAt: 0,
       updatedAt: 0,
+      updatedBy: 'd',
     };
     expect(entry.tripId).toBe('t1');
   });
