@@ -4,3 +4,8 @@ coverage
 test-results
 playwright-report
 *.tsbuildinfo
+
+# Dexie Cloud Zugangsdaten (geheim)
+dexie-cloud.json
+dexie-cloud.key
+.env.local
