@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { onboard } from './helpers';
 
 test.use({
   geolocation: { latitude: 54.3185, longitude: 10.1407, accuracy: 10 },
@@ -11,12 +12,7 @@ const toast = (page: Page) => page.locator('.toast');
 
 test('Mehrfachauswahl, Duplikate pro Tag (Eintrag und Tagesbericht)', async ({ page }) => {
   await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({ status: 200, body: '' }));
-  await page.goto('/');
-  await page.getByLabel('Name des Törns').fill('Fototörn');
-  await page.getByRole('button', { name: 'Weiter' }).click();
-  await page.getByLabel('Bootsname').fill('Seeschwalbe');
-  await page.getByRole('button', { name: 'Weiter' }).click();
-  await page.getByRole('button', { name: 'Törn anlegen' }).click();
+  await onboard(page, { trip: 'Fototörn' });
   await page.getByRole('button', { name: /Eintrag jetzt/ }).click();
   const sheet = page.getByRole('dialog');
   await expect(sheet).toBeVisible();

@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test';
+import { onboard } from './helpers';
 
 test('Erststart zeigt Onboarding; danach 4 Tabs und Tab-Wechsel', async ({ page }) => {
   await page.goto('/');
   const onboarding = page.getByRole('dialog', { name: 'Neuer Törn' });
   await expect(onboarding).toBeVisible();
 
-  await page.getByLabel('Name des Törns').fill('Smoke-Törn');
-  await page.getByRole('button', { name: 'Weiter' }).click();
-  await page.getByRole('button', { name: 'Weiter' }).click();
-  await page.getByRole('button', { name: 'Törn anlegen' }).click();
+  await onboard(page, { trip: 'Smoke-Törn', goto: false });
+  // ein Boot: kein Boot-Schalter
+  await expect(page.getByRole('radiogroup', { name: 'Boot wählen' })).toHaveCount(0);
 
   const nav = page.getByRole('navigation', { name: 'Hauptnavigation' });
   for (const name of ['Heute', 'Törn-Tage', 'Karte', 'Törn']) {
