@@ -1,6 +1,6 @@
 # Logbuch – Segel-Logbuch-PWA
 
-Lies vor der Arbeit: `docs/requirements.md`, `docs/architecture.md` (Module, Datenmodell, Exportformat), `docs/research/pwa-tech.md`. Visuelle Referenz: `prototypes/a-seekarte/index.html`.
+Lies vor der Arbeit zuerst `docs/STATUS.md` (aktueller Stand, nächster Schritt), dann `docs/requirements.md`, `docs/architecture.md` (Module, Datenmodell, Exportformat), `docs/research/pwa-tech.md`. Visuelle Referenz: `prototypes/a-seekarte/index.html`.
 
 ## Konventionen
 - UI-Texte Deutsch, Code/Bezeichner Englisch. TypeScript strict, keine `any`.
