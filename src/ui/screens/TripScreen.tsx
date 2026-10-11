@@ -2,7 +2,7 @@ import { useState, type MouseEvent, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { resizeImage } from '../../device';
 import { db } from '../../db/db';
-import { inviteToTrip, leaveTrip, removePerson, resendInvite, type PersonInfo } from '../../db/cloud';
+import { inviteToTrip, leaveTrip, removePerson, type PersonInfo } from '../../db/cloud';
 import { useEntries, usePhotoUrl, useTracks, useTripCrew } from '../../db/hooks';
 import {
   BoatInUseError, DuplicateEmailError, LastBoatError, addBoat, deleteTrip, removeBoat, removeTripCover, setActiveTrip,
@@ -22,6 +22,7 @@ import { initials, writeErrorMessage } from '../lib';
 import { useToast } from '../toast';
 import { Dialog } from '../components/Dialog';
 import { ExportCard } from '../components/ExportCard';
+import { JoinSheet } from '../components/JoinSheet';
 import { BoatFields, TripFields, boatDraftOf, emptyBoatDraft, tripDraftOf, tripPatchOf, validateTrip, type BoatDraft } from '../components/TripFields';
 import { parseDecimal } from '../lib';
 
@@ -446,8 +447,9 @@ function AddBoatCard({ trip }: { trip: Trip }) {
 
 // ---------- Personen ----------
 
-function InviteCard({ trip, boats }: { trip: Trip; boats: readonly Boat[] }) {
+function InviteCard({ trip, boats, people }: { trip: Trip; boats: readonly Boat[]; people: readonly PersonInfo[] }) {
   const toast = useToast();
+  const [qrOpen, setQrOpen] = useState(false);
   const signedIn = useCloudUser()?.isLoggedIn === true;
   const [email, setEmail] = useState('');
   const [boatId, setBoatId] = useState<ID>();
@@ -464,7 +466,7 @@ function InviteCard({ trip, boats }: { trip: Trip; boats: readonly Boat[] }) {
       const boat = boats.find((b) => b.id === boatId);
       setEmail('');
       setBoatId(undefined);
-      toast(`${signedIn ? 'Einladung an' : 'Vorgemerkt:'} ${e}${signedIn ? ' gesendet' : ''}${boat ? ` · Vorschlag: ${boat.name}` : ''}`, 3800);
+      toast(`${e} ${signedIn ? 'eingetragen' : 'vorgemerkt'}${boat ? ` · Vorschlag: ${boat.name}` : ''}`, 3800);
     } catch (err) {
       setError(err instanceof DuplicateEmailError ? 'Diese Adresse ist schon im Törn.' : writeErrorMessage(err, 'Die Einladung konnte nicht angelegt werden.'));
     }
@@ -472,10 +474,13 @@ function InviteCard({ trip, boats }: { trip: Trip; boats: readonly Boat[] }) {
   return (
     <section className="card" aria-label="Person einladen">
       <div className="legend">Person einladen</div>
-      <p className="muted">Die Einladung gilt für den ganzen Törn. Das Boot ist nur ein Vorschlag für den ersten Eintrag, keine Berechtigung.</p>
+      <p className="muted">
+        Trage die E-Mail-Adresse ein, mit der sich die Person anmeldet, und teile danach den QR-Code. Es wird keine Mail
+        verschickt. Das Boot ist nur ein Vorschlag für den ersten Eintrag, keine Berechtigung.
+      </p>
       {signedIn ? null : (
         <p className="muted">
-          <Icon name="lock" size={16} /> Nicht angemeldet: Einladungen werden vorgemerkt und nach der Anmeldung gesendet.
+          <Icon name="lock" size={16} /> Nicht angemeldet: Personen werden vorgemerkt und nach der Anmeldung eingetragen.
         </p>
       )}
       <label className="f">
@@ -502,8 +507,14 @@ function InviteCard({ trip, boats }: { trip: Trip; boats: readonly Boat[] }) {
       ) : null}
       <button className="btn primary block" type="button" onClick={() => void invite()}>
         <Icon name="mail" size={20} />
-        {signedIn ? 'Einladung senden' : 'Einladung vormerken'}
+        {signedIn ? 'Person eintragen' : 'Person vormerken'}
       </button>
+      {signedIn ? (
+        <button className="btn block" type="button" onClick={() => setQrOpen(true)}>
+          QR-Code zum Beitreten
+        </button>
+      ) : null}
+      {qrOpen ? <JoinSheet trip={trip} people={people} onClose={() => setQrOpen(false)} /> : null}
     </section>
   );
 }
@@ -511,7 +522,7 @@ function InviteCard({ trip, boats }: { trip: Trip; boats: readonly Boat[] }) {
 const STATUS: Record<PersonInfo['status'], [string, string]> = {
   pending: ['vorgemerkt', 'st warn'],
   invited: ['eingeladen', 'st warn'],
-  accepted: ['angenommen', 'st ok'],
+  accepted: ['dabei', 'st ok'],
   rejected: ['abgelehnt', 'st bad'],
 };
 
@@ -567,21 +578,6 @@ function PersonRow({ p, boats, admin, shared }: { p: PersonInfo; boats: readonly
               </option>
             ))}
           </select>
-          {!p.self && p.email && shared && (p.status === 'invited' || p.status === 'rejected') ? (
-            <button
-              className="btn sm"
-              type="button"
-              onClick={() =>
-                void resendInvite(db, p.crewId).then(
-                  () => toast(`Einladung an ${p.email} erneut gesendet`),
-                  () => toast('Einladung konnte nicht gesendet werden'),
-                )
-              }
-            >
-              <Icon name="mail" size={18} />
-              Erneut senden
-            </button>
-          ) : null}
           {!p.self && !p.admin ? (
             <button className="btn danger sm" type="button" onClick={() => setConfirming(true)}>
               Entfernen
@@ -615,7 +611,7 @@ function PeopleCard({ trip, boats, people, admin }: { trip: Trip; boats: readonl
           <PersonRow key={p.crewId} p={p} boats={boats} admin={admin} shared={shared} />
         ))}
       </ul>
-      <p className="muted">Das Boot ist nur ein Vorschlag fürs erste Eintragen. Jedes angenommene Mitglied schreibt auf alle Boote.</p>
+      <p className="muted">Das Boot ist nur ein Vorschlag fürs erste Eintragen. Jedes Mitglied, das dabei ist, schreibt auf alle Boote.</p>
     </section>
   );
 }
@@ -811,7 +807,7 @@ export function TripScreen({ trip }: { trip: Trip }) {
       ))}
       {admin ? <AddBoatCard trip={trip} /> : null}
       <div className="legend">Crew · {people.length}</div>
-      {admin && cloud !== 'local' ? <InviteCard trip={trip} boats={boats} /> : null}
+      {admin && cloud !== 'local' ? <InviteCard trip={trip} boats={boats} people={people} /> : null}
       {!admin ? (
         <div className="card" style={{ borderStyle: 'dashed', background: 'transparent' }}>
           <p className="muted">Nur der Admin lädt Personen ein und legt Boote an.</p>

@@ -19,7 +19,7 @@ import { LiveRouteContext, useLiveRoute, useLiveRouteState } from './live';
 import { TodayScreen } from './screens/TodayScreen';
 import { TripScreen } from './screens/TripScreen';
 import { CloudLoginHost } from './cloud/LoginHost';
-import { InviteBanner, JoinWatcher } from './cloud/InviteBanner';
+import { JoinScreen, JoinWatcher, JoiningBanner, JoiningScreen, useJoinGate } from './cloud/Join';
 import { RejectedChangesBanner, RejectionWatcher } from './cloud/RejectedChangesBanner';
 import { SyncIndicator } from './cloud/SyncIndicator';
 import { WritableTripsContext, useMyCrewId, useWritableTripIds } from './cloudHooks';
@@ -124,7 +124,7 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
       <LiveRouteContext.Provider value={live}>
         <div id="app">
           <Topbar trip={trip} dark={dark} onToggleTheme={onToggleTheme} />
-          <InviteBanner />
+          <JoiningBanner />
           <RejectedChangesBanner />
           {readOnly ? (
             <div className="banner" role="status">
@@ -191,8 +191,11 @@ function Root() {
     })();
   }, [trip, trips]);
   const writable = useWritableTripIds();
+  const gate = useJoinGate(trips ?? 0);
 
   if (trip === undefined || trips === undefined || settings === undefined || writable === undefined) return null;
+  if (gate === 'sign-in') return <JoinScreen />;
+  if (gate === 'joining') return <JoiningScreen />;
   if (trip === null) {
     // trips > 0 -> Aktivierung läuft gerade; sonst Onboarding (nicht abbrechbar).
     return trips > 0 ? null : <Onboarding onDone={() => undefined} />;

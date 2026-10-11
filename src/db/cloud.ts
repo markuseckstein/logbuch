@@ -132,7 +132,8 @@ function memberRow(db: LogbookDB, realmId: string, email: string, name: string):
     ...memberIdFields(db), realmId, email, name, roles: ['member'],
     // Rechte zusätzlich explizit: neu importierte globale Rollen wirken serverseitig verzögert (Spike 9.9)
     permissions: { add: [...(MEMBER_PERMISSIONS.add as string[])] },
-    invite: !isDemoEmail(email),
+    // Keine Dexie-Mail: die Crew tritt über Link/QR-Code bei (`?join=`) und meldet sich mit dieser Adresse an
+    invite: false,
   } as DBRealmMember;
 }
 
@@ -231,17 +232,6 @@ export async function removePerson(db: LogbookDB, crewId: ID): Promise<void> {
       await db.members.where('[email+realmId]').equals([c.email, trip.realmId!]).delete();
     }
   });
-}
-
-/** Admin: Einladung erneut senden (Mail nur für echte Adressen; fehlt das Mitglied, wird es angelegt). */
-export async function resendInvite(db: LogbookDB, crewId: ID): Promise<void> {
-  const c = await db.crewMembers.get(crewId);
-  if (!c?.email) return;
-  const trip = await db.trips.get(c.tripId);
-  if (!trip || !isSharedRealm(trip.realmId)) return;
-  const row = await db.members.where('[email+realmId]').equals([c.email, trip.realmId!]).first();
-  if (!row?.id) await sendPendingInvites(db, c.tripId);
-  else await db.members.update(row.id, { invite: !isDemoEmail(c.email) });
 }
 
 async function sharedRealmOf(db: LogbookDB, tripId: ID): Promise<string> {

@@ -70,7 +70,7 @@ function useNow(intervalMs = 30_000): number {
   return now;
 }
 
-function LogoutDialog({ onClose }: { onClose: () => void }) {
+export function LogoutDialog({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const out = async (): Promise<void> => {
     onClose();

@@ -243,8 +243,6 @@ fieldset.ro>*+*{margin-top:12px}
 .members{list-style:none;margin:0;padding:0}
 .members li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:52px;border-bottom:1px solid var(--line);padding:6px 0}
 .members li .who{flex:1;min-width:0;overflow-wrap:anywhere}
-.invite-banner{flex-wrap:wrap}
-.invite-banner .actions{display:flex;gap:8px;margin-left:auto}
 
 /* Törn-Modell v2 (Prototyp D „Boot-Schalter“): Bootsfarben + Symbolformen */
 .bsh{display:inline-block;width:12px;height:12px;flex:none;background:var(--c);vertical-align:middle}
@@ -357,3 +355,10 @@ legend em.req{font-style:normal;color:var(--magenta);letter-spacing:.04em;margin
 .leaflet-tooltip.boat-label{background:var(--surface);border:1.5px solid currentColor;font:700 12px var(--font-sans);box-shadow:none;padding:1px 6px}
 .leaflet-tooltip.boat-label.b1{color:var(--b1)}.leaflet-tooltip.boat-label.b2{color:var(--b2)}.leaflet-tooltip.boat-label.b3{color:var(--b3)}.leaflet-tooltip.boat-label.b4{color:var(--b4)}
 .leaflet-tooltip-top.boat-label::before{border-top-color:currentColor}
+
+/* Beitreten per Link / QR-Code */
+.join-sheet{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.qr{width:min(100%,320px);aspect-ratio:1;height:auto;border:1px solid var(--line);border-radius:6px;background:#fff}
+.join-link{font-size:13px;overflow-wrap:anywhere;color:var(--ink-2);margin:0}
+.join-screen{display:flex;flex-direction:column;justify-content:center;min-height:100dvh}
+.join-screen h1{font-size:24px;line-height:1.2;margin:0}

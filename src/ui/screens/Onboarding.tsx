@@ -8,7 +8,7 @@ import { Icon } from '../icons';
 import { useToast } from '../toast';
 import { ImportLogbook } from '../components/ImportLogbook';
 import { SignInDialog } from '../cloud/CloudCard';
-import { InviteBanner } from '../cloud/InviteBanner';
+import { startJoin } from '../cloud/joinState';
 import { useCloudStatus, useCloudUser } from '../cloudHooks';
 import { BoatShape } from '../boats';
 import { TripFields, emptyTripDraft, tripPatchOf, validateTrip } from '../components/TripFields';
@@ -263,14 +263,13 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
             )}
             {onCancel || cloud === 'local' ? null : (
               <div className="card">
-                <InviteBanner />
                 {cloud === 'signed-out' ? (
-                  <button className="btn block" type="button" onClick={() => setSigningIn(true)}>
+                  <button className="btn block" type="button" onClick={() => startJoin()}>
                     <Icon name="mail" size={20} />
                     Ich wurde eingeladen – anmelden
                   </button>
                 ) : (
-                  <p className="muted">Angemeldet – Einladungen erscheinen hier, sobald sie da sind.</p>
+                  <p className="muted">Angemeldet – Einladungen werden automatisch angenommen, sobald sie da sind.</p>
                 )}
               </div>
             )}

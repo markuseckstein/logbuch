@@ -23,10 +23,11 @@ Entscheidung 2026-10-11: UI nach Prototyp **D „Boot-Schalter“** (`prototypes
 - Lokal (`settings`, nie exportiert, nie synchronisiert): `boatSelectionByTrip[tripId] = boatId | 'all'` (Boot-Schalter) und `lastBoatByTrip[tripId]` (Vorschlag im Eintrag). Erstwahl = `suggestedBoatId` der eigenen Person, sonst erstes Boot.
 - Exportformat **v4**: `boats[]` statt `trip.boat`, `boatId` an Einträgen/Tracks, keine Flottille. Import = Wiederherstellen bzw. Mergen in denselben Törn (gleiche `trip.id`), keine Ownership-Frage. ZIP/GPX: ein `<trk>` je Boot, Waypoints mit Bootsname.
 
-## Einladen
-- Admin gibt E-Mail + optional Boot-Vorschlag ein ⇒ in **einer** Transaktion: `CrewMember {name (aus E-Mail, editierbar), email, suggestedBoatId}` + Realm-Mitglied `{email, roles: ['member']}`.
-- Mitgliederliste: Name, E-Mail, Status (eingeladen/angenommen/abgelehnt), Admin-Badge, Boot-Vorschlag ändern (Select), Erneut senden, Entfernen (mit Bestätigung in der UI).
-- Eingeladene: Anmelden ⇒ Einladung annehmen ⇒ Törn erscheint, Boot-Schalter steht auf ihrem vorgeschlagenen Boot. Schreiben erst, wenn die Mitgliedschaft wirksam ist (siehe Fix zum Rechtefehler).
+## Einladen (Link/QR statt Dexie-Mail)
+- Admin gibt E-Mail + optional Boot-Vorschlag ein ⇒ in **einer** Transaktion: `CrewMember {name (aus E-Mail, editierbar), email, suggestedBoatId}` + Realm-Mitglied `{email, roles: ['member'], invite: false}` – Dexie verschickt keine Mail, „Erneut senden“ gibt es nicht.
+- Törn-Tab (Admin, angemeldet): „QR-Code zum Beitreten“ ⇒ Sheet mit QR-Code und Link `<App-URL>?join=<tripId>`, „Link teilen“ (Web Share, Fallback Zwischenablage), Hinweis, wenn noch niemand eingetragen ist.
+- Mitgliederliste: Name, E-Mail, Status (eingeladen / dabei; abgelehnt nur falls gesetzt), Admin-Badge, Boot-Vorschlag ändern (Select), Entfernen (mit Bestätigung in der UI).
+- Eingeladene öffnen den Link ⇒ Beitreten-Bildschirm (auch statt Onboarding) ⇒ Anmelden mit der eingetragenen E-Mail ⇒ offene Einladungen werden automatisch angenommen ⇒ Törn erscheint, Boot-Schalter steht auf ihrem vorgeschlagenen Boot. Schreiben erst, wenn die Mitgliedschaft wirksam ist („Törn wird geladen …“). Ohne passende Einladung: „Für <E-Mail> liegt keine Einladung vor. Bitte den Admin, genau diese Adresse einzutragen.“ + „Abmelden / andere E-Mail“.
 
 ## UI (nach Prototyp D)
 - **Header**: Boot-Schalter (Segmente je Boot + „Alle“), Auswahl lokal gespeichert. Bei nur einem Boot ausgeblendet.

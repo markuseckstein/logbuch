@@ -10,8 +10,10 @@ import './ui/theme.css';
 import './ui/app.css';
 import { deleteLegacyDb } from './db/legacy';
 import { App } from './ui/App';
+import { captureJoinFromUrl } from './ui/cloud/joinState';
 
 void deleteLegacyDb();
+captureJoinFromUrl();
 
 // Nur im Entwicklungsserver: Zugriff für manuelle Spikes/Debugging (nie im Produktions-Build).
 if (import.meta.env.DEV) {

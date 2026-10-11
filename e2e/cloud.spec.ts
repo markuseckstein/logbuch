@@ -4,7 +4,7 @@ import { onboard } from './helpers';
 /**
  * Cloud-Sync gegen die echte Dexie-Cloud-Datenbank (nur `npm run e2e:cloud`, braucht VITE_DEXIE_CLOUD_URL
  * und die Demo-Nutzer aus e2e/demoUsers.json). Login mit @demo.local-Adressen ohne E-Mail-Code.
- * Törn-Modell v2: Alice (Admin) legt einen Törn mit zwei Booten an und lädt Bob und Carol mit Boot-Vorschlag ein.
+ * Törn-Modell v2: Alice (Admin) legt einen Törn mit zwei Booten an und trägt Bob und Carol mit Boot-Vorschlag ein, Bob und Carol treten über den Join-Link (QR) bei.
  */
 test.skip(!process.env['E2E_CLOUD_URL'], 'Keine Dexie-Cloud-URL konfiguriert (VITE_DEXIE_CLOUD_URL)');
 test.use({ serviceWorkers: 'block' });
@@ -39,26 +39,40 @@ const account = (page: Page) => page.getByRole('region', { name: 'Konto' });
 const boatSwitch = (page: Page) => page.getByRole('radiogroup', { name: 'Boot wählen' });
 const people = (page: Page) => page.getByRole('list', { name: 'Personen' });
 
-async function signIn(page: Page, email: string, from: 'account' | 'onboarding'): Promise<void> {
+async function signIn(page: Page, email: string, from: 'account' | 'join'): Promise<void> {
   if (from === 'account') await account(page).getByRole('button', { name: 'Anmelden' }).click();
-  else await page.getByRole('button', { name: 'Ich wurde eingeladen – anmelden' }).click();
+  else await page.getByRole('main').getByRole('button', { name: 'Anmelden' }).click();
   const dlg = page.getByRole('dialog', { name: 'Mit Cloud-Konto anmelden' });
   await dlg.getByLabel('E-Mail-Adresse').fill(email);
   await dlg.getByRole('button', { name: 'Code anfordern' }).click();
 }
 
-async function acceptInvite(page: Page, trip: string): Promise<void> {
-  const banner = page.getByRole('region', { name: 'Einladung' }).filter({ hasText: trip });
-  await expect(banner).toBeVisible(SYNC);
-  await expect(banner).toContainText(`lädt dich in den Törn „${trip}“ ein`);
-  await banner.getByRole('button', { name: 'Annehmen' }).click();
+/** Admin: QR-Sheet öffnen, QR und Link prüfen, Link zurückgeben. */
+async function joinLink(page: Page): Promise<string> {
+  await page.getByRole('region', { name: 'Person einladen' }).getByRole('button', { name: 'QR-Code zum Beitreten' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Zum Törn einladen' });
+  await expect(sheet.getByRole('img', { name: /QR-Code zum Beitreten/ })).toBeVisible();
+  const link = (await sheet.getByTestId('join-link').textContent()) ?? '';
+  expect(link).toContain('join=');
+  await expect(sheet.getByText('Noch niemand eingetragen')).toHaveCount(0);
+  await sheet.getByRole('button', { name: 'Schließen' }).click();
+  await expect(sheet).toBeHidden();
+  return link;
+}
+
+/** Eingeladene: Link öffnen, Beitreten-Bildschirm, anmelden – ohne „Annehmen“ landen sie im Törn. */
+async function joinViaLink(page: Page, link: string, email: string): Promise<void> {
+  await page.goto(link);
+  await expect(page.getByRole('heading', { name: 'Du wurdest zu einem Törn eingeladen' })).toBeVisible();
+  expect(page.url()).not.toContain('join=');
+  await signIn(page, email, 'join');
 }
 
 async function invite(page: Page, email: string, boat: string): Promise<void> {
   const card = page.getByRole('region', { name: 'Person einladen' });
   await card.getByLabel('E-Mail-Adresse').fill(email);
   await card.getByRole('radio', { name: boat }).click();
-  await card.getByRole('button', { name: 'Einladung senden' }).click();
+  await card.getByRole('button', { name: 'Person eintragen' }).click();
   await expect(card.getByLabel('E-Mail-Adresse')).toHaveValue('');
 }
 
@@ -97,15 +111,14 @@ test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, bei
   await expect(people(alice)).toContainText('bob@demo.local · Vorschlag: ' + b1);
   await expect(people(alice)).toContainText('carol@demo.local · Vorschlag: ' + b2);
   await expect(people(alice).getByText('eingeladen')).toHaveCount(2, SYNC);
+  const link = await joinLink(alice);
   await expect(alice.getByRole('img', { name: 'Cloud: synchronisiert' })).toBeVisible(SYNC);
 
   let failed = true;
   try {
-    // --- Bob: leeres Handy, Anmeldung vom Startbildschirm, Einladung annehmen
+    // --- Bob: leeres Handy, öffnet den Beitritts-Link, meldet sich an – kein Annehmen-Klick
     const bob = await phone(browser);
-    await bob.goto('/');
-    await signIn(bob, 'bob@demo.local', 'onboarding');
-    await acceptInvite(bob, trip);
+    await joinViaLink(bob, link, 'bob@demo.local');
     await expect(bob.locator('.brand span')).toContainText(trip, SYNC);
     // Boot-Schalter steht auf dem vorgeschlagenen Boot
     await expect(boatSwitch(bob).getByRole('radio', { name: b1 })).toHaveAttribute('aria-checked', 'true', SYNC);
@@ -128,9 +141,8 @@ test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, bei
 
     // --- Carol: anderes Boot vorgeschlagen
     const carol = await phone(browser, { latitude: 54.42, longitude: 10.25 });
-    await carol.goto('/');
-    await signIn(carol, 'carol@demo.local', 'onboarding');
-    await acceptInvite(carol, trip);
+    await joinViaLink(carol, link, 'carol@demo.local');
+    await expect(carol.locator('.brand span')).toContainText(trip, SYNC);
     await expect(boatSwitch(carol).getByRole('radio', { name: b2 })).toHaveAttribute('aria-checked', 'true', SYNC);
     await entryWithText(carol, b2, 'Carol auf der Möwe');
 
@@ -143,7 +155,7 @@ test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, bei
     await expect(bob.getByRole('dialog').getByRole('button', { name: 'Löschen' })).toHaveCount(0);
     await bob.getByRole('dialog').getByRole('button', { name: 'Fertig' }).click();
 
-    // Alice (Admin) sieht beide, darf fremde Einträge bearbeiten; Mitgliederliste: angenommen
+    // Alice (Admin) sieht beide, darf fremde Einträge bearbeiten; Mitgliederliste: alle dabei
     await tab(alice, 'Heute').click();
     await boatSwitch(alice).getByRole('radio', { name: 'Alle' }).click();
     await expect(alice.locator('.tl-item', { hasText: 'Bob übernimmt das Ruder' })).toBeVisible(SYNC);
@@ -152,7 +164,7 @@ test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, bei
     await expect(alice.getByRole('dialog').getByRole('note')).toContainText('Admin-Bearbeitung');
     await alice.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click();
     await tab(alice, 'Törn').click();
-    await expect(people(alice).getByText('angenommen')).toHaveCount(3, SYNC);
+    await expect(people(alice).getByText('dabei')).toHaveCount(3, SYNC);
     failed = false;
   } finally {
     if (process.env['E2E_KEEP'] && failed) {

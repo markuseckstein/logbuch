@@ -3,7 +3,7 @@ import { tiedRealmId } from '../domain/access';
 import type { LogbookDB } from './db';
 import {
   CloudNotSignedInError, adoptOwnTrips, cloudStatus, inviteToTrip, isDemoEmail, leaveTrip, listPeople, login, logout,
-  memberStatus, removePerson, resendInvite, shareTripToCloud, watchSyncRejections,
+  memberStatus, removePerson, shareTripToCloud, watchSyncRejections,
 } from './cloud';
 import { listRescued, resubmitRescued } from './syncRejections';
 import { DuplicateEmailError, createEntry, createTrip, getDeviceId, getSettings, listCrew, loadTripData } from './repo';
@@ -128,7 +128,7 @@ describe('people and invitations', () => {
     await ownRealm(trip.id);
     return trip;
   }
-  it('invites with person + realm member (role member, explicit rights) in one go; demo users get no mail', async () => {
+  it('invites with person + realm member (role member, explicit rights) in one go; nobody gets a Dexie mail (invite: false)', async () => {
     const trip = await shared();
     const [, b] = await boatIds(db, trip.id);
     await inviteToTrip(db, trip.id, { email: 'Bob@Demo.Local', suggestedBoatId: b });
@@ -141,7 +141,7 @@ describe('people and invitations', () => {
     ]);
     expect(people[0]!.self).toBe(true);
     const rows = await db.members.where('realmId').equals(tiedRealmId(trip.id)).toArray();
-    expect(rows.find((m) => m.email === 'carol.k@example.de')!.invite).toBe(true);
+    expect(rows.find((m) => m.email === 'carol.k@example.de')!.invite).toBe(false);
     expect(rows.find((m) => m.email === 'bob@demo.local')).toMatchObject({ invite: false, roles: ['member'], name: 'Bob' });
   });
   it('a failing person write rolls back the realm member too (one transaction)', async () => {
@@ -164,16 +164,6 @@ describe('people and invitations', () => {
     await removePerson(db, bob.id);
     expect((await listPeople(db, trip.id)).map((p) => p.name)).toEqual(['Alice']);
     expect(await db.members.where('email').equals('bob@demo.local').count()).toBe(0);
-  });
-  it('resendInvite flags the invitation again (real addresses) or recreates a missing member', async () => {
-    const trip = await shared();
-    const carol = await inviteToTrip(db, trip.id, { email: 'carol@example.de' });
-    await db.members.where('email').equals('carol@example.de').modify({ invite: false });
-    await resendInvite(db, carol.id);
-    expect((await db.members.where('email').equals('carol@example.de').first())!.invite).toBe(true);
-    await db.members.where('email').equals('carol@example.de').delete();
-    await resendInvite(db, carol.id);
-    expect(await db.members.where('email').equals('carol@example.de').count()).toBe(1);
   });
   it('leaveTrip removes my own membership only', async () => {
     const trip = await shared();

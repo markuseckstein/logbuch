@@ -67,8 +67,12 @@ benutzt.
 
 1. Admin: Törn anlegen (Onboarding: Törn → Boote → Crew). Anmelden im Onboarding oder später im Törn-Tab („Konto“ →
    Anmelden, E-Mail → Code). Lokal angelegte Törns kommen nach der Anmeldung automatisch in ihren Realm.
-2. Admin lädt ein: Törn-Tab → „Person einladen“: E-Mail + optional Boot-Vorschlag. Ohne Anmeldung wird die Einladung
-   vorgemerkt und nach der Anmeldung gesendet. Mitgliederliste: Status, Vorschlag ändern, erneut senden, entfernen.
-3. Eingeladene: App öffnen → „Ich wurde eingeladen – anmelden“ mit genau dieser E-Mail → Banner „… lädt dich in den
-   Törn … ein“ → Annehmen. Der Boot-Schalter steht danach auf dem vorgeschlagenen Boot; Schreiben geht, sobald der
-   Server die Mitgliedschaft bestätigt hat.
+2. Admin trägt ein: Törn-Tab → „Person einladen“: E-Mail + optional Boot-Vorschlag. Das Realm-Mitglied wird mit
+   `invite: false` angelegt – Dexie verschickt **keine** Mail. Ohne Anmeldung wird die Person vorgemerkt und nach der
+   Anmeldung eingetragen. Danach „QR-Code zum Beitreten“ → Sheet mit QR-Code und Link `<App-URL>?join=<tripId>`,
+   „Link teilen“ (Web Share, sonst Zwischenablage). Mitgliederliste: Status eingeladen/dabei, Vorschlag ändern, entfernen.
+3. Crew scannt den Code bzw. öffnet den Link → Beitreten-Bildschirm → Anmelden mit genau der eingetragenen E-Mail
+   (Code kommt von Dexie Cloud per Mail, ggf. Spam). Offene Einladungen (`db.cloud.invites`) werden automatisch
+   angenommen, die App wechselt in den Törn, der Boot-Schalter steht auf dem vorgeschlagenen Boot; Schreiben geht,
+   sobald der Server die Mitgliedschaft bestätigt hat. Liegt für die Adresse keine Einladung vor, erscheint ein Hinweis
+   mit „Abmelden / andere E-Mail“.
