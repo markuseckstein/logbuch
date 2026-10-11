@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // GitHub Pages liefert unter /<repo>/ aus; lokal und in Tests '/'.
+  base: process.env['BASE_PATH'] ?? '/',
   plugins: [
     react(),
     VitePWA({
@@ -16,8 +18,8 @@ export default defineConfig({
         lang: 'de',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
+        start_url: '.',
+        scope: '.',
         theme_color: '#f5f6f2',
         background_color: '#f5f6f2',
         icons: [
@@ -28,7 +30,6 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,woff}'],
-        navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
