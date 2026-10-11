@@ -1,0 +1,1141 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Logbuch Gemeinsame Timeline</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root{
+  --bg:#f5f6f2; --surface:#ffffff; --surface-2:#e9f1f4; --water-deep:#ffffff; --water-mid:#e4f0f5; --water-shallow:#c9e1ec;
+  --land:#ecdcae; --land-edge:#8f7840; --ink:#0d2848; --ink-2:#4b5f76; --line:#c5d2db; --grid:#a8739f;
+  --magenta:#b0106a; --on-magenta:#ffffff; --danger:#a3201a; --toast-bg:#0d2848; --toast-ink:#ffffff;
+  --scrim:rgba(13,40,72,.5); --shadow:0 -6px 24px rgba(13,40,72,.22);
+  --b1:#0a66a8; --b2:#c4560a; --b3:#23823f; --b4:#7a3fb0;
+  --ok:#1d6b3a; --ok-bg:#dff0e3; --warn:#7a5000; --warn-bg:#f8ecc9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#120e0c; --surface:#1d1613; --surface-2:#271d18; --water-deep:#15110f; --water-mid:#1b1e1c; --water-shallow:#242d2b;
+    --land:#3b2e1c; --land-edge:#7a6236; --ink:#e3c28f; --ink-2:#a58d6b; --line:#3d3029; --grid:#7a5069;
+    --magenta:#e07a98; --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
+    --scrim:rgba(0,0,0,.7); --shadow:0 -6px 24px rgba(0,0,0,.6);
+    --b1:#6cbcf0; --b2:#f2a15a; --b3:#7fd490; --b4:#c39af0;
+    --ok:#8fd9a3; --ok-bg:#1e2c22; --warn:#e8c16a; --warn-bg:#33291a;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#120e0c; --surface:#1d1613; --surface-2:#271d18; --water-deep:#15110f; --water-mid:#1b1e1c; --water-shallow:#242d2b;
+  --land:#3b2e1c; --land-edge:#7a6236; --ink:#e3c28f; --ink-2:#a58d6b; --line:#3d3029; --grid:#7a5069;
+  --magenta:#e07a98; --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
+  --scrim:rgba(0,0,0,.7); --shadow:0 -6px 24px rgba(0,0,0,.6);
+  --b1:#6cbcf0; --b2:#f2a15a; --b3:#7fd490; --b4:#c39af0;
+  --ok:#8fd9a3; --ok-bg:#1e2c22; --warn:#e8c16a; --warn-bg:#33291a;
+}
+:root{
+  --font-mono:"IBM Plex Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --font-sans:"Source Sans 3","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{color-scheme:dark}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.4 var(--font-sans);overflow-x:hidden}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:3px solid var(--magenta);outline-offset:2px}
+.mono,.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ico{flex:none;display:block}
+#app{max-width:480px;margin:0 auto;min-height:100%;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.topbar{position:sticky;top:0;z-index:10;padding:10px 16px;background:var(--bg);border-bottom:3px double var(--ink)}
+.tb-row{display:flex;align-items:center;gap:12px}
+.topbar .brand{flex:1;min-width:0}
+.brand b{display:block;font:600 13px var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
+.brand span{display:block;font-size:14px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon-btn{width:44px;height:44px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.screen{padding:16px}
+.screen>*+*{margin-top:16px}
+h1,h2,h3{margin:0;font-weight:700;line-height:1.2}
+h2{font-size:22px}h3{font-size:18px}
+.legend{display:flex;align-items:center;gap:10px;font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.legend::after{content:"";flex:1;border-top:1px solid var(--line)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px}
+.card>*+*{margin-top:12px}
+.muted{color:var(--ink-2);font-size:15px}
+.small{font-size:14px}
+p{margin:0}
+/* map */
+.mapframe{border:1px solid var(--ink);padding:3px;background:var(--surface);border-radius:2px}
+.mapframe svg{display:block;width:100%;height:auto;border:1px solid var(--ink)}
+.mk{cursor:pointer}
+.mk:focus-visible{outline:none}
+.mk:focus-visible .ring{stroke:var(--ink);stroke-width:3.5}
+/* fix */
+.fix{position:relative;width:100%;min-height:96px;display:flex;align-items:center;justify-content:center;gap:16px;padding:16px;background:var(--magenta);color:var(--on-magenta);border-radius:8px;font:700 26px/1.15 var(--font-sans);box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--magenta);animation:pulse 2.8s ease-out infinite}
+.fix small{display:block;font:500 13px var(--font-mono);opacity:.92;letter-spacing:.02em;margin-top:2px}
+.fix .lbl{text-align:left;min-width:0}
+.fix.busy{animation:none}
+.fix.busy .ico{animation:spin 1s linear infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--magenta),0 0 0 5px transparent}70%,100%{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--magenta),0 0 0 18px transparent}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fix:active{transform:scale(.985)}
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--ink);border-radius:2px;background:var(--surface)}
+.stats div{padding:10px 8px;text-align:center;min-width:0}
+.stats div+div{border-left:1px solid var(--line)}
+.stats b{display:block;font:600 22px var(--font-mono);font-variant-numeric:tabular-nums}
+.stats span{font-size:13px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em}
+/* boat badge + shapes */
+.bsh{display:inline-block;width:12px;height:12px;flex:none;background:var(--c);vertical-align:middle}
+.bsh.s1{border-radius:50%}.bsh.s2{border-radius:2px}
+.bsh.s3{clip-path:polygon(50% 0,100% 90%,0 90%)}
+.bsh.s4{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.bb{display:inline-flex;align-items:center;gap:6px;max-width:100%;font:600 12px var(--font-mono);letter-spacing:.02em;border:1.5px solid var(--c);border-radius:4px;padding:1px 7px 1px 6px;background:var(--surface);color:var(--ink);white-space:nowrap}
+.who{font:500 13px var(--font-mono);color:var(--ink-2)}
+.who.me{color:var(--ink);font-weight:600}
+.meta-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:3px}
+/* timeline */
+.tl{list-style:none;margin:0;padding:0}
+.tl li{position:relative}
+.tl li::before{content:"";position:absolute;left:74px;top:0;bottom:0;border-left:1px solid var(--ink-2)}
+.tl li:last-child::before{bottom:50%}
+.tl-item{position:relative;display:grid;grid-template-columns:50px 26px minmax(0,1fr);gap:10px;width:100%;min-height:64px;padding:10px 0;text-align:left;align-items:start}
+.tl-time{font:600 15px var(--font-mono);padding-top:6px;font-variant-numeric:tabular-nums}
+.tl-dot{width:26px;height:26px;border-radius:50%;background:var(--surface);border:2px solid var(--c,var(--magenta));color:var(--c,var(--magenta));display:flex;align-items:center;justify-content:center;margin-top:3px;z-index:1;margin-left:2px}
+.tl-dot .ico{width:15px;height:15px}
+.tl-body{display:block;min-width:0}
+.tl-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.tl-head b{font-size:18px}
+.pos{display:block;font:400 13px var(--font-mono);color:var(--ink-2);margin-top:2px}
+.wind{display:inline-flex;align-items:center;gap:4px;font:500 13px var(--font-mono);border:1px solid var(--line);border-radius:3px;padding:1px 6px;background:var(--surface-2)}
+.wind svg{width:12px;height:12px}
+.tl-text{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:4px;font-size:16px}
+.empty{padding:16px;border:1px dashed var(--ink-2);border-radius:6px;text-align:center;color:var(--ink-2)}
+/* chips */
+fieldset{border:0;margin:0;padding:0;min-width:0}
+legend{padding:0;margin-bottom:8px;font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+legend em{font-style:normal;color:var(--magenta);letter-spacing:.04em;margin-left:6px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;padding:6px 12px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--ink-2);border-radius:22px;background:var(--surface);font-size:16px;max-width:100%}
+.chip[aria-pressed="true"],.chip[aria-checked="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+.chip .bsh{box-shadow:0 0 0 1.5px var(--surface)}
+.chip[aria-checked="true"] .bsh,.chip[aria-pressed="true"] .bsh{box-shadow:0 0 0 1.5px var(--bg)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid3 .chip{border-radius:6px;flex-direction:column;gap:2px;justify-content:center;font-size:14px;padding:6px 4px;text-align:center}
+/* segmented boat switch */
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1.5px solid var(--ink);border-radius:8px;overflow:hidden;margin-top:10px;background:var(--surface)}
+.seg button{min-height:46px;padding:4px 4px;display:flex;align-items:center;justify-content:center;gap:6px;font:600 14px var(--font-sans);min-width:0}
+.seg button+button{border-left:1.5px solid var(--ink)}
+.seg button span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--bg)}
+.seg .bsh{box-shadow:0 0 0 1.5px var(--surface)}
+.seg button[aria-checked="true"] .bsh{box-shadow:0 0 0 1.5px var(--bg)}
+.seg.flash{animation:flash .9s ease-out 2}
+@keyframes flash{50%{box-shadow:0 0 0 4px var(--magenta)}}
+/* sheet */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:30;opacity:0;transition:opacity .2s}
+.scrim.open{opacity:1}
+.sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:480px;height:92%;max-height:92%;z-index:31;background:var(--bg);border-radius:14px 14px 0 0;box-shadow:var(--shadow);border-top:3px double var(--ink);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .26s ease-out}
+.sheet.open{transform:none}
+.sh-head{padding:8px 16px 10px;border-bottom:1px solid var(--line)}
+.grab{width:44px;height:4px;border-radius:2px;background:var(--ink-2);margin:0 auto 8px;opacity:.5}
+.sh-row{display:flex;align-items:center;gap:12px}
+.sh-row>div{flex:1;min-width:0}
+.sh-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px;overscroll-behavior:contain}
+.sh-body>*+*{margin-top:20px}
+#sh-form>*+*{margin-top:20px}
+.sh-foot{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--surface);display:flex;gap:12px;flex-wrap:wrap}
+.banner{border:1.5px solid var(--ink-2);border-left-width:6px;border-radius:6px;padding:10px 12px;background:var(--surface);font-size:15px}
+.banner b{display:block}
+.btn{min-height:48px;padding:8px 18px;border-radius:6px;border:1.5px solid var(--ink);font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--surface);text-align:center}
+.btn.primary{background:var(--magenta);border-color:var(--magenta);color:var(--on-magenta)}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn.sm{min-height:44px;padding:6px 12px;font-size:15px}
+.btn.block{width:100%}
+.btn[aria-disabled="true"]{opacity:.45}
+.sh-foot .primary{flex:1}
+.confirm{width:100%;border:1.5px solid var(--danger);border-radius:6px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;background:var(--surface)}
+.confirm p{margin:0;flex:1 1 100%;font-weight:600;color:var(--danger)}
+/* rose */
+.rose-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
+.rose{width:min(100%,264px);height:auto}
+.rose .w{fill:var(--surface-2);stroke:var(--ink-2);stroke-width:.6;cursor:pointer}
+.rose .w.card4{fill:var(--water-shallow)}
+.rose .w[aria-checked="true"]{fill:var(--magenta)}
+.rose .w:focus-visible{outline:none;stroke:var(--magenta);stroke-width:2.5}
+.rose text{font:500 8.5px var(--font-mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.rose .ctr{font:600 14px var(--font-mono)}
+.windbar{display:flex;align-items:center;gap:12px}
+.windbar output{font:600 16px var(--font-mono);min-width:150px;text-align:center}
+.bft{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.bft button{min-height:48px;border:1px solid var(--ink-2);border-radius:4px;font:600 17px var(--font-mono);background:color-mix(in srgb,var(--magenta) calc(var(--lv)*32%),var(--surface))}
+.bft button[aria-pressed="true"]{background:var(--magenta);color:var(--on-magenta);border-color:var(--magenta)}
+.bft-desc{margin-top:8px;font-size:17px}
+.bft-desc small{font:400 13px var(--font-mono);color:var(--ink-2);margin-left:6px}
+/* forms */
+label.f{display:block}
+label.f>span{display:block;font-size:14px;color:var(--ink-2);margin-bottom:4px;font-weight:600}
+input[type=text],input[type=email],input[type=date],input[type=number],select,textarea{width:100%;min-height:48px;padding:10px 12px;border:1px solid var(--ink-2);border-radius:6px;background:var(--surface);color:var(--ink)}
+textarea{min-height:110px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row2>*{min-width:0}
+.err{color:var(--danger);font-size:14px;font-weight:600;margin-top:4px}
+.hint{margin-top:8px}
+/* tabs */
+.tabbar{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:480px;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tab{min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:600;color:var(--ink-2);border-top:3px solid transparent}
+.tab[aria-current="page"]{color:var(--ink);border-top-color:var(--magenta)}
+.tab[aria-current="page"] .ico{color:var(--magenta)}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));margin:0 auto;max-width:448px;z-index:60;background:var(--toast-bg);color:var(--toast-ink);padding:12px 16px;border-radius:6px;font:500 14px/1.4 var(--font-mono);opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .2s,transform .2s}
+.toast.show{opacity:1;transform:none}
+/* role + status */
+.role{font:600 12px var(--font-mono);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--magenta);color:var(--magenta);border-radius:3px;padding:1px 6px;white-space:nowrap}
+.st{font:600 12px var(--font-mono);letter-spacing:.04em;border-radius:3px;padding:2px 7px;white-space:nowrap}
+.st.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok)}
+.st.warn{background:var(--warn-bg);color:var(--warn);border:1px dashed var(--warn)}
+.av{flex:none;width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:1.5px solid var(--ink-2);display:inline-flex;align-items:center;justify-content:center;font:600 14px var(--font-mono);font-style:normal}
+.av.sm{width:26px;height:26px;font-size:12px}
+/* day nav */
+.back{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-weight:700;color:var(--magenta)}
+/* report */
+.rep{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px}
+.rep+.rep{margin-top:12px}
+.rep-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rep-h b{font-size:18px}
+.rep-h .num{margin-left:auto;font-size:14px;color:var(--ink-2)}
+.rep p{margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere}
+.rep.mine{border-color:var(--ink);border-width:1.5px}
+.rep.new{border-style:dashed;border-color:var(--ink-2)}
+.rep-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.rep textarea{margin-top:10px;min-height:120px}
+.dtbl{width:100%;border-collapse:collapse}
+.dtbl td{padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
+.dtbl td:last-child{text-align:right;font:500 14px var(--font-mono)}
+.dtbl tr:last-child td{border-bottom:0}
+/* map legend */
+.mleg{list-style:none;margin:0;padding:0}
+.mleg li+li{border-top:1px solid var(--line)}
+.mleg button{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;text-align:left;padding:6px 0}
+.mleg .bsh{width:16px;height:16px}
+.mleg .ml-t{flex:1;min-width:0}
+.mleg .ml-t b{display:block}
+.mleg .ml-t span{font:400 13px var(--font-mono);color:var(--ink-2)}
+.mleg button[aria-pressed="false"] .ml-t,.mleg button[aria-pressed="false"] .bsh{opacity:.4}
+.mleg .sw{flex:none;font:600 12px var(--font-mono);color:var(--ink-2)}
+/* boats + people */
+.boatpic{height:130px;border:1px solid var(--ink);border-radius:2px;overflow:hidden;position:relative;background:var(--water-mid)}
+.boatpic svg,.boatpic img{width:100%;height:100%;object-fit:cover;display:block}
+.bcard{border-left:6px solid var(--c)}
+.bc-head{display:flex;align-items:center;gap:10px}
+.bc-head>div{flex:1;min-width:0}
+.people{display:flex;flex-wrap:wrap;gap:6px}
+.pchip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:2px 10px 2px 4px;border:1px solid var(--ink-2);border-radius:18px;background:var(--surface);font-size:15px}
+.pchip.inv{border-style:dashed;color:var(--ink-2)}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+.members{list-style:none;margin:0;padding:0}
+.mem{padding:12px 0;border-bottom:1px solid var(--line)}
+.mem:last-child{border-bottom:0}
+.mem-top{display:flex;align-items:center;gap:10px}
+.mem-main{flex:1;min-width:0}
+.mem-main b{margin-right:6px}
+.mem-main .muted{font-size:14px;overflow-wrap:anywhere}
+.mem-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+.mem-acts select{width:auto;min-height:44px;flex:1 1 150px}
+.rules{margin:0;padding-left:20px}
+.rules li+li{margin-top:4px}
+.lockcard{border:1.5px dashed var(--ink-2);border-radius:6px;padding:14px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
+.lockcard .row{display:flex;gap:10px;align-items:flex-start}
+.acct{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.acct>div{flex:1;min-width:150px}
+/* crew plan */
+.pgroup{background:var(--surface);border:1px solid var(--line);border-top:5px solid var(--c,var(--ink-2));border-radius:6px}
+.pgroup.drop{outline:3px dashed var(--magenta);outline-offset:2px}
+.pg-h{display:flex;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap}
+.pg-h>div{flex:1;min-width:120px}
+.pg-h b{font-size:18px}
+.plist{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.prow{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:0 12px;min-height:56px}
+.prow:last-child{border-bottom:0}
+.prow.sel{background:var(--surface-2);box-shadow:inset 4px 0 0 var(--magenta)}
+.prow[draggable="true"]{cursor:grab}
+.prow-btn{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;text-align:left}
+.prow-btn .nm{flex:1;min-width:0}
+.prow-btn .nm b{margin-right:6px}
+.prow-btn .nm .muted{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis}
+.pempty{padding:12px;color:var(--ink-2);font-size:15px}
+.brow{display:flex;align-items:center;gap:10px}
+.brow>div{flex:1;min-width:0}
+/* onboarding */
+.onb{position:fixed;inset:0;z-index:50;background:var(--bg);overflow-y:auto}
+#login{z-index:55}
+.onb-in{max-width:480px;margin:0 auto;padding:16px 16px calc(24px + env(safe-area-inset-bottom,0px));min-height:100%;display:flex;flex-direction:column;gap:16px}
+.onb-in>section>*+*{margin-top:12px}
+.steps{display:flex;gap:6px}
+.steps i{flex:1;height:6px;border:1px solid var(--ink);border-radius:3px}
+.steps i.on{background:var(--magenta);border-color:var(--magenta)}
+.onb-nav{margin-top:auto;display:flex;gap:12px;padding-top:12px}
+.onb-nav .primary{flex:1}
+.itemlist{list-style:none;margin:0;padding:0}
+.itemlist li{display:flex;align-items:center;gap:10px;min-height:52px;border-bottom:1px solid var(--line)}
+.itemlist li>div{flex:1;min-width:0}
+.thumb-s{width:44px;height:36px;border:1px solid var(--ink);border-radius:2px;overflow:hidden;flex:none;background:var(--water-mid)}
+.thumb-s svg,.thumb-s img{width:100%;height:100%;object-fit:cover;display:block}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+details.opt{border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+details.opt summary{min-height:48px;padding:0 12px;display:flex;align-items:center;cursor:pointer;font-weight:600}
+details.opt .in{padding:0 12px 12px}
+details.opt .in>*+*{margin-top:8px}
+.dim{border-style:dashed;background:transparent}
+.tl li::before{display:none}
+.tl li+li{margin-top:10px}
+.tl-item{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:6px;padding:10px 12px 10px 10px;grid-template-columns:46px 26px minmax(0,1fr);gap:8px}
+.tl-dot{margin-left:0}
+.tl-time{font-size:14px}
+.bchips .chip{border-radius:8px}
+.bchips .chip[aria-checked="true"]{background:var(--surface);color:var(--ink);border:2.5px solid var(--c,var(--ink));font-weight:700}
+.bchips .chip[aria-checked="true"] .bsh{box-shadow:0 0 0 1.5px var(--surface)}
+.bchips .chip{min-height:48px}
+.filt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.filt .lg{font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);width:100%}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar" id="topbar">
+    <div class="tb-row">
+      <div class="brand"><b>Logbuch</b><span id="tb-sub"></span></div>
+      <span class="role" id="tb-role" hidden>Admin</span>
+      <button class="icon-btn" id="theme-btn" type="button" aria-label="Darstellung wechseln (Tag / Nachtfahrt)"></button>
+    </div>
+    <div id="tb-extra"></div>
+  </header>
+
+  <main class="screen" id="view"></main>
+
+  <nav class="tabbar" aria-label="Hauptnavigation">
+    <button class="tab" type="button" data-act="go" data-id="heute"><span data-ico="tab-heute"></span>Heute</button>
+    <button class="tab" type="button" data-act="go" data-id="tag"><span data-ico="tab-tage"></span>Tag</button>
+    <button class="tab" type="button" data-act="go" data-id="karte"><span data-ico="tab-karte"></span>Karte</button>
+    <button class="tab" type="button" data-act="go" data-id="toern"><span data-ico="tab-toern"></span>Törn</button>
+  </nav>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-title" hidden>
+  <div class="sh-head">
+    <div class="grab"></div>
+    <div class="sh-row">
+      <div><h2 id="sh-title">Eintrag</h2><div class="mono muted" id="sh-pos"></div></div>
+      <button class="icon-btn" id="sh-close" type="button" aria-label="Schließen"></button>
+    </div>
+  </div>
+  <div class="sh-body" id="sh-body">
+    <div class="banner" id="sh-ro" hidden></div>
+    <div id="sh-form">
+      <fieldset id="fs-boat"><legend id="lg-boat">Für welches Boot? <em>Pflicht</em></legend>
+        <div class="chips bchips" id="f-boat" role="radiogroup" aria-labelledby="lg-boat"></div>
+        <div class="err" id="boat-err" hidden>Bitte zuerst ein Boot wählen.</div>
+        <div class="muted small hint" id="boat-hint"></div>
+      </fieldset>
+      <fieldset><legend>Typ</legend><div class="chips" id="f-type" role="radiogroup" aria-label="Eintragstyp"></div></fieldset>
+      <fieldset><legend>Windrichtung (Wind aus …)</legend>
+        <div class="rose-wrap">
+          <svg class="rose" id="rose" viewBox="0 0 200 200" role="radiogroup" aria-label="Windrichtung"></svg>
+          <div class="windbar">
+            <button class="icon-btn" id="wd-prev" type="button" aria-label="Eine Richtung zurück" data-ico="chev-l"></button>
+            <output id="wd-out" for="rose">keine Angabe</output>
+            <button class="icon-btn" id="wd-next" type="button" aria-label="Eine Richtung weiter" data-ico="chev-r"></button>
+          </div>
+        </div>
+      </fieldset>
+      <fieldset><legend>Windstärke (Beaufort)</legend>
+        <div class="bft" id="f-bft"></div>
+        <div class="bft-desc" id="bft-desc">Nicht gesetzt</div>
+      </fieldset>
+      <fieldset><legend>Wetter</legend><div class="grid3" id="f-wx"></div></fieldset>
+      <label class="f"><span>Text</span><textarea id="f-text" placeholder="Was ist passiert? Kurs, Segelstellung, Stimmung …"></textarea></label>
+    </div>
+    <div class="muted small" id="sh-by"></div>
+  </div>
+  <div class="sh-foot">
+    <div class="confirm" id="del-confirm" hidden>
+      <p>Diesen Eintrag wirklich löschen?</p>
+      <button class="btn" id="del-no" type="button">Abbrechen</button>
+      <button class="btn danger" id="del-yes" type="button">Endgültig löschen</button>
+    </div>
+    <button class="btn danger" id="f-del" type="button"><span data-ico="trash"></span>Löschen</button>
+    <button class="btn primary" id="f-save" type="button">Speichern</button>
+    <button class="btn block" id="f-close" type="button" hidden>Schließen</button>
+  </div>
+</section>
+
+<div class="onb" id="onb" role="dialog" aria-modal="true" aria-labelledby="onb-title" hidden>
+  <div class="onb-in">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="legend" style="flex:1" id="onb-step">Schritt 1 von 3</div>
+      <button class="icon-btn" id="onb-x" type="button" aria-label="Abbrechen" data-ico="x"></button>
+    </div>
+    <div class="steps" aria-hidden="true"><i></i><i></i><i></i></div>
+    <h2 id="onb-title">Neuer Törn</h2>
+    <section id="onb-body"></section>
+    <div class="onb-nav">
+      <button class="btn" id="onb-back" type="button">Zurück</button>
+      <button class="btn primary" id="onb-next" type="button">Weiter</button>
+    </div>
+  </div>
+</div>
+
+<div class="onb" id="login" role="dialog" aria-modal="true" aria-labelledby="login-title" hidden>
+  <div class="onb-in">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="legend" style="flex:1">Cloud-Konto</div>
+      <button class="icon-btn" id="login-x" type="button" aria-label="Abbrechen" data-ico="x"></button>
+    </div>
+    <h2 id="login-title">Anmelden</h2>
+    <section id="login-body"></section>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const VARIANT='shared';
+"use strict";
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ICON={
+  eintrag:'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+  ablegen:'<path d="M4 4v16M8 12h12M15 7l5 5-5 5"/>',
+  hafen:'<path d="M8 20v-9a4 4 0 0 1 8 0v9M5 20h14M9 11h6"/>',
+  anker:'<circle cx="12" cy="5" r="2"/><path d="M12 7v14M8 11h8M4 14a8 8 0 0 0 16 0M4 14l-1.5 2M20 14l1.5 2"/>',
+  boje:'<path d="M12 2v4M9 6h6l2 9H7zM5 19c2 1.5 3.5 1.5 5 0s3-1.5 5 0 2.5 1 4 0"/>',
+  segelan:'<path d="M12 3v15M12 4l6 11h-6M12 8l-5 7h5M5 20h14"/>',
+  segelab:'<path d="M11 3v15M11 5l-3 11h3M5 20h14M18 6v8M15 11l3 3 3-3"/>',
+  motor:'<circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
+  sichtung:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  sonst:'<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.5"/>',
+  sonne:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  leicht:'<circle cx="8" cy="8" r="3"/><path d="M8 2v1M2 8h1M3.8 3.8l.7.7M12.2 3.8l-.7.7"/><path d="M8 20h9a3.5 3.5 0 0 0 .5-6.9A5 5 0 0 0 8 14a3 3 0 0 0 0 6z"/>',
+  bewoelkt:'<path d="M7 19h10a4 4 0 0 0 .5-7.9A6 6 0 0 0 6 12.5 3.3 3.3 0 0 0 7 19z"/>',
+  regen:'<path d="M7 15h10a4 4 0 0 0 .5-7.9A6 6 0 0 0 6 8.5 3.3 3.3 0 0 0 7 15zM8 21l1-3M12 21l1-3M16 21l1-3"/>',
+  gewitter:'<path d="M7 14h10a4 4 0 0 0 .5-7.9A6 6 0 0 0 6 7.5 3.3 3.3 0 0 0 7 14zM12.5 14l-2.5 4h4l-2.5 4"/>',
+  nebel:'<path d="M4 8h16M3 12h14M6 16h15M4 20h10"/>',
+  'tab-heute':'<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  'tab-tage':'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/>',
+  'tab-karte':'<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/>',
+  'tab-toern':'<path d="M3 15h18l-3 5H6zM12 3v12M12 4l6 9h-6"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>','chev-l':'<path d="M15 5l-7 7 7 7"/>','chev-r':'<path d="M9 5l7 7-7 7"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+  cam:'<path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.5"/>',
+  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  check:'<path d="M5 12l5 5 9-10"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  swap:'<path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>'
+};
+const ico=(n,s=22)=>`<svg class="ico" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+
+/* ---------- Domäne ---------- */
+const TYPES=[['eintrag','Eintrag'],['ablegen','Ablegen'],['hafen','Hafen'],['anker','Ankerplatz'],['boje','Boje'],['segelan','Segel setzen'],['segelab','Segel bergen'],['motor','Motor an/aus'],['sichtung','Sichtung'],['sonst','Sonstiges']];
+const TLABEL=Object.fromEntries(TYPES);
+const WX=[['sonne','Sonne'],['leicht','Leicht bewölkt'],['bewoelkt','Bewölkt'],['regen','Regen'],['gewitter','Gewitter'],['nebel','Nebel']];
+const DIRS=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const BFT=[['Windstille','< 1'],['leiser Zug','1–3'],['leichte Brise','4–6'],['schwache Brise','7–10'],['mäßige Brise','11–16'],['frische Brise','17–21'],['starker Wind','22–27'],['steifer Wind','28–33'],['stürmischer Wind','34–40'],['Sturm','41–47'],['schwerer Sturm','48–55'],['orkanartiger Sturm','56–63'],['Orkan','≥ 64']];
+const WD=['So','Mo','Di','Mi','Do','Fr','Sa'];
+const pad=n=>String(n).padStart(2,'0');
+
+let nid=1, pidn=7;
+const ME=(day,boat,t,lat,lon,type,dir,bft,wx,text,by)=>({id:'e'+(nid++),day,boat,t,lat,lon,type,dir,bft,wx,text,by});
+function seed(){
+  return {
+    trip:{name:'Ostsee Sommer 2026',from:'2026-08-08',to:'2026-08-15',area:'Kieler Bucht'},
+    signedIn:true,email:'anna@example.com',
+    boats:[{id:'b1',name:'Seeschwalbe',type:'Bavaria 37',ci:1,photo:null},{id:'b2',name:'Möwe',type:'Hanse 345',ci:2,photo:null}],
+    people:[
+      {id:'p1',name:'Anna',email:'anna@example.com',admin:true,status:'angenommen',pre:'b1'},
+      {id:'p2',name:'Ben',email:'ben@example.com',admin:false,status:'angenommen',pre:'b1'},
+      {id:'p3',name:'Chris',email:'chris@example.com',admin:false,status:'eingeladen',pre:'b1'},
+      {id:'p4',name:'Dana',email:'dana@example.com',admin:false,status:'angenommen',pre:'b2'},
+      {id:'p5',name:'Emil',email:'emil@example.com',admin:false,status:'angenommen',pre:'b2'},
+      {id:'p6',name:'Frida',email:'frida@example.com',admin:false,status:'eingeladen',pre:'b2'}
+    ],
+    me:'p1', dev:{}, today:3, day:3, view:'heute', sel:VARIANT==='switch'?'b1':'all',
+    mapDay:0, mapOff:{}, clock:14*60+30, fix:0,
+    entries:[
+      ME(1,'b1','10:05',54.436,10.190,'ablegen',10,3,'leicht','Leinen los in Schilksee. Alle an Bord, Rettungswesten an.','p1'),
+      ME(1,'b1','11:20',54.470,10.130,'segelan',10,4,'sonne','Großsegel im ersten Reff, Genua voll. Kurs West Richtung Eckernförder Bucht.','p2'),
+      ME(1,'b1','13:00',54.485,10.090,'eintrag',11,4,'sonne','Halber Wind, 6 kn über Grund. Mittagessen im Cockpit.','p1'),
+      ME(1,'b1','15:30',54.500,10.050,'anker',10,3,'leicht','Anker gefallen vor dem Strand, 6 m Wassertiefe. Baden!','p4'),
+      ME(1,'b2','10:40',54.432,10.246,'ablegen',8,2,'sonne','Ablegen in Laboe, kaum Wind.','p4'),
+      ME(1,'b2','12:15',54.465,10.300,'segelan',9,3,'sonne','Segel gesetzt, Kurs Nordost.','p5'),
+      ME(1,'b2','14:30',54.445,10.345,'sichtung',10,3,'leicht','Schweinswale querab, zwei Tiere.','p5'),
+      ME(1,'b2','16:10',54.440,10.275,'hafen',9,3,'leicht','Zurück in Laboe, Gästehafen. Fischbrötchen für alle.','p4'),
+      ME(2,'b1','09:50',54.500,10.050,'ablegen',12,3,'bewoelkt','Anker auf, Frühstück unterwegs.','p2'),
+      ME(2,'b1','12:10',54.520,10.150,'eintrag',12,4,'regen','Kurze Schauer, Ölzeug an. Danach wieder Sonne.','p1'),
+      ME(2,'b1','14:40',54.500,10.240,'segelab',11,4,'bewoelkt','Segel runter vor der Förde, Motor an.','p2'),
+      ME(2,'b1','15:25',54.436,10.190,'hafen',11,3,'leicht','Fest in Schilksee.','p1'),
+      ME(2,'b2','10:20',54.432,10.246,'ablegen',9,3,'sonne','Ablegen Richtung Norden.','p4'),
+      ME(2,'b2','12:40',54.520,10.300,'eintrag',10,4,'sonne','Schönes Segeln, 4 Bft aus ONO.','p5'),
+      ME(2,'b2','14:00',54.580,10.350,'sichtung',10,4,'sonne','Frachter quert unseren Kurs, Abstand ausreichend. (Anna zu Gast auf der Möwe)','p1'),
+      ME(2,'b2','16:20',54.432,10.246,'hafen',10,3,'sonne','Zurück in Laboe.','p4'),
+      ME(3,'b1','08:40',54.436,10.190,'ablegen',10,3,'leicht','Leinen los in Schilksee.','p1'),
+      ME(3,'b1','09:25',54.470,10.220,'segelan',10,4,'sonne','Großsegel und Genua, Kurs Ost.','p2'),
+      ME(3,'b1','10:50',54.495,10.290,'eintrag',11,5,'leicht','SW 5, Vorsegel gerefft. Boot läuft 7 kn.','p1'),
+      ME(3,'b1','12:15',54.470,10.370,'sichtung',10,4,'sonne','Seehunde auf der Sandbank, zwei Dutzend.','p2'),
+      ME(3,'b1','13:40',54.435,10.450,'eintrag',11,4,'sonne','Mittagspause im Cockpit, Nudelsalat. Hohwacht schon in Sicht.','p1'),
+      ME(3,'b2','09:10',54.432,10.246,'ablegen',10,3,'sonne','Ablegen in Laboe.','p4'),
+      ME(3,'b2','10:30',54.480,10.280,'segelan',10,4,'sonne','Segel oben, Kurs Nordost.','p5'),
+      ME(3,'b2','12:00',54.540,10.330,'eintrag',11,4,'leicht','Wind passt, 4 Bft aus SSW. Halbwindkurs.','p4'),
+      ME(3,'b2','13:30',54.560,10.400,'sichtung',10,4,'sonne','Zwei Yachten der Flottille im Blick, Winken.','p5')
+    ],
+    reports:[
+      {day:1,by:'p1',t:'17:40',text:'Erster Tag: Raus aus der Förde, dann West bis vor Eckernförde. Seeschwalbe ankert, abends Grillen an Bord.'},
+      {day:1,by:'p4',t:'17:55',text:'Möwe blieb in der Nähe von Laboe. Schweinswale gesehen! Abends alle zusammen im Hafen.'},
+      {day:1,by:'p2',t:'18:20',text:'Windstärke 4, perfekt zum Eingewöhnen.'},
+      {day:2,by:'p2',t:'17:30',text:'Zurück nach Schilksee, kurze Schauer am Mittag, sonst Sonne.'},
+      {day:2,by:'p5',t:'18:10',text:'Nordschlag mit der Möwe. Anna war zu Besuch an Bord, hat das Logbuch gefüttert.'},
+      {day:3,by:'p1',t:'11:50',text:'Früher Start bei leichtem Südwest. Seeschwalbe läuft gut, vor Hohwacht wird gerefft.'},
+      {day:3,by:'p4',t:'13:55',text:'Möwe segelt etwas nördlicher, die Flottille bleibt in Sichtweite.'}
+    ],
+    editBoat:null, confirm:null, moveSel:null, repEdit:null, repDraft:'',
+    inv:{email:'',boat:''}, invErr:'', nb:{name:'',type:'',photo:null}, nbErr:'', eb:{name:'',type:''},
+    sh:null
+  };
+}
+let S=seed();
+
+const boatById=id=>S.boats.find(b=>b.id===id);
+const personById=id=>S.people.find(p=>p.id===id);
+const meP=()=>personById(S.me);
+const isAdmin=()=>!!meP().admin;
+const adminOn=()=>isAdmin()&&S.signedIn;
+const canEdit=e=>isAdmin()||e.by===S.me;
+const pname=id=>personById(id)?.name??'Ehemalig';
+const whoLbl=id=>id===S.me?'Du':pname(id);
+const initials=n=>String(n||'?').trim().slice(0,1).toUpperCase();
+const byT=(a,b)=>a.t.localeCompare(b.t);
+const mins=t=>+t.slice(0,2)*60+ +t.slice(3);
+const f1=n=>n.toFixed(1).replace('.',',');
+function suggestBoat(){const d=S.dev[S.me];if(d&&boatById(d))return d;const p=meP().pre;return p&&boatById(p)?p:null;}
+function nowT(){const m=S.clock;return pad(Math.floor(m/60))+':'+pad(m%60);}
+function dayInfo(n){
+  const iso=S.trip.from||new Date().toISOString().slice(0,10);
+  const [y,m,d]=iso.split('-').map(Number),dt=new Date(Date.UTC(y,m-1,d+n-1));
+  return {wd:WD[dt.getUTCDay()],d:pad(dt.getUTCDate()),m:pad(dt.getUTCMonth()+1)};
+}
+const dayLabel=n=>{const i=dayInfo(n);return `${i.wd} ${i.d}.${i.m}.`;};
+function fmtDate(iso){if(!iso)return '';const [y,m,d]=iso.split('-');return `${d}.${m}.${y}`;}
+
+/* Koordinaten + Distanz */
+const R=3440.065;
+function nm(a,b){const r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lon-a.lon);const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+function fc(v,p,n,lon,dec){const h=v>=0?p:n;v=Math.abs(v);let d=Math.floor(v),m=((v-d)*60).toFixed(dec);if(+m>=60){d++;m=(0).toFixed(dec);}return String(d).padStart(lon?3:2,'0')+'°'+m.padStart(2+(dec?dec+1:0),'0').replace('.',',')+'′'+h;}
+const fpos=(e,dec=1)=>fc(e.lat,'N','S',false,dec)+' '+fc(e.lon,'E','W',true,dec);
+
+/* Auswahl-Helfer */
+const allIds=()=>S.boats.map(b=>b.id);
+const shownIds=()=>S.sel==='all'||!boatById(S.sel)?allIds():[S.sel];
+const dayEntries=(day,ids)=>S.entries.filter(e=>e.day===day&&ids.includes(e.boat)).sort(byT);
+function distOf(es){let s=0;for(let i=1;i<es.length;i++)s+=nm(es[i-1],es[i]);return s;}
+function boatDayStats(bid,day){const es=dayEntries(day,[bid]);return{sm:distOf(es),min:es.length>1?mins(es[es.length-1].t)-mins(es[0].t):0,n:es.length};}
+function statTiles(ids,day){
+  const st=ids.map(i=>boatDayStats(i,day)),sm=st.reduce((a,s)=>a+s.sm,0),n=st.reduce((a,s)=>a+s.n,0);
+  if(ids.length===1){const m=st[0].min;return `<div><b>${f1(sm)}</b><span>sm</span></div><div><b>${m?`${Math.floor(m/60)}:${pad(m%60)}`:'–'}</b><span>Fahrtzeit h</span></div><div><b>${n}</b><span>Einträge</span></div>`;}
+  const au=new Set(dayEntries(day,ids).map(e=>e.by)).size;
+  return `<div><b>${f1(sm)}</b><span>sm gesamt</span></div><div><b>${n}</b><span>Einträge</span></div><div><b>${au}</b><span>Schreibende</span></div>`;
+}
+
+/* Boot-Darstellung */
+const bsh=ci=>`<i class="bsh s${ci}" aria-hidden="true"></i>`;
+const bcol=b=>`--c:var(--b${b.ci})`;
+const boatBadge=b=>`<span class="bb" style="${bcol(b)}">${bsh(b.ci)}${esc(b.name)}</span>`;
+const boatSVG=ci=>`<svg viewBox="0 0 300 140" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="300" height="140" fill="var(--water-mid)"/><rect y="96" width="300" height="44" fill="var(--water-shallow)"/><path d="M60 98h180l-22 20H84z" fill="var(--b${ci})"/><path d="M148 22v74M148 24l56 66h-56M144 40l-48 50h48" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/></svg>`;
+const boatPic=b=>b.photo?`<img src="${b.photo}" alt="Foto ${esc(b.name)}">`:boatSVG(b.ci);
+
+/* ---------- Karte ---------- */
+const P=(la,lo)=>[(lo-9.95)*700,(54.62-la)*1200];
+const LAND=[
+  [[54.49,9.95],[54.47,10.05],[54.46,10.14],[54.457,10.193],[54.43,10.18],[54.40,10.15],[54.33,10.135],[54.33,9.95]],
+  [[54.33,10.17],[54.40,10.19],[54.41,10.225],[54.425,10.24],[54.42,10.30],[54.40,10.40],[54.38,10.48],[54.34,10.55],[54.33,10.55]]
+];
+const PLACES=[['Schilksee',54.436,10.190,-1],['Laboe',54.432,10.246,1],['Hohwacht',54.385,10.500,1]];
+const AREAS=[['KIEL',54.360,10.065],['PROBSTEI',54.352,10.36],['SCHWANSEN',54.42,9.99]];
+const SOUND=[[54.58,10.15,'21'],[54.52,10.42,'18'],[54.47,10.0,'14'],[54.60,10.5,'24'],[54.44,10.52,'12']];
+function mkShape(ci,x,y,r){
+  if(ci===2)return `<rect x="${(x-r).toFixed(1)}" y="${(y-r).toFixed(1)}" width="${(2*r).toFixed(1)}" height="${(2*r).toFixed(1)}" rx="1"`;
+  if(ci===3)return `<path d="M${x.toFixed(1)} ${(y-r*1.25).toFixed(1)}L${(x+r*1.15).toFixed(1)} ${(y+r*.9).toFixed(1)}L${(x-r*1.15).toFixed(1)} ${(y+r*.9).toFixed(1)}Z"`;
+  if(ci===4)return `<path d="M${x.toFixed(1)} ${(y-r*1.35).toFixed(1)}L${(x+r*1.35).toFixed(1)} ${y.toFixed(1)}L${x.toFixed(1)} ${(y+r*1.35).toFixed(1)}L${(x-r*1.35).toFixed(1)} ${y.toFixed(1)}Z"`;
+  return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"`;
+}
+function bbox(es,aspect=.62,minW=130){
+  if(!es.length)return[0,0,420,348];
+  const p=es.map(e=>P(e.lat,e.lon)),xs=p.map(a=>a[0]),ys=p.map(a=>a[1]);
+  const w=Math.min(420,Math.max((Math.max(...xs)-Math.min(...xs))*1.5,(Math.max(...ys)-Math.min(...ys))*1.5/aspect,minW)),h=w*aspect;
+  let x=(Math.min(...xs)+Math.max(...xs))/2-w/2,y=(Math.min(...ys)+Math.max(...ys))/2-h/2;
+  x=Math.max(0,Math.min(420-w,x));y=Math.max(0,Math.min(348-h,y));
+  return[x,y,w,h];
+}
+function mapSVG(ids,days,vb,selId,label){
+  const [vx,vy,vw,vh]=vb,u=vw/360,f=n=>n.toFixed(1);
+  const land=LAND.map(pl=>'M'+pl.map(([a,o])=>P(a,o).map(f).join(',')).join('L')+'Z').join('');
+  let s=`<svg viewBox="${vb.map(f).join(' ')}" role="img" aria-label="${esc(label)}">`;
+  s+=`<rect x="${f(vx)}" y="${f(vy)}" width="${f(vw)}" height="${f(vh)}" fill="var(--water-deep)"/>`;
+  s+=`<path d="${land}" fill="var(--water-mid)" stroke="var(--water-mid)" stroke-width="${f(52*u)}" stroke-linejoin="round"/>`;
+  s+=`<path d="${land}" fill="var(--water-shallow)" stroke="var(--water-shallow)" stroke-width="${f(22*u)}" stroke-linejoin="round"/>`;
+  const step=(vw>220?10:5)/60;
+  for(let la=Math.ceil(54.30/step)*step;la<54.65;la+=step){const y=P(la,0)[1];if(y<vy||y>vy+vh)continue;
+    s+=`<line x1="${f(vx)}" x2="${f(vx+vw)}" y1="${f(y)}" y2="${f(y)}" stroke="var(--grid)" stroke-width=".7" vector-effect="non-scaling-stroke"/><text x="${f(vx+4*u)}" y="${f(y-3*u)}" font-size="${f(9*u)}" font-family="IBM Plex Mono,monospace" fill="var(--ink-2)">${fc(la,'N','S',false,0)}</text>`;}
+  for(let lo=Math.ceil(9.90/step)*step;lo<10.6;lo+=step){const x=P(0,lo)[0];if(x<vx||x>vx+vw)continue;
+    s+=`<line y1="${f(vy)}" y2="${f(vy+vh)}" x1="${f(x)}" x2="${f(x)}" stroke="var(--grid)" stroke-width=".7" vector-effect="non-scaling-stroke"/><text x="${f(x+3*u)}" y="${f(vy+11*u)}" font-size="${f(9*u)}" font-family="IBM Plex Mono,monospace" fill="var(--ink-2)">${fc(lo,'E','W',true,0)}</text>`;}
+  s+=`<path d="${land}" fill="var(--land)" stroke="var(--land-edge)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
+  AREAS.forEach(([n,la,lo])=>{const[x,y]=P(la,lo);s+=`<text x="${f(x)}" y="${f(y)}" text-anchor="middle" font-size="${f(10*u)}" font-style="italic" letter-spacing="${f(2*u)}" fill="var(--land-edge)" font-family="Source Sans 3,sans-serif">${n}</text>`;});
+  SOUND.forEach(([la,lo,n])=>{const[x,y]=P(la,lo);s+=`<text x="${f(x)}" y="${f(y)}" font-size="${f(9*u)}" font-style="italic" fill="var(--ink-2)" opacity=".8" font-family="IBM Plex Mono,monospace">${n}</text>`;});
+  const shown=[];
+  ids.forEach(bid=>{const b=boatById(bid);if(!b)return;
+    days.forEach(d=>{const es=dayEntries(d,[bid]);if(!es.length)return;shown.push(...es);
+      s+=`<polyline points="${es.map(e=>P(e.lat,e.lon).map(f).join(',')).join(' ')}" fill="none" stroke="var(--b${b.ci})" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;});});
+  PLACES.forEach(([n,la,lo,side0])=>{const[x,y]=P(la,lo),side=(side0>0&&x+(n.length*6.5+8)*u>vx+vw)?-1:side0;s+=`<circle cx="${f(x)}" cy="${f(y)}" r="${f(2*u)}" fill="var(--ink)"/><text x="${f(x+side*5*u)}" y="${f(y+13*u)}" ${side<0?'text-anchor="end"':''} font-size="${f(11*u)}" font-weight="700" fill="var(--ink)" paint-order="stroke" stroke="var(--water-deep)" stroke-width="${f(3*u)}" font-family="Source Sans 3,sans-serif">${n}</text>`;});
+  shown.forEach(e=>{const b=boatById(e.boat),[x,y]=P(e.lat,e.lon),on=e.id===selId,r=(on?6.5:4.2)*u;
+    s+=`<g class="mk" data-act="open" data-id="${e.id}" role="button" tabindex="0" aria-label="Eintrag ${e.t}, ${esc(b.name)}, ${TLABEL[e.type]}"><circle cx="${f(x)}" cy="${f(y)}" r="${f(18*u)}" fill="transparent"/>${mkShape(b.ci,x,y,r)} class="ring" fill="var(--b${b.ci})" stroke="${on?'var(--ink)':'var(--surface)'}" stroke-width="${on?3:1.8}" vector-effect="non-scaling-stroke"/></g>`;});
+  ids.forEach(bid=>{const b=boatById(bid);if(!b)return;const es=shown.filter(e=>e.boat===bid).sort((a,c)=>a.day-c.day||byT(a,c));if(!es.length)return;const l=es[es.length-1],[x,y]=P(l.lat,l.lon);
+    const left=x+(b.name.length*6.5+10)*u>vx+vw;s+=`<text x="${f(left?x-8*u:x+8*u)}" y="${f(y-7*u)}" ${left?'text-anchor="end"':''} font-size="${f(11*u)}" font-weight="700" fill="var(--b${b.ci})" paint-order="stroke" stroke="var(--water-deep)" stroke-width="${f(3.2*u)}" font-family="Source Sans 3,sans-serif">${esc(b.name)}</text>`;});
+  const cx=vx+vw-26*u,cy=vy+vh-30*u,k=u*16;
+  s+=`<g stroke="var(--magenta)" fill="none" stroke-width="1.2" vector-effect="non-scaling-stroke"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(k*.8)}" vector-effect="non-scaling-stroke"/><path d="M${f(cx)} ${f(cy-k*1.1)}L${f(cx+k*.28)} ${f(cy)}L${f(cx)} ${f(cy+k*1.1)}L${f(cx-k*.28)} ${f(cy)}Z" fill="var(--magenta)" vector-effect="non-scaling-stroke"/></g><text x="${f(cx)}" y="${f(cy-k*1.2)}" text-anchor="middle" font-size="${f(9*u)}" font-weight="700" fill="var(--magenta)" font-family="IBM Plex Mono,monospace">N</text>`;
+  const nmB=vh>200?5:1,bh=nmB/60*1200,bx=vx+14*u,by=vy+vh-12*u-bh;
+  s+=`<path d="M${f(bx)} ${f(by)}v${f(bh)}M${f(bx-3*u)} ${f(by)}h${f(6*u)}M${f(bx-3*u)} ${f(by+bh)}h${f(6*u)}" stroke="var(--ink)" stroke-width="1.5" vector-effect="non-scaling-stroke" fill="none"/><text x="${f(bx+6*u)}" y="${f(by+bh/2+3*u)}" font-size="${f(9*u)}" fill="var(--ink)" font-family="IBM Plex Mono,monospace">${nmB} sm</text>`;
+  return s+'</svg>';
+}
+
+/* ---------- Render-Bausteine ---------- */
+const windChip=e=>e.dir==null&&e.bft==null?'':`<span class="wind num">${e.dir!=null?`<svg viewBox="0 0 24 24" style="transform:rotate(${e.dir*22.5+180}deg)" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 20V4M6 10l6-6 6 6"/></svg>${DIRS[e.dir]}`:''} ${e.bft!=null?e.bft+' Bft':''}</span>`;
+function tlItem(e,showBoat){
+  const b=boatById(e.boat);
+  return `<li style="${bcol(b)}"><button class="tl-item" type="button" data-act="open" data-id="${e.id}" aria-label="Eintrag ${e.t}, ${esc(b.name)}, ${TLABEL[e.type]}, von ${esc(whoLbl(e.by))}">
+  <span class="tl-time">${e.t}</span><span class="tl-dot">${ico(e.type,15)}</span>
+  <span class="tl-body"><span class="tl-head"><b>${TLABEL[e.type]}</b>${windChip(e)}${e.wx?`<span class="wind" style="background:none;border:0;padding:0">${ico(e.wx,18)}</span>`:''}</span>
+  <span class="meta-row">${showBoat?boatBadge(b):''}<span class="who${e.by===S.me?' me':''}">${esc(whoLbl(e.by))}</span></span>
+  <span class="pos">${fpos(e)}</span>${e.text?`<span class="tl-text">${esc(e.text)}</span>`:''}</span></button></li>`;
+}
+const timeline=(es,showBoat,emptyTxt)=>es.length?`<ol class="tl">${es.map(e=>tlItem(e,showBoat)).join('')}</ol>`:`<div class="empty">${emptyTxt||'Noch keine Einträge.'}</div>`;
+const mapBlock=(ids,days,label,minW=150)=>`<div class="mapframe">${mapSVG(ids,days,bbox(days.flatMap(d=>dayEntries(d,ids)),.62,minW),S.sh&&S.sh.id||null,label)}</div>`;
+const boatKey=ids=>ids.length>1?`<div class="acts" aria-label="Legende">${ids.map(i=>boatBadge(boatById(i))).join('')}</div>`:'';
+const dayChips=()=>`<div class="chips" role="group" aria-label="Tag wählen">${Array.from({length:S.today},(_,i)=>i+1).map(n=>`<button class="chip" type="button" data-act="day" data-id="${n}" aria-pressed="${S.day===n}"><span class="num">Tag ${n}</span> <span class="muted" style="color:inherit;opacity:.8">${dayLabel(n)}</span></button>`).join('')}</div>`;
+const boatChipsHTML=(act,selected,withNone)=>`${withNone?`<button class="chip" type="button" role="radio" data-act="${act}" data-id="" aria-checked="${selected===''}">Kein Vorschlag</button>`:''}${S.boats.map(b=>`<button class="chip" type="button" role="radio" data-act="${act}" data-id="${b.id}" style="${bcol(b)}" aria-checked="${selected===b.id}">${bsh(b.ci)}${esc(b.name)}</button>`).join('')}`;
+
+/* Tagesbericht */
+const canRep=r=>isAdmin()||r.by===S.me;
+function repHead(by,t,extra=''){const p=personById(by);return `<div class="rep-h"><i class="av sm">${initials(pname(by))}</i><b>${esc(pname(by))}${by===S.me?' <span class="who me">(du)</span>':''}</b>${p&&p.admin?'<span class="role">Admin</span>':''}${extra}${t?`<span class="num">${t} Uhr</span>`:''}</div>`;}
+function repCard(r,n){
+  const ed=S.repEdit&&S.repEdit.day===n&&S.repEdit.by===r.by, cf=S.confirm&&S.confirm.kind==='rep'&&S.confirm.id===r.by;
+  let h=`<article class="rep${r.by===S.me?' mine':''}">${repHead(r.by,r.t)}`;
+  if(ed){
+    h+=`<textarea id="rep-text" data-bind="S.repDraft" aria-label="Abschnitt von ${esc(pname(r.by))}">${esc(S.repDraft)}</textarea><div class="rep-act"><button class="btn primary sm" type="button" data-act="repsave">Speichern</button><button class="btn sm" type="button" data-act="repcancel">Abbrechen</button><button class="btn danger sm" type="button" data-act="repdel" data-id="${r.by}">Löschen</button></div>`;
+    if(cf)h+=`<div class="confirm" style="margin-top:10px"><p>Abschnitt wirklich löschen?</p><button class="btn sm" type="button" data-act="repno">Abbrechen</button><button class="btn danger sm" type="button" data-act="repyes">Endgültig löschen</button></div>`;
+  }else{
+    h+=`<p>${esc(r.text)}</p>`;
+    if(canRep(r))h+=`<div class="rep-act"><button class="btn sm" type="button" data-act="repedit" data-id="${r.by}">${ico('edit',18)}Bearbeiten${r.by!==S.me?' (Admin)':''}</button></div>`;
+  }
+  return h+'</article>';
+}
+function reportsHTML(n){
+  const rs=S.reports.filter(r=>r.day===n).sort(byT);
+  let h=`<div class="legend">Tagesbericht</div><p class="muted">Jede Person schreibt ihren eigenen kurzen Abschnitt. Die Abschnitte stehen untereinander, eigene kannst du ändern.</p><div>${rs.map(r=>repCard(r,n)).join('')}`;
+  if(!rs.some(r=>r.by===S.me)){
+    const ed=S.repEdit&&S.repEdit.day===n&&S.repEdit.by===S.me;
+    h+=`<article class="rep new mine">${repHead(S.me,'')}`+(ed?`<textarea id="rep-text" data-bind="S.repDraft" placeholder="Kurze Zusammenfassung des Tages …" aria-label="Dein Abschnitt">${esc(S.repDraft)}</textarea><div class="rep-act"><button class="btn primary sm" type="button" data-act="repsave">Speichern</button><button class="btn sm" type="button" data-act="repcancel">Abbrechen</button></div>`:`<p class="muted">Noch kein Abschnitt von dir für diesen Tag.</p><div class="rep-act"><button class="btn sm" type="button" data-act="repnew">${ico('plus',18)}Meinen Abschnitt schreiben</button></div>`)+'</article>';
+  }
+  return h+'</div>';
+}
+
+/* ---------- Ansichten (gemeinsam) ---------- */
+function viewTag(){
+  const n=S.day,ids=shownIds(),es=dayEntries(n,ids);
+  const rows=ids.length>1?`<table class="dtbl" aria-label="Boote an diesem Tag">${ids.map(i=>{const b=boatById(i),st=boatDayStats(i,n);return `<tr><td>${boatBadge(b)}</td><td>${f1(st.sm)} sm · ${st.n} Einträge</td></tr>`;}).join('')}</table>`:'';
+  return `${dayChips()}${dayFilter()}
+  <div><div class="mono muted small">Tag ${n} · ${dayLabel(n)}${fmtDate(S.trip.from).slice(-4)?' '+fmtDate(S.trip.from).slice(-4):''}</div><h2>${esc(S.trip.name)}</h2></div>
+  ${mapBlock(ids,[n],'Karte Tag '+n)}${boatKey(ids)}
+  <div class="stats">${statTiles(ids,n)}</div>${rows}
+  ${reportsHTML(n)}
+  <div class="legend">Einträge</div>${timeline(es,ids.length>1,'Für diesen Tag gibt es noch keine Einträge.')}`;
+}
+function viewKarte(){
+  const days=S.mapDay?[S.mapDay]:Array.from({length:S.today},(_,i)=>i+1);
+  const ids=allIds().filter(i=>!S.mapOff[i]);
+  const es=ids.flatMap(i=>days.flatMap(d=>dayEntries(d,[i])));
+  const sm=ids.reduce((a,i)=>a+days.reduce((x,d)=>x+boatDayStats(i,d).sm,0),0);
+  return `<h2>Törnkarte</h2>
+  <div class="chips" role="group" aria-label="Tage anzeigen"><button class="chip" type="button" data-act="mapday" data-id="0" aria-pressed="${!S.mapDay}">Alle Tage</button>${Array.from({length:S.today},(_,i)=>i+1).map(n=>`<button class="chip" type="button" data-act="mapday" data-id="${n}" aria-pressed="${S.mapDay===n}">Tag ${n}</button>`).join('')}</div>
+  <div class="mapframe">${mapSVG(ids,days,S.mapDay?bbox(es,.82,150):[0,0,420,348],S.sh&&S.sh.id||null,'Törnkarte aller Boote')}</div>
+  <div class="muted num">${f1(sm)} sm · ${es.length} Einträge · ${ids.length} von ${S.boats.length} Booten sichtbar</div>
+  <div class="card"><div class="legend">Legende</div>
+    <ul class="mleg">${S.boats.map(b=>{const on=!S.mapOff[b.id],all=Array.from({length:S.today},(_,i)=>i+1);const sm2=all.reduce((x,d)=>x+boatDayStats(b.id,d).sm,0),n=S.entries.filter(e=>e.boat===b.id).length;
+      return `<li><button type="button" data-act="maptog" data-id="${b.id}" aria-pressed="${on}" style="${bcol(b)}" aria-label="${esc(b.name)} ${on?'ausblenden':'einblenden'}">${bsh(b.ci)}<span class="ml-t"><b>${esc(b.name)}</b><span>${esc(b.type)} · ${f1(sm2)} sm · ${n} Einträge</span></span><span class="sw">${on?'sichtbar':'aus'}</span></button></li>`;}).join('')}</ul>
+    <p class="muted small">Jedes Boot hat Farbe und Symbolform. Tippe auf einen Eintrag in der Karte, um ihn zu öffnen.</p></div>`;
+}
+
+/* Törn-Verwaltung: gemeinsame Teile */
+const nameFromEmail=m=>m.split('@')[0].split(/[._-]+/).filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')||m;
+const validMail=m=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m);
+function lockCard(txt){return `<div class="lockcard"><div class="row">${ico('lock',22)}<div><b>Anmeldung nötig</b><div class="muted">${txt}</div></div></div><button class="btn sm" type="button" data-act="login">${ico('mail',18)}Mit E-Mail anmelden</button></div>`;}
+function accountCard(){
+  const me=meP();
+  return `<div class="card"><div class="legend">Konto</div>`+(S.signedIn
+    ?`<div class="acct"><i class="av">${initials(me.name)}</i><div><b>${esc(me.name)}</b> ${me.admin?'<span class="role">Admin</span>':'<span class="st ok">Mitglied</span>'}<div class="muted small">Cloud-Konto · ${esc(me.email)}</div></div><button class="btn sm" type="button" data-act="logout">Abmelden</button></div>`
+    :`<div class="acct"><i class="av">${initials(me.name)}</i><div><b>${esc(me.name)}</b> <span class="role">Admin</span><div class="muted small">Lokaler Modus · Daten nur auf diesem Gerät</div></div></div>${lockCard('Boote anlegen, Personen einladen und das Umsetzen der Crew gehen erst nach der Anmeldung per E-Mail-Code. Einträge schreiben geht auch ohne.')}`)+
+  `<div class="muted small"><b>Törn:</b> ${esc(S.trip.name)}${S.trip.from?' · '+fmtDate(S.trip.from)+(S.trip.to?' – '+fmtDate(S.trip.to):''):''}${S.trip.area?' · '+esc(S.trip.area):''}</div></div>`;
+}
+function asCard(){
+  if(!S.signedIn)return '';
+  return `<div class="card dim"><div class="legend">Demo · Ansicht als</div><div class="chips" role="group" aria-label="Angemeldete Person wechseln">${S.people.filter(p=>p.status==='angenommen').map(p=>`<button class="chip" type="button" data-act="as" data-id="${p.id}" aria-pressed="${p.id===S.me}"><i class="av sm">${initials(p.name)}</i>${esc(p.name)}${p.admin?' · Admin':''}</button>`).join('')}</div><p class="muted small">Nur Prototyp-Hilfe: Wechselt die angemeldete Person, um die Rechte zu prüfen.</p></div>`;
+}
+const rulesCard=()=>`<details class="opt"><summary>So funktionieren Rechte &amp; Boote</summary><div class="in"><ul class="rules muted"><li>Wer den Törn anlegt, ist Admin. Boote und Einladungen gibt es erst nach der Anmeldung.</li><li>Eingeladene gelten für den ganzen Törn. Das vorab zugewiesene Boot ist nur ein Vorschlag.</li><li>Alle dürfen auf jedes Boot schreiben, wählen aber vor dem Eintrag ein Boot. Die Wahl bleibt auf dem Gerät.</li><li>Eigene Einträge ändern oder löschen, fremde nur ansehen. Der Admin darf alles.</li></ul></div></details>`;
+function inviteCard(){
+  return `<div class="card"><div class="legend">Person einladen</div>
+  <p class="muted">Die Einladung gilt für den ganzen Törn. Das Boot ist nur ein Vorschlag für den ersten Eintrag, keine Berechtigung.</p>
+  <label class="f"><span>E-Mail-Adresse</span><input type="email" inputmode="email" autocomplete="off" id="inv-email" data-bind="S.inv.email" value="${esc(S.inv.email)}" placeholder="name@example.com"></label>
+  <fieldset><legend>Boot-Vorschlag (optional)</legend><div class="chips bchips" role="radiogroup" aria-label="Boot-Vorschlag">${boatChipsHTML('invboat',S.inv.boat,true)}</div></fieldset>
+  ${S.invErr?`<div class="err">${S.invErr}</div>`:''}
+  <button class="btn primary block" type="button" data-act="invite">${ico('mail',20)}Einladung senden</button></div>`;
+}
+const inviteBlock=()=>adminOn()?inviteCard():(isAdmin()?lockCard('Zum Einladen von Personen musst du dich anmelden.'):`<div class="card dim"><p class="muted">Nur der Admin lädt Personen ein.</p></div>`);
+function boatEditForm(b){
+  return `<div class="card dim"><label class="f"><span>Name</span><input type="text" data-bind="S.eb.name" value="${esc(S.eb.name)}" id="eb-name"></label><label class="f"><span>Typ</span><input type="text" data-bind="S.eb.type" value="${esc(S.eb.type)}"></label>
+  <div class="acts"><button class="btn sm" type="button" data-act="pickphoto" data-id="ebphoto">${ico('cam',18)}Foto ändern</button><input class="sr-only" type="file" accept="image/*" id="ebphoto" data-file="ebphoto:${b.id}" aria-label="Bootsfoto wählen" tabindex="-1"></div>
+  <div class="acts"><button class="btn primary sm" type="button" data-act="boatsave">Speichern</button><button class="btn sm" type="button" data-act="boatcancel">Abbrechen</button></div></div>`;
+}
+function boatAdminActs(b){
+  if(!adminOn())return '';
+  const cf=S.confirm&&S.confirm.kind==='boat'&&S.confirm.id===b.id;
+  return (S.editBoat===b.id?boatEditForm(b):`<div class="acts"><button class="btn sm" type="button" data-act="boatedit" data-id="${b.id}">${ico('edit',18)}Bearbeiten</button><button class="btn danger sm" type="button" data-act="boatrm" data-id="${b.id}">${ico('trash',18)}Entfernen</button></div>`)+
+  (cf?`<div class="confirm"><p>Boot „${esc(b.name)}“ wirklich entfernen?</p><button class="btn sm" type="button" data-act="boatno">Abbrechen</button><button class="btn danger sm" type="button" data-act="boatyes">Endgültig entfernen</button></div>`:'');
+}
+function addBoatCard(){
+  if(!adminOn())return isAdmin()?lockCard('Zum Anlegen von Booten musst du dich anmelden.'):`<div class="card dim"><p class="muted">Nur der Admin legt Boote an.</p></div>`;
+  return `<div class="card"><div class="legend">Boot anlegen</div>
+  <div class="boatpic">${S.nb.photo?`<img src="${S.nb.photo}" alt="Vorschau Bootsfoto">`:boatSVG(nextCi()||4)}</div>
+  <div class="acts"><button class="btn sm" type="button" data-act="pickphoto" data-id="nbphoto">${ico('cam',18)}Foto wählen</button><input class="sr-only" type="file" accept="image/*" id="nbphoto" data-file="nbphoto" aria-label="Bootsfoto wählen" tabindex="-1"></div>
+  <div class="row2"><label class="f"><span>Name</span><input type="text" id="nb-name" data-bind="S.nb.name" value="${esc(S.nb.name)}" autocomplete="off"></label><label class="f"><span>Typ</span><input type="text" data-bind="S.nb.type" value="${esc(S.nb.type)}" placeholder="z. B. Dehler 34"></label></div>
+  ${S.nbErr?`<div class="err">${S.nbErr}</div>`:''}
+  <button class="btn primary block" type="button" data-act="boatadd">${ico('plus',20)}Boot hinzufügen</button></div>`;
+}
+function nextCi(){for(let i=1;i<=4;i++)if(!S.boats.some(b=>b.ci===i))return i;return 0;}
+const newTripBtn=()=>`<button class="btn block" type="button" data-act="newtoern">Neuen Törn anlegen …</button>`;
+function memberStatus(p){return p.status==='angenommen'?'<span class="st ok">angenommen</span>':'<span class="st warn">eingeladen</span>';}
+function memberActs(p){
+  if(!adminOn()||p.id===S.me)return '';
+  const cf=S.confirm&&S.confirm.kind==='mem'&&S.confirm.id===p.id;
+  return `<div class="mem-acts">${p.status==='eingeladen'?`<button class="btn sm" type="button" data-act="resend" data-id="${p.id}">${ico('mail',18)}Erneut senden</button><button class="btn sm" type="button" data-act="accept" data-id="${p.id}">${ico('check',18)}Annahme simulieren</button>`:''}<button class="btn danger sm" type="button" data-act="memrm" data-id="${p.id}">Entfernen</button></div>`+
+  (cf?`<div class="confirm" style="margin-top:10px"><p>${esc(p.name)} wirklich aus dem Törn entfernen?</p><button class="btn sm" type="button" data-act="memno">Abbrechen</button><button class="btn danger sm" type="button" data-act="memyes">Endgültig entfernen</button></div>`:'');
+}
+
+/* ---------- Navigation / Render ---------- */
+function focusKey(){const a=document.activeElement;if(!a||a===document.body||!a.closest('#view,#tb-extra'))return null;if(a.id)return '#'+a.id;if(a.dataset&&a.dataset.act)return `[data-act="${a.dataset.act}"]`+(a.dataset.id!==undefined?`[data-id="${a.dataset.id}"]`:'');return null;}
+function render(){
+  const fk=focusKey();
+  $('#tb-sub').textContent=`${S.trip.name} · Tag ${S.today}`;
+  const r=$('#tb-role');r.hidden=!isAdmin();
+  $$('.tab').forEach(t=>{if(t.dataset.id===S.view)t.setAttribute('aria-current','page');else t.removeAttribute('aria-current');});
+  $('#tb-extra').innerHTML=topExtra();
+  $('#view').innerHTML=S.view==='heute'?viewHeute():S.view==='tag'?viewTag():S.view==='karte'?viewKarte():viewToern();
+  if(fk){try{const el=$(fk);if(el)el.focus({preventScroll:true});}catch(_){}}
+}
+let toastT;
+function toast(m,ms=3400){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),ms);}
+function themeIcon(){const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;$('#theme-btn').innerHTML=ico(dark?'sonne':'moon',22);}
+
+/* ---------- Sheet ---------- */
+function buildSheet(){
+  $('#f-type').innerHTML=TYPES.map(([id,l])=>`<button class="chip" type="button" role="radio" data-act="shtype" data-id="${id}">${ico(id,18)}${l}</button>`).join('');
+  $('#f-wx').innerHTML=WX.map(([id,l])=>`<button class="chip" type="button" data-act="shwx" data-id="${id}" aria-pressed="false">${ico(id,26)}${l}</button>`).join('');
+  $('#f-bft').innerHTML=BFT.map((b,i)=>`<button type="button" data-act="shbft" data-id="${i}" style="--lv:${i/12}" aria-pressed="false" aria-label="${i} Beaufort, ${b[0]}">${i}</button>`).join('');
+  const sv=$('#rose'),c=100,r0=30,r1=78,pt=(r,a)=>[c+r*Math.sin(a*Math.PI/180),c-r*Math.cos(a*Math.PI/180)].map(n=>n.toFixed(2));
+  let h='';
+  DIRS.forEach((d,i)=>{const a=i*22.5,[x0,y0]=pt(r1,a-11.25),[x1,y1]=pt(r1,a+11.25),[x2,y2]=pt(r0,a+11.25),[x3,y3]=pt(r0,a-11.25);
+    h+=`<path class="w ${i%4==0?'card4':''}" role="radio" tabindex="0" aria-checked="false" aria-label="Wind aus ${d}" data-act="shdir" data-id="${i}" d="M${x0} ${y0}A${r1} ${r1} 0 0 1 ${x1} ${y1}L${x2} ${y2}A${r0} ${r0} 0 0 0 ${x3} ${y3}Z"/>`;});
+  DIRS.forEach((d,i)=>{if(i%2)return;const[tx,ty]=pt(90,i*22.5);h+=`<text x="${tx}" y="${ty}" ${i%4==0?'style="font-weight:700"':''}>${d}</text>`;});
+  h+=`<text class="ctr" id="rose-ctr" x="100" y="100">–</text>`;
+  sv.innerHTML=h;
+}
+function phonePos(){
+  const bid=suggestBoat(),last=bid?dayEntries(S.today,[bid]).pop():null;
+  const base=last||{lat:54.436,lon:10.19};
+  return {lat:base.lat+0.004+S.fix*.0006,lon:base.lon+0.012+S.fix*.0009};
+}
+function syncSheet(){
+  const sh=S.sh,d=sh.draft,ro=sh.ro;
+  $$('#f-boat').forEach(el=>el.innerHTML=boatChipsHTML('shboat',d.boat||'__',false));
+  $$('#f-type .chip').forEach(b=>b.setAttribute('aria-checked',b.dataset.id===d.type));
+  $$('#rose .w').forEach(p=>p.setAttribute('aria-checked',+p.dataset.id===d.dir));
+  $('#rose-ctr').textContent=d.dir==null?'–':DIRS[d.dir];
+  $('#wd-out').textContent=d.dir==null?'keine Angabe':`aus ${DIRS[d.dir]} · ${Math.round(d.dir*22.5)}°`;
+  $$('#f-bft button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.id===d.bft));
+  $('#bft-desc').innerHTML=d.bft==null?'Nicht gesetzt':`<b>${d.bft} – ${BFT[d.bft][0]}</b><small>ca. ${BFT[d.bft][1]} kn</small>`;
+  $$('#f-wx .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===d.wx));
+  $('#boat-err').hidden=true;
+  if(sh.mode==='new'){
+    const sg=suggestBoat();
+    $('#boat-hint').textContent=sg?`Vorausgewählt: ${boatById(sg).name} (${S.dev[S.me]?'zuletzt von dir gewählt':'für dich vorab zugewiesen'}). Die Wahl bleibt nur auf diesem Gerät gespeichert.`:'Noch kein Boot gewählt. Die Wahl bleibt nur auf diesem Gerät gespeichert.';
+    $('#boat-hint').hidden=false;
+  }else $('#boat-hint').hidden=true;
+}
+function showSheet(){
+  const sh=S.sh,d=sh.draft,e=sh.mode==='edit'?S.entries.find(x=>x.id===sh.id):null;
+  S.lastFocus=document.activeElement;
+  const b=d.boat?boatById(d.boat):null;
+  $('#sh-title').textContent=sh.mode==='new'?`Neuer Eintrag · ${d.t}`:(sh.suppl?'Eintrag ergänzen · ':sh.ro?'Eintrag ansehen · ':'Eintrag · ')+d.t;
+  $('#sh-pos').textContent=`${fpos(d,3)} · ${sh.mode==='new'?'Handy-GPS ± 5 m':'± 6 m'}`;
+  $('#f-text').value=d.text||'';
+  const ro=$('#sh-ro');
+  if(sh.ro){ro.hidden=false;ro.style.borderLeftColor=b?`var(--b${b.ci})`:'';ro.innerHTML=`<b>Nur ansehen</b>Eintrag von ${esc(pname(d.by))}${b?' · '+esc(b.name):''}. Fremde Einträge kannst du nicht ändern oder löschen.`;}
+  else if(e&&e.by!==S.me){ro.hidden=false;ro.innerHTML=`<b>Admin-Bearbeitung</b>Eintrag von ${esc(pname(d.by))}${b?' · '+esc(b.name):''}. Als Admin darfst du ihn ändern oder löschen.`;}
+  else ro.hidden=true;
+  $('#sh-by').textContent=e?`Erfasst von ${pname(e.by)}${b?' · '+b.name:''}`:`Wird gespeichert als Eintrag von ${meP().name}.`;
+  $('#sh-form').inert=sh.ro;$('#sh-form').style.opacity=sh.ro?.85:1;
+  $('#del-confirm').hidden=true;$('#f-del').hidden=sh.ro||sh.mode==='new';$('#f-save').hidden=sh.ro;$('#f-close').hidden=!sh.ro;
+  $('#f-save').textContent=sh.mode==='new'?'Eintrag speichern':'Speichern';
+  syncSheet();
+  const el=$('#sheet'),sc=$('#scrim');el.hidden=false;sc.hidden=false;$('#sh-body').scrollTop=0;
+  requestAnimationFrame(()=>{el.classList.add('open');sc.classList.add('open');});
+  $('#sh-close').focus();
+  render();
+}
+function openSheet(id,suppl){
+  const e=S.entries.find(x=>x.id===id);if(!e)return;
+  S.sh={mode:'edit',id,suppl:!!suppl,ro:!canEdit(e),draft:{...e}};
+  showSheet();
+}
+function openNewSheet(){
+  const g=phonePos();
+  S.sh={mode:'new',ro:false,draft:{boat:suggestBoat()||'',type:'eintrag',dir:null,bft:null,wx:null,text:'',lat:g.lat,lon:g.lon,t:nowT(),by:S.me}};
+  showSheet();
+}
+function closeSheet(){
+  const el=$('#sheet'),sc=$('#scrim');if(el.hidden)return;
+  el.classList.remove('open');sc.classList.remove('open');
+  setTimeout(()=>{if(!S.sh){el.hidden=true;sc.hidden=true;}},260);
+  S.sh=null;render();
+  const lf=S.lastFocus;if(lf&&document.contains(lf))lf.focus({preventScroll:true});
+}
+function saveSheet(){
+  const sh=S.sh,d=sh.draft;d.text=$('#f-text').value;
+  if(!d.boat){$('#boat-err').hidden=false;const c=$('#f-boat .chip');if(c)c.focus();$('#fs-boat').scrollIntoView({block:'center'});return;}
+  const bn=boatById(d.boat).name;
+  if(sh.mode==='new'){
+    const e=ME(S.today,d.boat,d.t,d.lat,d.lon,d.type,d.dir,d.bft,d.wx,d.text,S.me);
+    S.entries.push(e);S.dev[S.me]=d.boat;S.clock+=1;S.fix++;
+    if(VARIANT==='switch'&&S.sel!=='all')S.sel=d.boat;
+    closeSheet();toast(`Eintrag ${e.t} gespeichert · ${bn}`);
+  }else{
+    const e=S.entries.find(x=>x.id===sh.id),t=e.t;
+    Object.assign(e,{boat:d.boat,type:d.type,dir:d.dir,bft:d.bft,wx:d.wx,text:d.text});
+    closeSheet();toast(`Eintrag ${t} gespeichert`);
+  }
+}
+
+/* Schnell-Eintrag */
+let busy=false;
+function doFix(){
+  if(busy)return;busy=true;
+  const b=$('#fix');if(b){b.classList.add('busy');$('#fix-ico').innerHTML=ico('motor',40);$('#fix-lbl').textContent='Position wird bestimmt …';$('#fix-sub').textContent='GPS-Fix, ± 5 m';}
+  setTimeout(()=>{
+    busy=false;
+    if(VARIANT==='switch'&&S.sel!=='all'){
+      const g=phonePos(),e=ME(S.today,S.sel,nowT(),g.lat,g.lon,'eintrag',null,null,null,'',S.me);
+      S.entries.push(e);S.dev[S.me]=S.sel;S.clock+=1;S.fix++;
+      toast(`Eintrag ${e.t} gespeichert · ${boatById(S.sel).name} · ${fpos(e)}`,3800);
+      render();setTimeout(()=>{if(!S.sh)openSheet(e.id,true);},500);
+    }else{render();openNewSheet();}
+  },1100);
+}
+
+/* ---------- Aktionen ---------- */
+function movePerson(pid,bid){
+  const p=personById(pid);if(!p||!adminOn())return;
+  p.pre=bid||null;S.moveSel=null;render();
+  toast(`${p.name} → ${bid?boatById(bid).name:'kein Vorschlag'} (nur Vorschlag, keine Berechtigung)`,3800);
+}
+const ACT={
+  go(el){S.view=el.dataset.id;S.confirm=null;S.moveSel=null;render();window.scrollTo(0,0);},
+  open(el){openSheet(el.dataset.id,false);},
+  fix(){doFix();},
+  day(el){S.day=+el.dataset.id;S.repEdit=null;S.confirm=null;render();},
+  mapday(el){S.mapDay=+el.dataset.id;render();},
+  maptog(el){const i=el.dataset.id;S.mapOff[i]=!S.mapOff[i];render();},
+  sel(el){S.sel=el.dataset.id;if(S.sel!=='all')S.dev[S.me]=S.sel;render();},
+  filt(el){S.sel=el.dataset.id;render();},
+  /* Sheet */
+  shtype(el){if(S.sh&&!S.sh.ro){S.sh.draft.type=el.dataset.id;syncSheet();}},
+  shdir(el){if(S.sh&&!S.sh.ro){const v=+el.dataset.id,d=S.sh.draft;d.dir=d.dir===v?null:v;syncSheet();}},
+  shbft(el){if(S.sh&&!S.sh.ro){const v=+el.dataset.id,d=S.sh.draft;d.bft=d.bft===v?null:v;syncSheet();}},
+  shwx(el){if(S.sh&&!S.sh.ro){const d=S.sh.draft;d.wx=d.wx===el.dataset.id?null:el.dataset.id;syncSheet();}},
+  shboat(el){if(S.sh&&!S.sh.ro){S.sh.draft.boat=el.dataset.id;syncSheet();const c=$(`#f-boat [data-id="${el.dataset.id}"]`);if(c)c.focus();}},
+  /* Tagesbericht */
+  repnew(){S.repEdit={day:S.day,by:S.me};S.repDraft='';render();setTimeout(()=>{const t=$('#rep-text');if(t)t.focus();},0);},
+  repedit(el){const r=S.reports.find(x=>x.day===S.day&&x.by===el.dataset.id);S.repEdit={day:S.day,by:el.dataset.id};S.repDraft=r?r.text:'';S.confirm=null;render();},
+  repcancel(){S.repEdit=null;S.confirm=null;render();},
+  repsave(){
+    const ed=S.repEdit,txt=S.repDraft.trim();if(!ed)return;
+    if(!txt){toast('Bitte einen kurzen Text eingeben');const t=$('#rep-text');if(t)t.focus();return;}
+    let r=S.reports.find(x=>x.day===ed.day&&x.by===ed.by);
+    if(r){r.text=txt;r.t=nowT();}else S.reports.push({day:ed.day,by:ed.by,t:nowT(),text:txt});
+    S.clock+=1;S.repEdit=null;render();toast(ed.by===S.me?'Dein Abschnitt ist gespeichert':`Abschnitt von ${pname(ed.by)} gespeichert (Admin)`);
+  },
+  repdel(el){S.confirm={kind:'rep',id:el.dataset.id};render();},
+  repno(){S.confirm=null;render();},
+  repyes(){const ed=S.repEdit;S.reports=S.reports.filter(x=>!(x.day===ed.day&&x.by===ed.by));S.repEdit=null;S.confirm=null;render();toast('Abschnitt gelöscht');},
+  /* Konto */
+  login(){openLogin(()=>{render();if(!$('#onb').hidden)renderOnb();});},
+  logout(){S.signedIn=false;S.me=S.people.find(p=>p.admin).id;S.confirm=null;S.editBoat=null;render();toast('Abgemeldet · Einträge schreiben geht weiter lokal, Admin-Funktionen ruhen');},
+  as(el){S.me=el.dataset.id;S.repEdit=null;S.confirm=null;S.editBoat=null;S.moveSel=null;
+    if(VARIANT==='switch')S.sel=suggestBoat()||'all';
+    render();toast(`Prototyp zeigt jetzt die Sicht von ${meP().name}${meP().admin?' (Admin)':''}`);},
+  /* Einladen */
+  invboat(el){S.inv.boat=el.dataset.id;render();},
+  invite(){
+    const m=S.inv.email.trim();
+    if(!validMail(m)){S.invErr='Bitte eine gültige E-Mail-Adresse eingeben.';render();const i=$('#inv-email');if(i)i.focus();return;}
+    if(S.people.some(p=>p.email.toLowerCase()===m.toLowerCase())){S.invErr='Diese Adresse ist schon im Törn.';render();return;}
+    const p={id:'p'+(pidn++),name:nameFromEmail(m),email:m,admin:false,status:'eingeladen',pre:S.inv.boat||null};
+    S.people.push(p);S.inv={email:'',boat:''};S.invErr='';render();
+    toast(`Einladung an ${m} gesendet${p.pre?' · Vorschlag: '+boatById(p.pre).name:''} (Prototyp)`,3800);
+  },
+  resend(el){toast(`Einladung an ${personById(el.dataset.id).email} erneut gesendet`);},
+  accept(el){const p=personById(el.dataset.id);p.status='angenommen';render();toast(`${p.name} hat die Einladung angenommen (Demo)`);},
+  memrm(el){S.confirm={kind:'mem',id:el.dataset.id};render();},
+  memno(){S.confirm=null;render();},
+  memyes(){const id=S.confirm.id,p=personById(id);S.people=S.people.filter(x=>x.id!==id);S.confirm=null;render();toast(`${p.name} entfernt`);},
+  /* Boote */
+  pickphoto(el){const i=document.getElementById(el.dataset.id);if(i)i.click();},
+  boatadd(){
+    const n=S.nb.name.trim();
+    if(!n){S.nbErr='Bitte dem Boot einen Namen geben.';render();const i=$('#nb-name');if(i)i.focus();return;}
+    const ci=nextCi();if(!ci){S.nbErr='Im Prototyp sind bis zu 4 Boote möglich.';render();return;}
+    S.boats.push({id:'b'+(bseq++),name:n,type:S.nb.type.trim()||'Boot',ci,photo:S.nb.photo});
+    S.nb={name:'',type:'',photo:null};S.nbErr='';render();toast(`Boot „${n}“ angelegt · eigene Farbe auf der Karte`);
+  },
+  boatedit(el){const b=boatById(el.dataset.id);S.editBoat=b.id;S.eb={name:b.name,type:b.type};S.confirm=null;render();},
+  boatcancel(){S.editBoat=null;render();},
+  boatsave(){const b=boatById(S.editBoat),n=S.eb.name.trim();if(!n){toast('Bitte einen Namen eingeben');return;}b.name=n;b.type=S.eb.type.trim()||b.type;S.editBoat=null;render();toast('Boot gespeichert');},
+  boatrm(el){
+    const b=boatById(el.dataset.id);
+    if(S.boats.length<2){toast('Ein Törn braucht mindestens ein Boot');return;}
+    if(S.entries.some(e=>e.boat===b.id)){toast(`„${b.name}“ hat Einträge und kann nicht entfernt werden`);return;}
+    S.confirm={kind:'boat',id:b.id};render();
+  },
+  boatno(){S.confirm=null;render();},
+  boatyes(){
+    const id=S.confirm.id,b=boatById(id);S.boats=S.boats.filter(x=>x.id!==id);
+    S.people.forEach(p=>{if(p.pre===id)p.pre=null;});Object.keys(S.dev).forEach(k=>{if(S.dev[k]===id)delete S.dev[k];});
+    if(S.sel===id)S.sel=VARIANT==='switch'?(suggestBoat()||'all'):'all';
+    S.confirm=null;render();toast(`Boot „${b.name}“ entfernt`);
+  },
+  /* Crew-Plan / Vorschlag */
+  psel(el){if(!adminOn())return;S.moveSel=S.moveSel===el.dataset.id?null:el.dataset.id;render();},
+  moveto(el){movePerson(S.moveSel,el.dataset.id);},
+  /* Onboarding */
+  newtoern(){openOnb();},
+  onext(){onbNext();},
+  oback(){O.step--;renderOnb();},
+  oadd(){
+    const n=O.nb.name.trim();
+    if(!n){O.err='Bitte dem Boot einen Namen geben.';renderOnb();const i=$('#o-bname');if(i)i.focus();return;}
+    if(O.boats.length>=4){O.err='Im Prototyp sind bis zu 4 Boote möglich.';renderOnb();return;}
+    O.boats.push({name:n,type:O.nb.type.trim()||'Boot',photo:O.nb.photo});O.nb={name:'',type:'',photo:null};O.err='';renderOnb();const i=$('#o-bname');if(i)i.focus();
+  },
+  orm(el){O.boats.splice(+el.dataset.id,1);renderOnb();},
+  oib(el){O.ib=el.dataset.id;renderOnb();},
+  oinv(){
+    const m=O.ie.trim();
+    if(!validMail(m)){O.ierr='Bitte eine gültige E-Mail-Adresse eingeben.';renderOnb();const i=$('#o-ie');if(i)i.focus();return;}
+    if(O.inv.some(x=>x.email.toLowerCase()===m.toLowerCase())){O.ierr='Diese Adresse steht schon in der Liste.';renderOnb();return;}
+    O.inv.push({email:m,boat:O.ib});O.ie='';O.ierr='';renderOnb();const i=$('#o-ie');if(i)i.focus();
+  },
+  oirm(el){O.inv.splice(+el.dataset.id,1);renderOnb();},
+  /* Login */
+  lsend(){
+    const m=L.email.trim();
+    if(!validMail(m)){L.err='Bitte eine gültige E-Mail-Adresse eingeben.';renderLogin();return;}
+    L.email=m;L.err='';L.step=2;renderLogin();
+  },
+  lback(){L.step=1;L.err='';L.code='';renderLogin();},
+  lverify(){
+    if(!/^[A-Za-z0-9]{6,8}$/.test(L.code.trim())){L.err='Bitte den Code aus der E-Mail eingeben.';renderLogin();return;}
+    S.signedIn=true;S.email=L.email;const cb=L.cb;closeLogin();
+    toast(`Angemeldet als ${L.email} · Admin-Funktionen freigeschaltet`,3800);
+    if(cb)cb();else render();
+  }
+};
+let bseq=3;
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest&&ev.target.closest('[data-act]');if(!t)return;
+  const fn=ACT[t.dataset.act];if(fn)fn(t,ev);
+});
+function setPath(path,v){const root={S,O,L};const parts=path.split('.');let o=root[parts[0]];for(let i=1;i<parts.length-1;i++)o=o[parts[i]];o[parts[parts.length-1]]=v;}
+document.addEventListener('input',ev=>{const b=ev.target.dataset&&ev.target.dataset.bind;if(b)setPath(b,ev.target.value);});
+function readFile(file,cb){const rd=new FileReader();rd.onload=()=>cb(rd.result);rd.readAsDataURL(file);}
+document.addEventListener('change',ev=>{
+  const t=ev.target,c=t.dataset&&t.dataset.chg;
+  if(c==='pre'){movePerson(t.dataset.id,t.value);}
+  const fl=t.dataset&&t.dataset.file;
+  if(fl&&t.files&&t.files[0]){
+    readFile(t.files[0],data=>{
+      if(fl==='nbphoto'){S.nb.photo=data;render();}
+      else if(fl==='obphoto'){O.nb.photo=data;renderOnb();}
+      else if(fl.startsWith('ebphoto:')){boatById(fl.slice(8)).photo=data;render();toast('Bootsfoto übernommen');}
+    });
+  }
+});
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){if(!$('#login').hidden)closeLogin();else if(!$('#onb').hidden)closeOnb();else if(!$('#sheet').hidden)closeSheet();}
+  if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&ev.target.matches('.rose .w,.mk')){ev.preventDefault();ev.target.dispatchEvent(new MouseEvent('click',{bubbles:true}));}
+  if(ev.key==='Enter'&&ev.target.matches&&ev.target.matches('#login input')){ev.preventDefault();const b=$('#login-body .primary');if(b)b.click();}
+});
+/* Drag & Drop (Crew-Plan) */
+document.addEventListener('dragstart',ev=>{const r=ev.target.closest&&ev.target.closest('.prow[draggable="true"]');if(!r)return;ev.dataTransfer.setData('text/plain',r.dataset.pid);ev.dataTransfer.effectAllowed='move';});
+document.addEventListener('dragover',ev=>{const g=ev.target.closest&&ev.target.closest('.pgroup');if(g&&adminOn()){ev.preventDefault();$$('.pgroup.drop').forEach(x=>{if(x!==g)x.classList.remove('drop');});g.classList.add('drop');}});
+document.addEventListener('drop',ev=>{const g=ev.target.closest&&ev.target.closest('.pgroup');if(!g||!adminOn())return;ev.preventDefault();movePerson(ev.dataTransfer.getData('text/plain'),g.dataset.bid);});
+document.addEventListener('dragend',()=>$$('.pgroup.drop').forEach(x=>x.classList.remove('drop')));
+
+$('#sh-close').onclick=closeSheet;$('#f-close').onclick=closeSheet;$('#scrim').onclick=closeSheet;
+const stepDir=k=>{if(!S.sh||S.sh.ro)return;const d=S.sh.draft;d.dir=d.dir==null?(k>0?0:15):(d.dir+k+16)%16;syncSheet();};
+$('#wd-prev').onclick=()=>stepDir(-1);$('#wd-next').onclick=()=>stepDir(1);
+$('#f-save').onclick=saveSheet;
+$('#f-del').onclick=()=>{$('#del-confirm').hidden=false;$('#f-del').hidden=true;$('#f-save').hidden=true;$('#del-no').focus();};
+$('#del-no').onclick=()=>{$('#del-confirm').hidden=true;$('#f-del').hidden=false;$('#f-save').hidden=false;$('#f-del').focus();};
+$('#del-yes').onclick=()=>{const e=S.entries.find(x=>x.id===S.sh.id),t=e.t;S.entries.splice(S.entries.indexOf(e),1);closeSheet();toast(`Eintrag ${t} gelöscht`);};
+$('#theme-btn').onclick=()=>{const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?'light':'dark';themeIcon();};
+
+/* ---------- Login ---------- */
+let L={step:1,email:'',code:'',err:'',cb:null};
+function openLogin(cb){L={step:1,email:S.email||'',code:'',err:'',cb};renderLogin();$('#login').hidden=false;}
+function closeLogin(){$('#login').hidden=true;}
+function renderLogin(){
+  $('#login-body').innerHTML=L.step===1
+   ?`<p class="muted">Für Admin-Funktionen (Boote anlegen, Personen einladen) brauchst du ein Cloud-Konto. Wir schicken dir einen Code per E-Mail, kein Passwort.</p>
+     <label class="f"><span>E-Mail-Adresse</span><input type="email" id="l-email" inputmode="email" autocomplete="email" data-bind="L.email" value="${esc(L.email)}" placeholder="name@example.com"></label>
+     ${L.err?`<div class="err">${L.err}</div>`:''}
+     <button class="btn primary block" type="button" data-act="lsend">${ico('mail',20)}Code senden</button>
+     <p class="muted small">Ohne Anmeldung bleibt alles lokal auf diesem Gerät nutzbar.</p>`
+   :`<p class="muted">Wir haben einen Code an <b>${esc(L.email)}</b> geschickt.</p>
+     <label class="f"><span>Code</span><input type="text" id="l-code" inputmode="text" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="one-time-code" maxlength="8" data-bind="L.code" value="${esc(L.code)}" placeholder="AB12CD" class="mono"></label>
+     ${L.err?`<div class="err">${L.err}</div>`:''}
+     <button class="btn primary block" type="button" data-act="lverify">Anmelden</button>
+     <button class="btn block" type="button" data-act="lback">Andere E-Mail-Adresse</button>
+     <p class="muted small">Prototyp: Jeder Code mit 6–8 Buchstaben/Ziffern funktioniert, zum Beispiel AB12CD.</p>`;
+  const i=$(L.step===1?'#l-email':'#l-code');if(i)i.focus();
+}
+$('#login-x').onclick=closeLogin;
+
+/* ---------- Onboarding ---------- */
+let O=null;
+function openOnb(){O={step:1,name:'',from:'',to:'',area:'',err:'',boats:[],nb:{name:'',type:'',photo:null},inv:[],ie:'',ib:'',ierr:''};renderOnb();$('#onb').hidden=false;$('#onb').scrollTop=0;const i=$('#o-name');if(i)i.focus();}
+function closeOnb(){$('#onb').hidden=true;}
+function renderOnb(){
+  $$('.steps i').forEach((x,i)=>x.classList.toggle('on',i<O.step));
+  $('#onb-step').textContent=`Schritt ${O.step} von 3 · ${['Neuer Törn','Boote','Crew einladen'][O.step-1]}`;
+  $('#onb-title').textContent=['Neuer Törn','Boote','Crew einladen'][O.step-1];
+  $('#onb-back').hidden=O.step===1;$('#onb-back').onclick=()=>ACT.oback();
+  $('#onb-next').textContent=O.step===3?'Törn anlegen':'Weiter';
+  let h='';
+  if(O.step===1){
+    h=`<p class="muted">Du legst den Törn an und wirst damit <b>Admin</b>. Ein Törn enthält immer eine Flottille mit einem oder mehreren Booten.</p>
+    <label class="f"><span>Name des Törns</span><input type="text" id="o-name" data-bind="O.name" value="${esc(O.name)}" placeholder="z. B. Ostsee Sommer 2027"></label>
+    ${O.err?`<div class="err">${O.err}</div>`:''}
+    <div class="row2"><label class="f"><span>Von</span><input type="date" data-bind="O.from" value="${esc(O.from)}"></label><label class="f"><span>Bis</span><input type="date" data-bind="O.to" value="${esc(O.to)}"></label></div>
+    <label class="f"><span>Revier (optional)</span><input type="text" data-bind="O.area" value="${esc(O.area)}"></label>`;
+  }else if(O.step===2){
+    h=`<p class="muted">Lege die Boote der Flottille an (mindestens eins). Weitere kannst du später in der Törn-Verwaltung ergänzen.</p>
+    ${O.boats.length?`<ul class="itemlist">${O.boats.map((b,i)=>`<li><span class="thumb-s">${b.photo?`<img src="${b.photo}" alt="">`:boatSVG(i+1)}</span><div><b>${esc(b.name)}</b><div class="muted small">${esc(b.type)}</div></div><span style="--c:var(--b${i+1})">${bsh(i+1)}</span><button class="icon-btn" type="button" data-act="orm" data-id="${i}" aria-label="${esc(b.name)} entfernen">${ico('x',18)}</button></li>`).join('')}</ul>`:'<div class="empty">Noch kein Boot angelegt.</div>'}
+    <div class="card"><div class="legend">Boot hinzufügen</div>
+      <div class="boatpic">${O.nb.photo?`<img src="${O.nb.photo}" alt="Vorschau">`:boatSVG(Math.min(O.boats.length+1,4))}</div>
+      <div class="acts"><button class="btn sm" type="button" data-act="pickphoto" data-id="obphoto">${ico('cam',18)}Foto wählen (optional)</button><input class="sr-only" type="file" accept="image/*" id="obphoto" data-file="obphoto" aria-label="Bootsfoto wählen" tabindex="-1"></div>
+      <div class="row2"><label class="f"><span>Bootsname</span><input type="text" id="o-bname" data-bind="O.nb.name" value="${esc(O.nb.name)}" autocomplete="off"></label><label class="f"><span>Typ / Modell</span><input type="text" data-bind="O.nb.type" value="${esc(O.nb.type)}" placeholder="z. B. Bavaria 37"></label></div>
+      ${O.err?`<div class="err">${O.err}</div>`:''}
+      <button class="btn block" type="button" data-act="oadd">${ico('plus',20)}Boot hinzufügen</button></div>`;
+  }else{
+    h=`<p class="muted">Lade Personen per E-Mail für den ganzen Törn ein. Das Boot ist nur ein Vorschlag, alle dürfen auf jedes Boot schreiben.</p>`+
+    (S.signedIn?`<div class="banner" style="border-left-color:var(--ok)"><b>Angemeldet</b>${esc(S.email)}</div>
+    <label class="f"><span>E-Mail-Adresse</span><input type="email" id="o-ie" inputmode="email" autocomplete="off" data-bind="O.ie" value="${esc(O.ie)}" placeholder="name@example.com"></label>
+    <fieldset><legend>Boot-Vorschlag (optional)</legend><div class="chips bchips" role="radiogroup" aria-label="Boot-Vorschlag">${O.boats.map((b,i)=>`<button class="chip" type="button" role="radio" data-act="oib" data-id="${i+1}" style="--c:var(--b${i+1})" aria-checked="${O.ib==String(i+1)}">${bsh(i+1)}${esc(b.name)}</button>`).join('').replace(/^/,`<button class="chip" type="button" role="radio" data-act="oib" data-id="" aria-checked="${O.ib===''}">Kein Vorschlag</button>`)}</div></fieldset>
+    ${O.ierr?`<div class="err">${O.ierr}</div>`:''}
+    <button class="btn block" type="button" data-act="oinv">${ico('mail',20)}Zur Liste hinzufügen</button>
+    ${O.inv.length?`<ul class="itemlist">${O.inv.map((x,i)=>`<li><i class="av sm">${initials(nameFromEmail(x.email))}</i><div><b>${esc(x.email)}</b><div class="muted small">${x.ib?'':''}${x.boat?'Vorschlag: '+esc(O.boats[+x.boat-1].name):'Kein Boot-Vorschlag'}</div></div><span class="st warn">wird eingeladen</span><button class="icon-btn" type="button" data-act="oirm" data-id="${i}" aria-label="${esc(x.email)} entfernen">${ico('x',18)}</button></li>`).join('')}</ul>`:''}`
+    :lockCard('Einladen geht erst nach der Anmeldung mit deinem Cloud-Konto (E-Mail-Code). Du kannst den Törn auch ohne Anmeldung anlegen und rein lokal nutzen. Eingeladen wird dann später.'));
+  }
+  $('#onb-body').innerHTML=h;
+}
+function onbNext(){
+  if(O.step===1&&!O.name.trim()){O.err='Bitte gib dem Törn einen Namen.';renderOnb();const i=$('#o-name');if(i)i.focus();return;}
+  if(O.step===1)O.err='';
+  if(O.step===2&&!O.boats.length){O.err='Bitte lege mindestens ein Boot an.';renderOnb();const i=$('#o-bname');if(i)i.focus();return;}
+  if(O.step===2)O.err='';
+  if(O.step<3){O.step++;renderOnb();$('#onb').scrollTop=0;return;}
+  finishOnb();
+}
+function finishOnb(){
+  const boats=O.boats.map((b,i)=>({id:'b'+(i+1),name:b.name,type:b.type,ci:i+1,photo:b.photo}));
+  const me=S.people.find(p=>p.admin)||{name:'Anna'};
+  const people=[{id:'p1',name:me.name,email:S.email||'anna@example.com',admin:true,status:'angenommen',pre:boats[0].id}];
+  O.inv.forEach((iv,i)=>people.push({id:'p'+(i+2),name:nameFromEmail(iv.email),email:iv.email,admin:false,status:'eingeladen',pre:iv.boat?'b'+iv.boat:null}));
+  pidn=people.length+1;bseq=boats.length+1;
+  const keep={signedIn:S.signedIn,email:S.email},nt=O.name.trim(),nInv=O.inv.length;
+  S=Object.assign(seed(),{trip:{name:nt,from:O.from,to:O.to,area:O.area},signedIn:keep.signedIn,email:keep.email,boats,people,entries:[],reports:[],today:1,day:1,view:'heute',sel:VARIANT==='switch'?boats[0].id:'all',dev:{}});
+  closeOnb();render();window.scrollTo(0,0);
+  toast(`Törn „${nt}“ angelegt · du bist Admin · ${boats.length} Boot${boats.length>1?'e':''}${nInv?' · '+nInv+' Einladung'+(nInv>1?'en':'')+' vorgemerkt':''}`,4600);
+}
+$('#onb-x').onclick=closeOnb;$('#onb-next').onclick=()=>ACT.onext();
+
+/* ========== Variante 2: Gemeinsame Timeline ========== */
+function dayFilter(){
+  return `<div class="filt" role="group" aria-label="Filter nach Boot"><span class="lg">Filter · optional</span><button class="chip" type="button" data-act="filt" data-id="all" aria-pressed="${S.sel==='all'}">Alle Boote</button>${S.boats.map(b=>`<button class="chip" type="button" data-act="filt" data-id="${b.id}" style="${bcol(b)}" aria-pressed="${S.sel===b.id}">${bsh(b.ci)}${esc(b.name)}</button>`).join('')}</div>`;
+}
+const topExtra=()=>'';
+function viewHeute(){
+  const ids=shownIds(),es=dayEntries(S.today,ids),sg=suggestBoat();
+  const fix=`<button class="fix" id="fix" type="button" data-act="fix"><span id="fix-ico">${ico('eintrag',40)}</span><span class="lbl"><span id="fix-lbl">Eintrag jetzt</span><small id="fix-sub">${sg?'Boot wählst du im Formular · zuletzt: '+esc(boatById(sg).name):'Boot wählst du im Formular'}</small></span></button>`;
+  return `${fix}
+  ${mapBlock(ids,[S.today],'Karte der heutigen Routen')}${boatKey(ids)}
+  <div class="stats">${statTiles(ids,S.today)}</div>
+  ${dayFilter()}
+  <div class="legend">Tag ${S.today} · ${dayLabel(S.today)} · gemeinsame Timeline</div>
+  ${timeline(es.slice().reverse(),true,'Heute noch keine Einträge.')}`;
+}
+function prow(p){
+  const sel=S.moveSel===p.id;
+  return `<li class="prow${sel?' sel':''}" style="flex-wrap:wrap"${adminOn()?` draggable="true"`:''} data-pid="${p.id}"><button class="prow-btn" type="button" data-act="psel" data-id="${p.id}" aria-pressed="${sel}" aria-label="${esc(p.name)}${adminOn()?(sel?' ausgewählt, Boot als Ziel wählen':' zum Umsetzen auswählen'):''}"><i class="av">${initials(p.name)}</i><span class="nm"><b>${esc(p.name)}</b>${p.admin?'<span class="role">Admin</span> ':''}${p.id===S.me?'<span class="who me">(du)</span>':''}<span class="muted">${esc(p.email)}</span></span>${memberStatus(p)}${adminOn()?`<span class="muted" aria-hidden="true">${ico('swap',20)}</span>`:''}</button>${memberActs(p)?`<div style="flex:1 0 100%;padding-bottom:10px">${memberActs(p)}</div>`:''}</li>`;
+}
+function planGroup(b){
+  const bid=b?b.id:'',mem=S.people.filter(p=>(p.pre||'')===bid),sp=S.moveSel&&adminOn()?personById(S.moveSel):null;
+  const here=sp&&(sp.pre||'')===bid;
+  return `<section class="pgroup" data-bid="${bid}"${b?` style="${bcol(b)}"`:''} aria-label="${b?esc(b.name):'Ohne Boot-Vorschlag'}">
+  <div class="pg-h"><div>${b?`<b>${bsh(b.ci)} ${esc(b.name)}</b><div class="muted small">${esc(b.type)} · ${mem.length} ${mem.length===1?'Person':'Personen'}</div>`:`<b>Kein Vorschlag</b><div class="muted small">${mem.length} ${mem.length===1?'Person':'Personen'}</div>`}</div>${sp?(here?'<span class="muted small">bereits hier</span>':`<button class="btn primary sm" type="button" data-act="moveto" data-id="${bid}">${sp.name} hierher setzen</button>`):''}</div>
+  ${mem.length?`<ul class="plist">${mem.map(prow).join('')}</ul>`:'<div class="pempty" style="border-top:1px solid var(--line)">Niemand zugewiesen.</div>'}</section>`;
+}
+function boatRow(b){
+  const n=S.entries.filter(e=>e.boat===b.id).length;
+  return `<article class="card bcard" style="${bcol(b)}"><div class="brow"><span class="thumb-s">${boatPic(b)}</span><div><b>${esc(b.name)}</b><div class="muted small">${esc(b.type)} · ${n} Einträge</div></div>${bsh(b.ci)}</div>${boatAdminActs(b)}</article>`;
+}
+function viewToern(){
+  const sp=S.moveSel&&personById(S.moveSel);
+  return `<h2>Törn-Verwaltung</h2>${accountCard()}${asCard()}${rulesCard()}
+  <div class="legend">Crew-Plan</div>
+  <p class="muted">${adminOn()?(sp?`<b>${esc(sp.name)}</b> ist ausgewählt. Wähle unten ein Boot als Ziel, oder tippe die Person erneut an.`:'Person antippen, dann beim Ziel-Boot „hierher setzen“ wählen (am Rechner auch per Ziehen). Die Zuordnung ist nur ein Vorschlag.'):'Der Plan zeigt, wer welchem Boot vorgeschlagen ist. Nur der Admin kann umsetzen. Schreiben darf trotzdem jede Person auf jedes Boot.'}</p>
+  ${S.boats.map(planGroup).join('')}${planGroup(null)}
+  <div class="legend">Crew einladen</div>${inviteBlock()}
+  <div class="legend">Boote · ${S.boats.length}</div>${S.boats.map(boatRow).join('')}${addBoatCard()}${newTripBtn()}`;
+}
+function init(){
+  $$('[data-ico]').forEach(el=>el.innerHTML=ico(el.dataset.ico,el.classList.contains('icon-btn')?22:24));
+  $('#sh-close').innerHTML=ico('x',22);
+  buildSheet();themeIcon();render();
+}
+init();
+</script>
+</body>
+</html>
