@@ -1,0 +1,690 @@
+<title>Logbuch Reisetagebuch</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F3F7F6; --surface:#FFFFFF; --surface2:#E7EFEC; --ink:#13272B; --muted:#4A5F63; --line:#C9D6D2;
+  --sea:#3B6762; --sea-soft:#D2E2DE; --rope:#9C8254; --accent:#FFC20E; --on-accent:#13272B;
+  --danger:#B3261E; --scrim:rgba(8,24,27,.55); --focus:#0B57D0;
+  --sky1:#CFE3E6; --sky2:#EEF5F3; --water1:#7FA9A4; --water2:#4C7A76; --sailc:#FBFDFC; --hull:#1E3A40; --land:#5F7F73; --roof:#8C6B57; --sun:#FFC20E;
+  --on-photo:#FFFFFF; --photo-scrim:rgba(8,24,27,.78);
+  --font-display:'Bricolage Grotesque','Arial Narrow',system-ui,sans-serif;
+  --font-text:'Atkinson Hyperlegible','Segoe UI',system-ui,sans-serif;
+  --font-mono:'DM Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1819; --surface:#152426; --surface2:#1D3033; --ink:#E6EFEC; --muted:#9DB2AE; --line:#2C4245;
+    --sea:#7FB3AB; --sea-soft:#1F3A39; --rope:#C9AE7C; --accent:#FFCB2E; --on-accent:#10201F;
+    --danger:#FF8A80; --scrim:rgba(0,0,0,.65); --focus:#8AB4F8;
+    --sky1:#1B3236; --sky2:#2E4A4C; --water1:#2B4D4D; --water2:#193334; --sailc:#DCE7E4; --hull:#0A1315; --land:#2D4A43; --roof:#5A4538; --sun:#FFCB2E;
+    --on-photo:#FFFFFF; --photo-scrim:rgba(0,0,0,.8);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+    --bg:#0D1819; --surface:#152426; --surface2:#1D3033; --ink:#E6EFEC; --muted:#9DB2AE; --line:#2C4245;
+    --sea:#7FB3AB; --sea-soft:#1F3A39; --rope:#C9AE7C; --accent:#FFCB2E; --on-accent:#10201F;
+    --danger:#FF8A80; --scrim:rgba(0,0,0,.65); --focus:#8AB4F8;
+    --sky1:#1B3236; --sky2:#2E4A4C; --water1:#2B4D4D; --water2:#193334; --sailc:#DCE7E4; --hull:#0A1315; --land:#2D4A43; --roof:#5A4538; --sun:#FFCB2E;
+    --on-photo:#FFFFFF; --photo-scrim:rgba(0,0,0,.8);
+    color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.5 var(--font-text);-webkit-text-size-adjust:100%;overflow-x:hidden;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--font-display);line-height:1.08;letter-spacing:-.01em}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+#app{max-width:520px;margin:0 auto;min-height:100%;padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+.screen{padding:0 16px}
+.screen[hidden]{display:none}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0 6px}
+.eyebrow{font:500 12px/1.2 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.btn{min-height:48px;padding:0 18px;border-radius:999px;border:2px solid var(--ink);font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--surface)}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn.ghost{border-color:var(--line)}
+.btn.block{width:100%}
+.btn svg,.ic{width:22px;height:22px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--line);background:var(--surface)}
+
+.f-sail{fill:var(--sailc)}.f-hull{fill:var(--hull)}.f-sun{fill:var(--sun)}.f-land{fill:var(--land)}.f-roof{fill:var(--roof)}.f-quay{fill:var(--rope)}.s-line{stroke:var(--sailc);stroke-width:2;opacity:.35;fill:none;stroke-linecap:round}
+.s-line+.f-hull{stroke:none}
+/* Kapitelkopf */
+.chapter{margin:6px -16px 0;position:relative;color:var(--on-photo);overflow:hidden;min-height:300px;display:flex;flex-direction:column;justify-content:flex-end}
+.chapter .ph{position:absolute;inset:0}
+.chapter .ph svg{width:100%;height:100%;display:block}
+.chapter::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,var(--photo-scrim) 5%,transparent 70%)}
+.chapter .txt{position:relative;z-index:1;padding:20px 16px 18px}
+.chapter .num{font:800 15px/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase;display:inline-block;background:var(--accent);color:var(--on-accent);padding:5px 9px;border-radius:3px;margin-bottom:10px}
+.chapter h1{font-size:clamp(32px,9.5vw,44px);font-weight:800}
+.chapter .arrow{font-weight:500;opacity:.9}
+.chapter .meta{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font:500 13px/1.2 var(--font-mono);letter-spacing:.04em}
+.meta b{font-size:19px;font-family:var(--font-display);font-weight:700;letter-spacing:0}
+.rope{height:8px;margin:0 -16px;background:repeating-linear-gradient(115deg,var(--rope) 0 6px,transparent 6px 9px);opacity:.85}
+
+/* Tagesbericht */
+.report{margin:22px 0 8px;background:var(--surface);border:2px solid var(--ink);border-radius:6px 28px 6px 28px;padding:18px 18px 16px}
+.report h2{font-size:24px;margin:2px 0 8px}
+.report p{white-space:pre-line}
+.report .prompt{width:100%;text-align:left;min-height:48px}
+.report .prompt h2{margin-bottom:4px}
+.report .hint{color:var(--muted)}
+.field{display:block;margin:12px 0 0}
+.field>span{display:block;font:500 12px/1.2 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;min-height:48px;padding:10px 12px;border:2px solid var(--line);border-radius:10px;background:var(--bg)}
+textarea{min-height:120px;resize:vertical;line-height:1.5}
+input:focus,select:focus,textarea:focus{border-color:var(--ink)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row.end{justify-content:flex-end}
+
+/* Zeitleiste */
+.sectionhead{display:flex;align-items:baseline;justify-content:space-between;margin:28px 0 12px}
+.sectionhead h2{font-size:22px}
+.timeline{list-style:none;padding:0;position:relative}
+.timeline::before{content:"";position:absolute;left:55px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.tl{display:grid;grid-template-columns:48px 14px 1fr;gap:0 8px;margin-bottom:14px;align-items:start}
+.tl time{font:500 14px/1.2 var(--font-mono);padding-top:14px;text-align:right}
+.tl .dot{width:14px;height:14px;border-radius:50%;background:var(--bg);border:3px solid var(--sea);margin-top:15px;position:relative;z-index:1}
+.tl.fix .dot{background:var(--accent);border-color:var(--ink)}
+.ecard{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-height:56px}
+.ecard:active{transform:scale(.99)}
+.ecard .shots{display:grid;gap:2px;grid-template-columns:2fr 1fr;grid-auto-rows:92px}
+.ecard .shots.one{grid-template-columns:1fr;grid-auto-rows:170px}
+.ecard .shots.two{grid-template-columns:1fr 1fr;grid-auto-rows:130px}
+.ecard .shots .big{grid-row:span 2}
+.shots svg,.shots img,.shot svg,.shot img{width:100%;height:100%;display:block;object-fit:cover}
+.ecard .body{padding:10px 14px 12px}
+.etype{font:700 12px/1.2 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--sea)}
+.ecard p{margin-top:4px}
+.ecard .facts{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px;font:400 13px/1.3 var(--font-mono);color:var(--muted)}
+.wnd{display:inline-flex;align-items:center;gap:5px;color:var(--ink);font-weight:500}
+.wnd svg{width:16px;height:16px;fill:var(--ink)}
+.empty{padding:22px;text-align:center;color:var(--muted);border:2px dashed var(--line);border-radius:14px}
+
+/* Reise */
+.tripcard{display:block;width:100%;text-align:left;margin-bottom:18px;background:var(--surface);border:1px solid var(--line);border-radius:6px 24px 6px 24px;overflow:hidden}
+.tripcard .ph{height:170px}
+.tripcard .ph svg{width:100%;height:100%;display:block}
+.tripcard .b{padding:12px 16px 16px}
+.tripcard h3{font-size:22px;margin:4px 0 6px}
+.tripcard p{color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.tripcard .sm{font:500 13px var(--font-mono);color:var(--sea)}
+
+/* Karte */
+.mapbox{border:2px solid var(--ink);border-radius:6px 24px 6px 24px;overflow:hidden;background:var(--sky1)}
+.mapbox svg{display:block;width:100%;height:auto}
+.m-land{fill:var(--land)} .m-grid{stroke:var(--line);stroke-width:.6;opacity:.7} .m-route{fill:none;stroke:var(--hull);stroke-width:2.2;stroke-dasharray:5 3;opacity:.7}
+.m-today{fill:none;stroke:var(--accent);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+.m-pt{fill:var(--surface);stroke:var(--hull);stroke-width:2.5}
+.m-lbl{font:500 10.5px var(--font-mono);fill:var(--ink);paint-order:stroke;stroke:var(--sky1);stroke-width:3px}
+.switch{display:flex;align-items:center;gap:14px;min-height:56px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;cursor:pointer;margin-top:12px}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.track{width:54px;height:30px;border-radius:15px;background:var(--surface2);border:2px solid var(--muted);position:relative;flex:none;transition:background .2s}
+.track::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:transform .2s}
+.switch input:checked+.track{background:var(--accent);border-color:var(--ink)}
+.switch input:checked+.track::after{transform:translateX(24px);background:var(--ink)}
+.switch input:focus-visible+.track{outline:3px solid var(--focus);outline-offset:2px}
+.note{font-size:14px;color:var(--muted);margin-top:6px}
+
+/* Törn */
+.cover{margin:6px -16px 0;height:300px;position:relative;color:var(--on-photo);display:flex;align-items:flex-end;overflow:hidden}
+.cover .ph{position:absolute;inset:0}.cover .ph svg{width:100%;height:100%;display:block}
+.cover::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,var(--photo-scrim) 0%,transparent 65%)}
+.cover .txt{position:relative;z-index:1;padding:16px}
+.cover h1{font-size:40px;font-weight:800}
+.specs{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:18px}
+.specs div{background:var(--surface);padding:12px 14px}
+.specs dt{font:500 11px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.specs dd{font-weight:700;margin:2px 0 0}
+.crew{list-style:none;padding:0;margin:0}
+.crew li{display:flex;align-items:center;gap:12px;min-height:56px;border-bottom:1px solid var(--line)}
+.avatar{width:40px;height:40px;border-radius:50%;background:var(--sea);color:var(--surface);display:grid;place-items:center;font:700 16px var(--font-display);flex:none}
+.crew .n{flex:1}.crew small{display:block;color:var(--muted);font-size:14px}
+.linkbtn{min-height:48px;text-decoration:underline;text-underline-offset:4px;font-weight:700;color:var(--ink)}
+.addcrew{display:grid;grid-template-columns:1fr 130px auto;gap:8px;margin-top:12px}
+
+/* Tab-Leiste und FAB */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:2px solid var(--ink);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbar nav{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-width:520px}
+.tab{min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:500 12px var(--font-mono);letter-spacing:.04em;color:var(--muted);position:relative}
+.tab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-current=page]{color:var(--ink);font-weight:500}
+.tab[aria-current=page]::before{content:"";position:absolute;top:0;left:28%;right:28%;height:5px;background:var(--accent);border-radius:0 0 4px 4px}
+.fab{position:fixed;right:max(16px,calc(50% - 244px));bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:25;width:84px;height:84px;border-radius:50%;background:var(--accent);color:var(--on-accent);border:3px solid var(--ink);box-shadow:0 6px 0 var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font:800 13px var(--font-display);letter-spacing:.02em}
+.fab svg{width:30px;height:30px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round}
+.fab:active{transform:translateY(4px);box-shadow:0 2px 0 var(--ink)}
+.fab[hidden]{display:none}
+.fab.busy svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(172px + env(safe-area-inset-bottom,0px));z-index:60;max-width:420px;margin:0 auto;background:var(--ink);color:var(--bg);padding:13px 16px;border-radius:12px;font-weight:700;opacity:0;transform:translateY(10px);pointer-events:none;transition:opacity .2s,transform .2s}
+.toast.show{opacity:1;transform:none}
+
+/* Sheet */
+.overlay{position:fixed;inset:0;z-index:50;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center}
+.overlay[hidden]{display:none}
+.sheet{background:var(--bg);width:100%;max-width:520px;max-height:94%;overflow-y:auto;overflow-x:hidden;border-radius:26px 26px 0 0;padding:0 16px calc(24px + env(safe-area-inset-bottom,0px));animation:up .25s ease-out;border-top:3px solid var(--accent)}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.sheethead{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg);padding:14px 0 8px;z-index:2}
+.sheethead h2{font-size:24px}
+.sheethead .mono{font-size:12px;color:var(--muted);display:block;margin-top:2px}
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.slot{position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;border:2px dashed var(--muted);background:var(--surface);display:grid;place-items:center;text-align:center;font-size:13px;color:var(--muted)}
+.slot.has{border:2px solid var(--ink)}
+.slot input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.slot .prev{position:absolute;inset:0}.slot .prev svg,.slot .prev img{width:100%;height:100%;object-fit:cover;display:block}
+.slot .x{position:absolute;top:4px;right:4px;width:44px;height:44px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;z-index:3}
+.slot .x svg{width:18px;height:18px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:round}
+.slot .plus{display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+.slot .plus svg{width:28px;height:28px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;padding:0 15px;border-radius:999px;border:2px solid var(--line);background:var(--surface);font-weight:700;font-size:15px}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.typ[aria-pressed=true]{background:var(--accent);color:var(--on-accent);border-color:var(--ink)}
+.group{margin-top:22px}
+.group>h3{font:500 12px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.rose{display:block;width:min(100%,300px);margin:0 auto;touch-action:manipulation}
+.rose .w{fill:var(--surface);stroke:var(--ink);stroke-width:1;cursor:pointer}
+.rose .w:hover{fill:var(--sea-soft)}
+.rose .w[aria-pressed=true]{fill:var(--accent)}
+.rose text{font:500 11px var(--font-mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.rose .c{font:700 15px var(--font-display)}
+.rose .tick{stroke:var(--muted);stroke-width:1}
+.windread{text-align:center;font-weight:700;margin-top:6px}
+input[type=range]{width:100%;height:44px;accent-color:var(--ink)}
+.bft{display:flex;align-items:baseline;gap:10px;margin-bottom:2px}
+.bft b{font:800 38px var(--font-display);min-width:50px}
+details{border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+summary{min-height:48px;padding:0 14px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+details .in{padding:0 14px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.confirm{margin-top:12px;padding:14px;border:2px solid var(--danger);border-radius:12px;background:var(--surface)}
+.confirm p{font-weight:700;margin-bottom:10px}
+.actions{display:grid;grid-template-columns:auto 1fr;gap:10px;margin-top:26px}
+
+/* Onboarding */
+.ob{align-items:stretch}
+.obpanel{background:var(--bg);width:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;padding:0 16px calc(16px + env(safe-area-inset-bottom,0px));overflow-y:auto}
+.steps{display:flex;gap:6px;margin:18px 0 8px}
+.steps i{flex:1;height:6px;background:var(--line);border-radius:3px}
+.steps i.on{background:var(--accent);box-shadow:0 0 0 1px var(--ink)}
+.obpanel h1{font-size:34px;margin:10px 0 4px}
+.obpanel .lead{color:var(--muted);margin-bottom:6px}
+.obfoot{margin-top:auto;padding-top:22px;display:grid;grid-template-columns:auto 1fr;gap:10px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app">
+  <section class="screen" id="s-heute" aria-label="Heute"></section>
+  <section class="screen" id="s-reise" aria-label="Reise" hidden></section>
+  <section class="screen" id="s-karte" aria-label="Karte" hidden></section>
+  <section class="screen" id="s-toern" aria-label="Törn" hidden></section>
+</div>
+
+<button class="fab" id="fab" type="button" aria-label="Eintrag erfassen: Position und Zeit speichern">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg>Eintrag
+</button>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="tabbar"><nav aria-label="Hauptnavigation">
+  <button class="tab" data-tab="heute" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v15H4zM4 10h16M9 3v4M15 3v4"/></svg>Heute</button>
+  <button class="tab" data-tab="reise" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg>Reise</button>
+  <button class="tab" data-tab="karte" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg>Karte</button>
+  <button class="tab" data-tab="toern" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13M5 16l7 4 7-4M12 3 5 14h7M12 6l6 8h-6"/></svg>Törn</button>
+</nav></div>
+
+<!-- Eintrag-Detail -->
+<div class="overlay" id="sheetOv" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" id="sheet">
+    <div class="sheethead">
+      <div><h2 id="sheetTitle">Eintrag</h2><span class="mono" id="sheetMeta"></span></div>
+      <button class="iconbtn" id="sheetClose" type="button" aria-label="Schließen"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="photos" id="photos"></div>
+    <label class="field"><span>Notiz</span><textarea id="entryText" placeholder="Was passiert gerade? Stimmung, Begegnung, Besonderes …"></textarea></label>
+    <div class="group"><h3>Art des Eintrags</h3><div class="chips" id="typeChips"></div></div>
+    <div class="group"><h3>Wind &ndash; Richtung, aus der er weht</h3>
+      <svg class="rose" id="rose" viewBox="-110 -110 220 220" role="group" aria-label="Windrose, 16 Richtungen"></svg>
+      <div class="windread" id="windRead"></div>
+    </div>
+    <div class="group"><h3>Windstärke</h3>
+      <div class="bft"><b id="bftNum">3</b><span id="bftDesc"></span></div>
+      <input type="range" id="bft" min="0" max="12" step="1" value="3" aria-label="Windstärke in Beaufort">
+    </div>
+    <div class="group"><h3>Wetter</h3><div class="chips" id="wxChips"></div></div>
+    <div class="group"><h3>Seegang</h3><div class="chips" id="seaChips"></div></div>
+    <div class="group"><details><summary>Luftdruck &amp; Temperatur (optional)</summary>
+      <div class="in">
+        <label class="field"><span>Luftdruck hPa</span><input type="number" id="pressure" inputmode="numeric" placeholder="1015"></label>
+        <label class="field"><span>Temperatur °C</span><input type="number" id="temp" inputmode="decimal" placeholder="19"></label>
+      </div></details></div>
+    <div id="confirmBox" class="confirm" hidden>
+      <p>Diesen Eintrag wirklich löschen?</p>
+      <div class="row"><button class="btn" id="delNo" type="button">Abbrechen</button><button class="btn danger" id="delYes" type="button">Ja, löschen</button></div>
+    </div>
+    <div class="actions">
+      <button class="btn danger" id="delBtn" type="button">Löschen</button>
+      <button class="btn primary" id="saveBtn" type="button">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Onboarding -->
+<div class="overlay ob" id="obOv" hidden>
+  <div class="obpanel" role="dialog" aria-modal="true" aria-labelledby="obTitle">
+    <div class="steps" id="obSteps"><i></i><i></i><i></i></div>
+    <div class="eyebrow" id="obEyebrow"></div>
+    <h1 id="obTitle"></h1>
+    <p class="lead" id="obLead"></p>
+    <div id="obBody"></div>
+    <div class="obfoot">
+      <button class="btn ghost" id="obBack" type="button">Zurück</button>
+      <button class="btn primary" id="obNext" type="button">Weiter</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const I={
+  plus:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  x:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>',
+  back:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+  up:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>',
+  pen:'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-5L16 4l4 4L9 19zM14 6l4 4"/></svg>'
+};
+
+/* ---------- Domänenhilfen ---------- */
+function fmtCoord(lat,lon){
+  const f=(v,p,n,w)=>{const h=v>=0?p:n;v=Math.abs(v);let d=Math.floor(v),m=(v-d)*60;if(m>=59.9995){d++;m=0}
+    return String(d).padStart(w,'0')+'°'+m.toFixed(3).padStart(6,'0').replace('.',',')+'′'+h};
+  return f(lat,'N','S',2)+' '+f(lon,'E','W',3);
+}
+const DIRS=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const BFT=[['Windstill','< 1 kn'],['Leiser Zug','1–3 kn'],['Leichte Brise','4–6 kn'],['Schwache Brise','7–10 kn'],['Mäßige Brise','11–16 kn'],['Frische Brise','17–21 kn'],['Starker Wind','22–27 kn'],['Steifer Wind','28–33 kn'],['Stürmischer Wind','34–40 kn'],['Sturm','41–47 kn'],['Schwerer Sturm','48–55 kn'],['Orkanartiger Sturm','56–63 kn'],['Orkan','≥ 64 kn']];
+const TYPES=['Eintrag','Ablegen','Hafen','Ankerplatz','Boje','Segel setzen','Segel bergen','Motor an/aus','Sichtung','Sonstiges'];
+const WX=['Sonne','Leicht bewölkt','Bewölkt','Regen','Gewitter','Nebel'];
+const SEA=['Glatt','Leicht bewegt','Mäßig','Grob','Sehr grob'];
+
+/* ---------- Platzhalter-Fotos (SVG) ---------- */
+let gid=0;
+function boat(x,y,k){return `<g transform="translate(${x} ${y}) scale(${k})"><path class="f-sail" d="M2 -10 V-125 L52 -12 Z"/><path class="f-sail" opacity=".8" d="M-4 -10 V-108 L-52 -10 Z"/><rect class="f-hull" x="-1" y="-128" width="3" height="128"/><path class="f-hull" d="M-58 -2 H62 L44 17 H-42 Z"/></g>`}
+function scene(kind,v){
+  v=v||0;const g='g'+(gid++);const sx=70+((v*97)%240);
+  const H=kind==='horizon'?150:kind==='harbor'?185:175;
+  let s=`<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"><defs><linearGradient id="${g}a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sky1)"/><stop offset="1" style="stop-color:var(--sky2)"/></linearGradient><linearGradient id="${g}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--water1)"/><stop offset="1" style="stop-color:var(--water2)"/></linearGradient></defs><rect width="400" height="300" fill="url(#${g}a)"/>`;
+  if(kind!=='harbor')s+=`<circle class="f-sun" cx="${kind==='horizon'?200:sx}" cy="${kind==='horizon'?H-26:70}" r="${kind==='horizon'?42:24}" opacity=".9"/>`;
+  s+=`<rect y="${H}" width="400" height="${300-H}" fill="url(#${g}b)"/>`;
+  for(let i=0;i<5;i++)s+=`<path class="s-line" d="M${(i*83+v*31)%330} ${H+18+i*20} h${40+i*9}"/>`;
+  if(kind==='sail'||kind==='boat')s+=boat(kind==='boat'?200:sx,H+8,kind==='boat'?1.55:1);
+  if(kind==='horizon'||kind==='dolphin'){
+    s+=`<path class="f-land" opacity=".55" d="M0 ${H} q60 -14 120 -2 t140 -4 t140 4 V${H}Z"/>`;
+    if(kind==='dolphin')s+=`<path class="f-hull" d="M110 ${H+60} q18 -34 38 -8 q-16 -4 -38 8z"/><path class="f-hull" d="M215 ${H+82} q20 -38 42 -8 q-18 -4 -42 8z"/>`;
+    else s+=boat(sx,H+4,.45);
+  }
+  if(kind==='anchor'){
+    s+=`<path class="f-land" d="M0 ${H} V120 q40 -40 90 -20 q40 -30 100 10 q30 20 40 ${H-110}z"/>`+boat(280,H+14,.8)+`<path class="s-line" style="stroke-dasharray:3 4" d="M280 ${H+30} V280"/><path class="f-hull" d="M274 282 h12 M280 262 v22 M270 272 q10 14 20 0"/>`;
+  }
+  if(kind==='harbor'){
+    for(let i=0;i<7;i++){const x=20+i*54;s+=`<rect class="f-land" x="${x}" y="${150-(i%3)*10}" width="42" height="${H-150+(i%3)*10}"/><path class="f-roof" d="M${x-4} ${150-(i%3)*10} l25 -22 l25 22z"/>`}
+    s+=`<rect class="f-quay" y="238" width="400" height="62"/>`;
+    for(let i=0;i<5;i++){const x=50+i*75+((v*13)%20),h=70+((i*37+v*11)%40);s+=`<rect class="f-hull" x="${x}" y="${238-h}" width="2.5" height="${h}"/><path class="f-hull" d="M${x-30} 232 h62 l-10 12 h-44z"/><path class="f-sail" opacity=".85" d="M${x+4} ${238-h+6} V228 H${x+28}Z"/>`}
+  }
+  return s+'</svg>';
+}
+const photoHTML=p=>p.src?`<img src="${p.src}" alt="Foto">`:scene(p.k,p.v);
+
+/* ---------- Mock-Daten ---------- */
+const E=(t,type,lat,lon,o)=>Object.assign({t,type,lat,lon,text:'',photos:[],dir:null,bft:null,wx:'',sea:'',p:'',temp:''},o||{});
+const state={
+  today:3,viewDay:3,tab:'heute',editReport:false,
+  trip:{name:'Dänische Südsee 2026',from:'2026-08-08',to:'2026-08-16',area:'Kieler Förde bis Fynske Hav'},
+  boat:{name:'Seeschwalbe',type:'Bavaria 34',len:'10,30 m',home:'Kiel-Holtenau',mmsi:'211 456 780'},
+  crew:[{n:'Markus',r:'Skipper'},{n:'Anja',r:'Co-Skipper'},{n:'Jonas',r:'Crew'},{n:'Mieke',r:'Crew'}],
+  days:[
+  {n:1,date:'2026-08-08',wd:'Samstag',from:'Kiel',to:'Marstal',nm:46,time:'8 h 55',title:'Raus aus der Förde',report:'Um 6:50 Uhr Leinen los in Holtenau, noch kalt und diesig. Hinter Bülk kam die Sonne durch und der Westwind stand wie bestellt: Segel hoch, Kurs Nord über die Kieler Bucht. Gegen Mittag zogen drei Schweinswale querab durch und Mieke hat sie als Erste entdeckt. Am Nachmittag Ankunft in Marstal, Fischbrötchen am Kai, müde und glücklich.',entries:[
+    E('06:50','Ablegen',54.3721,10.1452,{text:'Schleuse Holtenau, Leinen los.',photos:[{k:'harbor',v:1}],dir:12,bft:3,wx:'Leicht bewölkt'}),
+    E('08:15','Segel setzen',54.4580,10.2960,{text:'Groß im zweiten Reff, Genua voll.',photos:[{k:'sail',v:2},{k:'boat',v:3}],dir:12,bft:4,wx:'Sonne',sea:'Leicht bewegt',p:'1016',temp:'17'}),
+    E('10:40','Sichtung',54.6210,10.4180,{text:'Drei Schweinswale querab.',photos:[{k:'dolphin',v:4}],dir:12,bft:4,wx:'Sonne'}),
+    E('12:30','Eintrag',54.7180,10.4560,{text:'Mittagspause unter Segeln, Nudelsalat.',dir:13,bft:5,wx:'Leicht bewölkt',sea:'Mäßig'}),
+    E('15:45','Hafen',54.8546,10.5172,{text:'Fest in Marstal, Box 14.',photos:[{k:'harbor',v:5}],dir:12,bft:3})]},
+  {n:2,date:'2026-08-09',wd:'Sonntag',from:'Marstal',to:'Svendborg',nm:22,time:'4 h 40',title:'Zwischen den Inseln',report:'Ruhiger Tag. Nach einem Bummel durch Marstal und einem Blick ins Schifffahrtsmuseum ging es erst um 9 Uhr los. Die Fahrrinne nach Norden war schmal, aber gut betonnt. Im Svendborgsund viel Verkehr, Fähre Ærøskøbing querte vor uns. Abends Eis am Hafen und die Erkenntnis: Hier könnte man bleiben.',entries:[
+    E('09:10','Ablegen',54.8553,10.5176,{text:'Marstal Havn verlassen.',photos:[{k:'harbor',v:6}],dir:10,bft:2,wx:'Sonne'}),
+    E('10:35','Segel setzen',54.9340,10.5620,{photos:[{k:'sail',v:7}],dir:10,bft:3,wx:'Sonne',sea:'Glatt'}),
+    E('12:50','Ankerplatz',54.9990,10.5480,{text:'Badestopp vor Thurø, Wasser 19 Grad.',photos:[{k:'anchor',v:8}],dir:9,bft:2,wx:'Sonne'}),
+    E('14:20','Hafen',55.0596,10.6086,{text:'Svendborg, Gästehafen am Rai.',photos:[{k:'harbor',v:9}],dir:10,bft:3})]},
+  {n:3,date:'2026-08-10',wd:'Montag',from:'Svendborg',to:'Faaborg',nm:19,time:'4 h 15',title:'Westwärts am Fünischen Ufer',report:'',entries:[
+    E('09:05','Ablegen',55.0598,10.6091,{text:'Leinen los, Kaffee in der Hand.',photos:[{k:'harbor',v:10}],dir:10,bft:3,wx:'Leicht bewölkt'}),
+    E('09:40','Segel setzen',55.0430,10.5420,{photos:[{k:'sail',v:11},{k:'horizon',v:12}],dir:11,bft:4,wx:'Leicht bewölkt',sea:'Leicht bewegt'}),
+    E('11:15','Eintrag',55.0262,10.4310,{text:'Seeadler über der Küste von Tåsinge, ordentlich Fahrt.',photos:[{k:'horizon',v:13}],dir:12,bft:5,wx:'Sonne',sea:'Mäßig',p:'1014',temp:'20'}),
+    E('13:10','Motor an/aus',55.0400,10.3000,{text:'Flaute im Lee der Insel, Motor an.',dir:12,bft:1,wx:'Sonne',sea:'Glatt'}),
+    E('14:20','Ankerplatz',55.0420,10.1690,{text:'Mittagsstopp vor Avernakø, Anker fiel auf 4 m Sand.',photos:[{k:'anchor',v:14},{k:'sail',v:15},{k:'dolphin',v:16}],dir:11,bft:2,wx:'Sonne'}),
+    E('16:05','Hafen',55.0945,10.2430,{text:'Faaborg, längsseits im Außenhafen.',photos:[{k:'harbor',v:17}],dir:11,bft:3})]}
+  ]};
+const day=()=>state.days.find(d=>d.n===state.viewDay);
+const hero=d=>{for(const e of d.entries)if(e.photos[0])return e.photos[0];return{k:'horizon',v:d.n}};
+
+/* ---------- UI-Helfer ---------- */
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600)}
+function windHTML(e){
+  if(e.dir==null&&e.bft==null)return '';
+  const arrow=e.dir!=null?`<svg viewBox="-8 -8 16 16" style="transform:rotate(${e.dir*22.5+180}deg)" aria-hidden="true"><path d="M0 -7 L5 6 L0 3 L-5 6Z"/></svg>`:'';
+  return `<span class="wnd">${arrow}${e.dir!=null?DIRS[e.dir]:''} ${e.bft!=null?e.bft+' Bft':''}</span>`;
+}
+function shotsHTML(ph){
+  if(!ph.length)return '';
+  const cls=ph.length===1?'one':ph.length===2?'two':'';
+  return `<div class="shots ${cls}">${ph.map((p,i)=>`<div class="shot ${ph.length===3&&i===0?'big':''}">${photoHTML(p)}</div>`).join('')}</div>`;
+}
+function setTab(t){
+  state.tab=t;
+  $$('.screen').forEach(s=>s.hidden=s.id!=='s-'+t);
+  $$('.tab').forEach(b=>b.getAttribute('data-tab')===t?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current'));
+  $('#fab').hidden=(t==='toern');
+  render();window.scrollTo(0,0);
+}
+
+/* ---------- Heute ---------- */
+function renderHeute(){
+  const d=day(),isToday=d.n===state.today;
+  const sorted=[...d.entries].sort((a,b)=>a.t.localeCompare(b.t));
+  const dt=new Date(d.date+'T12:00:00');
+  const dateStr=d.wd+', '+dt.getDate()+'. August 2026';
+  let h=`<div class="top"><span class="eyebrow">${esc(state.trip.name)}</span>${isToday?'':`<button class="btn ghost" data-act="gotoToday" type="button" style="min-height:44px">Zu heute</button>`}</div>
+  <header class="chapter"><div class="ph">${photoHTML(hero(d))}</div><div class="txt">
+    <span class="num">Tag ${d.n}</span>
+    <h1>${esc(d.from)} <span class="arrow">&rarr;</span> ${esc(d.to)}</h1>
+    <div class="eyebrow" style="color:inherit;opacity:.85;margin-top:8px">${esc(dateStr)}</div>
+    <div class="meta"><span><b>${d.nm}</b> sm</span><span><b>${esc(d.time)}</b> Fahrtzeit</span><span><b>${d.entries.length}</b> Einträge</span></div>
+  </div></header><div class="rope"></div>`;
+  h+=`<section class="report" aria-label="Tagesbericht">`;
+  if(state.editReport){
+    h+=`<div class="eyebrow">Tagesbericht</div>
+    <label class="field"><span>Titel (optional)</span><input type="text" id="repTitle" value="${esc(d.title)}" placeholder="z. B. Raus aus der Förde"></label>
+    <label class="field"><span>Wie war der Tag?</span><textarea id="repText" style="min-height:190px" placeholder="Erzähl vom Tag: Wetter, Stimmung, Begegnungen …">${esc(d.report)}</textarea></label>
+    <div class="row end" style="margin-top:14px"><button class="btn ghost" data-act="repCancel" type="button">Abbrechen</button><button class="btn primary" data-act="repSave" type="button">Speichern</button></div>`;
+  }else if(d.report||d.title){
+    h+=`<div class="eyebrow">Tagesbericht</div><h2>${esc(d.title||'Ohne Titel')}</h2><p>${esc(d.report)}</p>
+    <button class="linkbtn" data-act="repEdit" type="button">Bearbeiten</button>`;
+  }else{
+    h+=`<button class="prompt btn" style="border:0;justify-content:flex-start;padding:0;background:none;display:block;text-align:left" data-act="repEdit" type="button"><div class="eyebrow">Tagesbericht</div><h2>Wie war der Tag?</h2><span class="hint">Tippe hier und erzähle in ein paar Sätzen davon. Es wird später Teil deines Booklets.</span></button>`;
+  }
+  h+=`</section>`;
+  h+=`<div class="sectionhead"><h2>Zeitleiste</h2><span class="eyebrow">${sorted.length} Einträge</span></div>`;
+  if(!sorted.length)h+=`<div class="empty">Noch kein Eintrag. Der runde Button unten speichert Position und Uhrzeit.</div>`;
+  h+=`<ol class="timeline">`+sorted.map(e=>{
+    const idx=d.entries.indexOf(e);
+    return `<li class="tl ${e.text||e.photos.length?'':'fix'}"><time>${e.t}</time><span class="dot"></span>
+    <button class="ecard" data-act="open" data-i="${idx}" type="button" aria-label="Eintrag ${e.t} ${esc(e.type)} öffnen">${shotsHTML(e.photos)}
+    <div class="body"><span class="etype">${esc(e.type)}</span>${e.text?`<p>${esc(e.text)}</p>`:''}
+    <div class="facts">${windHTML(e)}<span>${fmtCoord(e.lat,e.lon)}</span></div></div></button></li>`}).join('')+`</ol>`;
+  $('#s-heute').innerHTML=h;
+}
+
+/* ---------- Reise ---------- */
+function renderReise(){
+  const total=state.days.reduce((a,d)=>a+d.nm,0);
+  $('#s-reise').innerHTML=`<div class="top"><div><div class="eyebrow">${esc(state.trip.name)}</div><h1 style="font-size:34px;margin-top:6px">Die Reise</h1></div></div>
+  <p class="note" style="margin:0 0 18px"><b class="mono">${total}</b> sm in <b class="mono">${state.days.length}</b> Tagen</p>`+
+  [...state.days].reverse().map(d=>{
+    const ex=d.report?d.report.slice(0,150).replace(/\s+\S*$/,'')+' …':'Noch kein Tagesbericht geschrieben.';
+    return `<button class="tripcard" data-act="gotoDay" data-n="${d.n}" type="button"><div class="ph">${photoHTML(hero(d))}</div>
+    <div class="b"><div class="eyebrow">Tag ${d.n} · ${d.date.slice(8)}.${d.date.slice(5,7)}.</div>
+    <h3>${esc(d.from)} &rarr; ${esc(d.to)}</h3>
+    <div class="sm">${d.nm} sm · ${esc(d.title)}</div><p style="margin-top:6px">${esc(ex)}</p></div></button>`}).join('');
+}
+
+/* ---------- Karte ---------- */
+const MAP={w:400,h:430,lat0:55.2,lat1:54.3,lon0:10.0,lon1:10.9};
+const px=(lat,lon)=>[20+(lon-MAP.lon0)/(MAP.lon1-MAP.lon0)*360, 20+(MAP.lat0-lat)/(MAP.lat0-MAP.lat1)*390];
+const poly=pts=>'M'+pts.map(p=>px(p[0],p[1]).map(n=>n.toFixed(1)).join(' ')).join(' L')+'Z';
+function renderKarte(){
+  const land=[
+    [[55.2,10.0],[55.2,10.9],[55.12,10.9],[55.07,10.7],[55.075,10.6],[55.09,10.45],[55.12,10.3],[55.12,10.2],[55.13,10.0]],
+    [[55.05,10.77],[55.02,10.87],[54.8,10.88],[54.75,10.8],[54.9,10.78]],
+    [[54.9,10.3],[54.925,10.42],[54.89,10.56],[54.835,10.55],[54.85,10.4],[54.87,10.3]],
+    [[54.3,9.95],[54.3,10.9],[54.45,10.9],[54.5,10.65],[54.44,10.45],[54.44,10.27],[54.36,10.14],[54.33,10.12],[54.4,9.95]],
+    [[55.05,10.12],[55.03,10.22],[55.0,10.2],[55.0,10.1]]
+  ];
+  let svg=`<svg viewBox="0 0 400 ${MAP.h}" role="img" aria-label="Schematische Karte des Törns von Kiel nach Faaborg"><rect width="400" height="${MAP.h}" fill="var(--sky1)"/>`;
+  for(let i=0;i<=4;i++){svg+=`<path class="m-grid" d="M0 ${20+i*97.5} H400"/><path class="m-grid" d="M${20+i*90} 0 V${MAP.h}"/>`}
+  land.forEach(l=>svg+=`<path class="m-land" d="${poly(l)}"/>`);
+  const pts=state.days.map(d=>[...d.entries].sort((a,b)=>a.t.localeCompare(b.t)));
+  pts.forEach((arr,i)=>{
+    const dpath='M'+arr.map(e=>px(e.lat,e.lon).map(n=>n.toFixed(1)).join(' ')).join(' L');
+    svg+=`<path class="${state.days[i].n===state.today?'m-today':'m-route'}" d="${dpath}"/>`;
+  });
+  const seen={};
+  state.days.forEach((d,i)=>pts[i].forEach(e=>{
+    if(e.type!=='Hafen'&&e.type!=='Ankerplatz')return;
+    const [x,y]=px(e.lat,e.lon);
+    const nm={'54.8546':'Marstal','55.0596':'Svendborg','55.0945':'Faaborg','55.0420':'Anker Avernakø','54.9990':'Anker Thurø'}[e.lat.toFixed(4)]||e.type;
+    if(seen[nm])return;seen[nm]=1;
+    const left=nm==='Faaborg'||nm==='Anker Avernakø';
+    svg+=`<circle class="m-pt" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${e.type==='Hafen'?6:4.5}"/><text class="m-lbl" x="${(x+(left?-10:10)).toFixed(1)}" y="${(y+(nm==='Svendborg'?-9:4)).toFixed(1)}" text-anchor="${left?'end':'start'}">${nm}</text>`;
+  }));
+  const k=px(54.3721,10.1452);
+  svg+=`<circle class="m-pt" cx="${k[0]}" cy="${k[1]}" r="6"/><text class="m-lbl" x="${k[0]+10}" y="${k[1]-8}">Kiel-Holtenau</text>`;
+  svg+=`<g transform="translate(360 395)"><circle r="16" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.5"/><path d="M0 -12 L5 4 L0 1 L-5 4Z" fill="var(--ink)"/><text x="0" y="-21" text-anchor="middle" class="m-lbl">N</text></g>`;
+  svg+=`<text class="m-lbl" x="20" y="420">schematisch, nicht zur Navigation</text></svg>`;
+  $('#s-karte').innerHTML=`<div class="top"><div><div class="eyebrow">${esc(state.trip.name)}</div><h1 style="font-size:34px;margin-top:6px">Karte</h1></div></div>
+  <div class="mapbox">${svg}</div>
+  <p class="note"><span style="display:inline-block;width:26px;height:4px;background:var(--accent);border:1px solid var(--ink);vertical-align:middle"></span> heutiger Tag &nbsp; <span style="display:inline-block;width:26px;border-top:2px dashed var(--hull);vertical-align:middle"></span> frühere Tage</p>
+  <div class="row" style="margin-top:14px"><label class="btn block" for="gpxFile" style="cursor:pointer">${I.up} GPX importieren</label>
+  <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml" class="sr"></div>
+  <label class="switch" for="liveRec"><input type="checkbox" id="liveRec" role="switch"${state.live?' checked':''}><span class="track"></span><span><b>Live-Route aufzeichnen</b><br><span style="font-size:15px">Bildschirm bleibt an</span></span></label>
+  <p class="note">Standardmäßig aus. Die Aufzeichnung läuft nur, solange die App im Vordergrund offen ist, und verbraucht spürbar Akku. Besser: Ladekabel anschließen.</p>`;
+}
+
+/* ---------- Törn ---------- */
+function renderToern(){
+  const b=state.boat;
+  $('#s-toern').innerHTML=`<div class="cover"><div class="ph">${scene('boat',3)}</div><div class="txt">
+   <div class="eyebrow" style="color:inherit;opacity:.9">${esc(state.trip.name)}</div><h1>${esc(b.name)}</h1></div></div><div class="rope"></div>
+   <dl class="specs"><div><dt>Typ</dt><dd>${esc(b.type)}</dd></div><div><dt>Länge</dt><dd>${esc(b.len)}</dd></div>
+   <div><dt>Heimathafen</dt><dd>${esc(b.home)}</dd></div><div><dt>MMSI</dt><dd class="mono">${esc(b.mmsi)}</dd></div>
+   <div><dt>Zeitraum</dt><dd class="mono">${state.trip.from.slice(8)}.${state.trip.from.slice(5,7)}. – ${state.trip.to.slice(8)}.${state.trip.to.slice(5,7)}.</dd></div><div><dt>Revier</dt><dd>${esc(state.trip.area)}</dd></div></dl>
+   <div class="sectionhead"><h2>Crew</h2><span class="eyebrow">${state.crew.length} Personen</span></div>
+   <ul class="crew">${state.crew.map((c,i)=>`<li><span class="avatar">${esc(c.n[0]||'?')}</span><span class="n">${esc(c.n)}<small>${esc(c.r)}</small></span>
+    <button class="iconbtn" data-act="crewDel" data-i="${i}" type="button" aria-label="${esc(c.n)} entfernen" style="border-color:transparent"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></li>`).join('')}</ul>
+   <div class="addcrew"><input type="text" id="crewName" placeholder="Name" aria-label="Name"><select id="crewRole" aria-label="Rolle"><option>Crew</option><option>Co-Skipper</option><option>Skipper</option></select><button class="btn" id="crewAdd" type="button" aria-label="Crew hinzufügen">${I.plus}</button></div>
+   <div class="sectionhead"><h2>Export</h2></div>
+   <div class="row"><button class="btn block" id="expZip" type="button">${I.up} ZIP mit Bildern</button><button class="btn block" id="expJson" type="button">${I.up} Einzelne JSON</button></div>
+   <p class="note">Das ZIP enthält logbook.json, images/ und die Route als GPX und eignet sich als Backup.</p>
+   <div style="margin-top:28px;text-align:center"><button class="linkbtn" id="newTrip" type="button">Neuen Törn anlegen</button></div>`;
+}
+function render(){({heute:renderHeute,reise:renderReise,karte:renderKarte,toern:renderToern})[state.tab]()}
+
+/* ---------- Eintrag-Sheet ---------- */
+let cur=null,curIdx=-1,curDay=null,sheetOpener=null;
+function openSheet(d,idx){
+  curDay=d;curIdx=idx;cur=JSON.parse(JSON.stringify(d.entries[idx]));
+  sheetOpener=document.activeElement;
+  $('#sheetTitle').textContent=cur.type+' · '+cur.t;
+  $('#sheetMeta').textContent='Tag '+d.n+' · '+fmtCoord(cur.lat,cur.lon);
+  $('#entryText').value=cur.text;
+  $('#pressure').value=cur.p;$('#temp').value=cur.temp;
+  $('#bft').value=cur.bft==null?3:cur.bft;
+  $('#confirmBox').hidden=true;
+  if(cur.p||cur.temp)$('details').open=true;else $('details').open=false;
+  buildSheet();
+  $('#sheetOv').hidden=false;$('#sheet').scrollTop=0;$('#sheetClose').focus();
+}
+function closeSheet(){$('#sheetOv').hidden=true;if(sheetOpener&&sheetOpener.focus&&document.contains(sheetOpener))sheetOpener.focus()}
+function chips(id,list,key,cls){
+  $(id).innerHTML=list.map(x=>`<button class="chip ${cls||''}" type="button" data-v="${esc(x)}" aria-pressed="${cur[key]===x}">${esc(x)}</button>`).join('');
+}
+function buildSheet(){
+  let ph='';
+  for(let i=0;i<3;i++){
+    const p=cur.photos[i];
+    ph+=`<div class="slot ${p?'has':''}">${p?`<div class="prev">${photoHTML(p)}</div><button class="x" type="button" data-rm="${i}" aria-label="Foto ${i+1} entfernen">${I.x}</button>`
+    :`<span class="plus">${I.cam}Foto ${i+1}</span><input type="file" accept="image/*" id="photo${i}" data-slot="${i}" aria-label="Foto ${i+1} hinzufügen">`}</div>`;
+  }
+  $('#photos').innerHTML=ph;
+  chips('#typeChips',TYPES,'type','typ');chips('#wxChips',WX,'wx');chips('#seaChips',SEA,'sea');
+  buildRose();updateBft();
+}
+function polar(r,deg){const a=deg*Math.PI/180;return[(r*Math.sin(a)).toFixed(2),(-r*Math.cos(a)).toFixed(2)]}
+function buildRose(){
+  let s='';
+  for(let i=0;i<16;i++){
+    const a0=i*22.5-11.25,a1=i*22.5+11.25,r0=24,r1=80;
+    const p=[polar(r0,a0),polar(r1,a0),polar(r1,a1),polar(r0,a1)];
+    s+=`<path class="w" data-d="${i}" tabindex="0" role="button" aria-pressed="${cur.dir===i}" aria-label="Wind aus ${DIRS[i]}" d="M${p[0]} L${p[1]} A${r1} ${r1} 0 0 1 ${p[2]} L${p[3]} A${r0} ${r0} 0 0 0 ${p[0]}Z"/>`;
+  }
+  for(let i=0;i<16;i++){const [x,y]=polar(i%4===0?94:88,i*22.5);const lab=i%4===0?DIRS[i]:'';if(lab)s+=`<text class="c" x="${x}" y="${y}">${lab}</text>`;
+    const [tx,ty]=polar(52,i*22.5);if(i%2===0||true)s+=`<text x="${tx}" y="${ty}" style="font-size:8px;opacity:${i%2?0:.9}">${i%2?'':DIRS[i]}</text>`}
+  s+=`<circle r="22" fill="var(--bg)" stroke="var(--ink)"/>`;
+  if(cur.dir!=null)s+=`<path d="M0 -14 L8 10 L0 5 L-8 10Z" fill="var(--ink)" transform="rotate(${cur.dir*22.5+180})"/>`;
+  else s+=`<text style="font-size:9px">Wind</text>`;
+  $('#rose').innerHTML=s;
+  $('#windRead').textContent=cur.dir==null?'Richtung antippen':'Wind aus '+DIRS[cur.dir]+' ('+Math.round(cur.dir*22.5)+'°)';
+}
+function updateBft(){
+  const v=+$('#bft').value;$('#bftNum').textContent=v;
+  $('#bftDesc').innerHTML=`<b style="font-weight:700">${BFT[v][0]}</b><br><span class="mono" style="font-size:13px;color:var(--muted)">${BFT[v][1]}</span>`;
+  $('#bft').setAttribute('aria-valuetext',v+' Beaufort, '+BFT[v][0]);
+}
+function readFile(file,slot){
+  if(!file)return;
+  const fr=new FileReader();
+  fr.onload=()=>{cur.photos[slot]={src:fr.result};cur.photos=cur.photos.filter(Boolean);buildSheet();toast('Foto hinzugefügt')};
+  fr.readAsDataURL(file);
+}
+function saveSheet(){
+  cur.text=$('#entryText').value.trim();cur.p=$('#pressure').value;cur.temp=$('#temp').value;
+  cur.bft=cur.bft!=null||cur.dir!=null||bftTouched?+$('#bft').value:null;
+  curDay.entries[curIdx]=cur;closeSheet();render();toast('Eintrag '+cur.t+' gespeichert');
+}
+let bftTouched=false;
+
+/* ---------- FAB ---------- */
+function quickEntry(){
+  const fab=$('#fab');if(fab.classList.contains('busy'))return;
+  fab.classList.add('busy');fab.setAttribute('aria-busy','true');
+  setTimeout(()=>{
+    fab.classList.remove('busy');fab.removeAttribute('aria-busy');
+    state.viewDay=state.today;
+    const d=day(),now=new Date(),t=pad(now.getHours())+':'+pad(now.getMinutes());
+    const last=[...d.entries].sort((a,b)=>a.t.localeCompare(b.t)).pop();
+    const e=E(t,'Eintrag',(last?last.lat:55.09)+0.0012,(last?last.lon:10.24)+0.0009);
+    d.entries.push(e);
+    if(state.tab!=='heute'){state.tab='heute';$$('.screen').forEach(s=>s.hidden=s.id!=='s-heute');$$('.tab').forEach(b=>b.getAttribute('data-tab')==='heute'?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current'))}
+    bftTouched=false;render();toast('Eintrag '+t+' gespeichert');
+    openSheet(d,d.entries.length-1);
+  },700);
+}
+
+/* ---------- Onboarding ---------- */
+const ob={step:0,crew:[{n:'',r:'Skipper'}],v:{}};
+function obRender(){
+  const S=[
+    ['Schritt 1 von 3','Dein Törn','Wohin soll es gehen? Das ist die Titelseite deines Booklets.',
+     `<label class="field"><span>Name des Törns</span><input type="text" id="obName" value="${esc(ob.v.name||'')}" placeholder="z. B. Dänische Südsee 2026"></label>
+      <div class="row" style="align-items:flex-start"><label class="field" style="flex:1;min-width:140px"><span>Von</span><input type="date" id="obFrom" value="${esc(ob.v.from||'')}"></label><label class="field" style="flex:1;min-width:140px"><span>Bis</span><input type="date" id="obTo" value="${esc(ob.v.to||'')}"></label></div>
+      <label class="field"><span>Revier (optional)</span><input type="text" id="obArea" value="${esc(ob.v.area||'')}" placeholder="z. B. Dänische Südsee"></label>`],
+    ['Schritt 2 von 3','Dein Boot','Name und Daten, mehr nicht. Ein Foto kommt später dazu.',
+     `<label class="field"><span>Bootsname</span><input type="text" id="obBoat" value="${esc(ob.v.boat||'')}" placeholder="z. B. Seeschwalbe"></label>
+      <label class="field"><span>Typ / Modell</span><input type="text" id="obType" value="${esc(ob.v.type||'')}" placeholder="z. B. Bavaria 34"></label>
+      <div class="row" style="align-items:flex-start"><label class="field" style="flex:1;min-width:120px"><span>Länge (m)</span><input type="text" inputmode="decimal" id="obLen" value="${esc(ob.v.len||'')}" placeholder="10,30"></label><label class="field" style="flex:2;min-width:160px"><span>Heimathafen</span><input type="text" id="obHome" value="${esc(ob.v.home||'')}" placeholder="Kiel-Holtenau"></label></div>
+      <label class="field"><span>Rufzeichen / MMSI (optional)</span><input type="text" id="obMmsi" value="${esc(ob.v.mmsi||'')}"></label>
+      <label class="field"><span>Bootsfoto (optional)</span><input type="file" id="obPhoto" accept="image/*"></label>`],
+    ['Schritt 3 von 3','Deine Crew','Wer ist an Bord? Rollen sind optional.',
+     `<ul class="crew">${ob.crew.map((c,i)=>`<li><span class="avatar">${esc((c.n||'?')[0])}</span><span class="n" style="display:flex;gap:6px"><input type="text" data-cn="${i}" value="${esc(c.n)}" placeholder="Name" aria-label="Name ${i+1}"><select data-cr="${i}" aria-label="Rolle ${i+1}" style="max-width:130px">${['Skipper','Co-Skipper','Crew'].map(r=>`<option${r===c.r?' selected':''}>${r}</option>`).join('')}</select></span>
+       <button class="iconbtn" data-cd="${i}" type="button" aria-label="Person entfernen" style="border-color:transparent"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></li>`).join('')}</ul>
+      <button class="btn block" id="obAddCrew" type="button" style="margin-top:12px">${I.plus} Person hinzufügen</button>`]
+  ][ob.step];
+  $('#obEyebrow').textContent=S[0];$('#obTitle').textContent=S[1];$('#obLead').textContent=S[2];$('#obBody').innerHTML=S[3];
+  $$('#obSteps i').forEach((el,i)=>el.classList.toggle('on',i<=ob.step));
+  $('#obNext').textContent=ob.step===2?'Törn anlegen':'Weiter';
+  $('#obBack').textContent=ob.step===0?'Abbrechen':'Zurück';
+}
+function obCollect(){
+  const g=id=>{const el=$(id);return el?el.value:undefined};
+  [['name','#obName'],['from','#obFrom'],['to','#obTo'],['area','#obArea'],['boat','#obBoat'],['type','#obType'],['len','#obLen'],['home','#obHome'],['mmsi','#obMmsi']].forEach(([k,id])=>{const v=g(id);if(v!==undefined)ob.v[k]=v});
+}
+function obOpen(){ob.step=0;ob.crew=[{n:'',r:'Skipper'}];ob.v={};obRender();$('#obOv').hidden=false;$('#obName').focus()}
+function obFinish(){
+  obCollect();
+  if(ob.v.name)state.trip.name=ob.v.name;if(ob.v.area)state.trip.area=ob.v.area;
+  if(ob.v.from)state.trip.from=ob.v.from;if(ob.v.to)state.trip.to=ob.v.to;
+  if(ob.v.boat)state.boat.name=ob.v.boat;if(ob.v.type)state.boat.type=ob.v.type;
+  if(ob.v.len)state.boat.len=ob.v.len+' m';if(ob.v.home)state.boat.home=ob.v.home;if(ob.v.mmsi)state.boat.mmsi=ob.v.mmsi;
+  const c=ob.crew.filter(x=>x.n.trim());if(c.length)state.crew=c.map(x=>({n:x.n.trim(),r:x.r}));
+  $('#obOv').hidden=true;render();toast('Törn angelegt');
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest('[data-tab],[data-act],[data-v],[data-d],[data-rm],#fab,#sheetClose,#saveBtn,#delBtn,#delYes,#delNo,#crewAdd,#expZip,#expJson,#newTrip,#obNext,#obBack,#obAddCrew,[data-cd]');
+  if(!t)return;
+  if(t.dataset.tab)return setTab(t.dataset.tab);
+  if(t.id==='fab')return quickEntry();
+  const a=t.dataset.act;
+  if(a==='open'){bftTouched=false;return openSheet(day(),+t.dataset.i)}
+  if(a==='gotoDay'){state.viewDay=+t.dataset.n;state.editReport=false;return setTab('heute')}
+  if(a==='gotoToday'){state.viewDay=state.today;state.editReport=false;return render()}
+  if(a==='repEdit'){state.editReport=true;render();return $('#repText').focus()}
+  if(a==='repCancel'){state.editReport=false;return render()}
+  if(a==='repSave'){const d=day();d.title=$('#repTitle').value.trim();d.report=$('#repText').value.trim();state.editReport=false;render();return toast('Tagesbericht gespeichert')}
+  if(a==='crewDel'){const c=state.crew.splice(+t.dataset.i,1)[0];render();return toast(c.n+' entfernt')}
+  if(t.id==='crewAdd'){const n=$('#crewName').value.trim();if(!n){$('#crewName').focus();return toast('Bitte einen Namen eingeben')}state.crew.push({n,r:$('#crewRole').value});render();return toast(n+' hinzugefügt')}
+  if(t.id==='expZip')return toast('ZIP mit '+state.days.reduce((a,d)=>a+d.entries.reduce((b,e)=>b+e.photos.length,0),0)+' Bildern erstellt (Demo)');
+  if(t.id==='expJson')return toast('logbook.json exportiert (Demo)');
+  if(t.id==='newTrip')return obOpen();
+  /* Sheet */
+  if(t.id==='sheetClose')return closeSheet();
+  if(t.id==='saveBtn')return saveSheet();
+  if(t.id==='delBtn'){$('#confirmBox').hidden=false;return $('#delNo').focus()}
+  if(t.id==='delNo'){$('#confirmBox').hidden=true;return}
+  if(t.id==='delYes'){curDay.entries.splice(curIdx,1);closeSheet();render();return toast('Eintrag gelöscht')}
+  if(t.dataset.rm!==undefined){cur.photos.splice(+t.dataset.rm,1);return buildSheet()}
+  if(t.dataset.d!==undefined){cur.dir=+t.dataset.d;if(cur.bft==null)cur.bft=+$('#bft').value;return buildRose()}
+  if(t.dataset.v!==undefined){
+    const grp=t.parentElement.id,key=grp==='typeChips'?'type':grp==='wxChips'?'wx':'sea';
+    cur[key]=(key!=='type'&&cur[key]===t.dataset.v)?'':t.dataset.v;
+    chips('#'+grp,key==='type'?TYPES:key==='wx'?WX:SEA,key,key==='type'?'typ':'');
+    if(key==='type')$('#sheetTitle').textContent=cur.type+' · '+cur.t;
+    return;
+  }
+  /* Onboarding */
+  if(t.id==='obBack'){obCollect();if(ob.step===0){$('#obOv').hidden=true;return}ob.step--;return obRender()}
+  if(t.id==='obNext'){obCollect();if(ob.step<2){ob.step++;return obRender()}return obFinish()}
+  if(t.id==='obAddCrew'){ob.crew.push({n:'',r:'Crew'});obRender();return $$('[data-cn]').pop().focus()}
+  if(t.dataset.cd!==undefined){ob.crew.splice(+t.dataset.cd,1);if(!ob.crew.length)ob.crew.push({n:'',r:'Crew'});return obRender()}
+});
+document.addEventListener('keydown',ev=>{
+  if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&ev.target.matches('.rose .w')){ev.preventDefault();ev.target.dispatchEvent(new MouseEvent('click',{bubbles:true}))}
+  if(ev.key==='Escape'){if(!$('#sheetOv').hidden)closeSheet();else if(!$('#obOv').hidden)$('#obOv').hidden=true}
+});
+document.addEventListener('change',ev=>{
+  const t=ev.target;
+  if(t.dataset&&t.dataset.slot!==undefined)readFile(t.files[0],+t.dataset.slot);
+  if(t.id==='gpxFile'&&t.files[0])toast('GPX „'+t.files[0].name+'“ den Tagen zugeordnet');
+  if(t.id==='liveRec'){state.live=t.checked;toast(t.checked?'Live-Aufzeichnung an, Bildschirm bleibt wach':'Live-Aufzeichnung aus')}
+  if(t.dataset&&t.dataset.cr!==undefined)ob.crew[+t.dataset.cr].r=t.value;
+});
+document.addEventListener('input',ev=>{
+  const t=ev.target;
+  if(t.id==='bft'){bftTouched=true;cur.bft=+t.value;updateBft()}
+  if(t.dataset&&t.dataset.cn!==undefined)ob.crew[+t.dataset.cn].n=t.value;
+});
+$('#sheetOv').addEventListener('click',ev=>{if(ev.target.id==='sheetOv')closeSheet()});
+
+/* Rose: Wedges haben data-d, daher Klick-Delegation oben; sicherstellen, dass SVG-Elemente closest() liefern */
+setTab('heute');
+})();
+</script>

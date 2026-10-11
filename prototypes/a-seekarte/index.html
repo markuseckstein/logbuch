@@ -1,0 +1,713 @@
+<title>Logbuch Seekarte</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root{
+  --bg:#f5f6f2; --surface:#ffffff; --surface-2:#e9f1f4; --water-deep:#ffffff; --water-mid:#e4f0f5; --water-shallow:#c9e1ec;
+  --land:#ecdcae; --land-edge:#8f7840; --ink:#0d2848; --ink-2:#4b5f76; --line:#c5d2db; --grid:#a8739f;
+  --magenta:#b0106a; --on-magenta:#ffffff; --danger:#a3201a; --toast-bg:#0d2848; --toast-ink:#ffffff;
+  --scrim:rgba(13,40,72,.5); --shadow:0 -6px 24px rgba(13,40,72,.22);
+  --font-mono:"IBM Plex Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --font-sans:"Source Sans 3","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#120e0c; --surface:#1d1613; --surface-2:#271d18; --water-deep:#15110f; --water-mid:#1b1e1c; --water-shallow:#242d2b;
+    --land:#3b2e1c; --land-edge:#7a6236; --ink:#e3c28f; --ink-2:#a58d6b; --line:#3d3029; --grid:#7a5069;
+    --magenta:#e07a98; --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
+    --scrim:rgba(0,0,0,.7); --shadow:0 -6px 24px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#120e0c; --surface:#1d1613; --surface-2:#271d18; --water-deep:#15110f; --water-mid:#1b1e1c; --water-shallow:#242d2b;
+  --land:#3b2e1c; --land-edge:#7a6236; --ink:#e3c28f; --ink-2:#a58d6b; --line:#3d3029; --grid:#7a5069;
+  --magenta:#e07a98; --on-magenta:#1a0a10; --danger:#e5806f; --toast-bg:#e3c28f; --toast-ink:#120e0c;
+  --scrim:rgba(0,0,0,.7); --shadow:0 -6px 24px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.4 var(--font-sans);overflow-x:hidden}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:3px solid var(--magenta);outline-offset:2px}
+.mono,.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ico{flex:none;display:block}
+#app{max-width:480px;margin:0 auto;min-height:100%;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--bg);border-bottom:3px double var(--ink)}
+.topbar .brand{flex:1;min-width:0}
+.brand b{display:block;font:600 13px var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
+.brand span{display:block;font-size:14px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon-btn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.rec{font:600 12px var(--font-mono);color:var(--magenta);display:flex;align-items:center;gap:6px}
+.rec i{width:10px;height:10px;border-radius:50%;background:var(--magenta)}
+.screen{padding:16px}
+.screen>*+*{margin-top:16px}
+h1,h2,h3{margin:0;font-weight:700;line-height:1.2}
+h2{font-size:22px}
+.legend{display:flex;align-items:center;gap:10px;font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.legend::after{content:"";flex:1;border-top:1px solid var(--line)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px}
+.card>*+*{margin-top:12px}
+.muted{color:var(--ink-2);font-size:15px}
+/* map */
+.mapframe{border:1px solid var(--ink);padding:3px;background:var(--surface);border-radius:2px}
+.mapframe svg{display:block;width:100%;height:auto;border:1px solid var(--ink)}
+.mk{cursor:pointer}
+.mk:focus-visible circle.ring{stroke-width:4}
+.mk:focus-visible{outline:none}
+/* fix button */
+.fix{position:relative;width:100%;min-height:96px;display:flex;align-items:center;justify-content:center;gap:16px;padding:16px;background:var(--magenta);color:var(--on-magenta);border-radius:8px;font:700 26px var(--font-sans);letter-spacing:.01em;box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--magenta);animation:pulse 2.8s ease-out infinite}
+.fix small{display:block;font:500 13px var(--font-mono);opacity:.9;letter-spacing:.04em}
+.fix .lbl{text-align:left}
+.fix.busy{animation:none}
+.fix.busy .ico{animation:spin 1s linear infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--magenta),0 0 0 5px transparent}70%,100%{box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--magenta),0 0 0 18px transparent}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fix:active{transform:scale(.985)}
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--ink);border-radius:2px;background:var(--surface)}
+.stats div{padding:10px 8px;text-align:center}
+.stats div+div{border-left:1px solid var(--line)}
+.stats b{display:block;font:600 22px var(--font-mono);font-variant-numeric:tabular-nums}
+.stats span{font-size:13px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em}
+/* timeline */
+.tl{list-style:none;margin:0;padding:0}
+.tl li{position:relative;padding-left:0}
+.tl li::before{content:"";position:absolute;left:74px;top:0;bottom:0;border-left:1px solid var(--ink-2)}
+.tl li:last-child::before{bottom:50%}
+.tl-item{position:relative;display:grid;grid-template-columns:50px 26px 1fr;gap:10px;width:100%;min-height:64px;padding:10px 0;text-align:left;align-items:start}
+.tl-time{font:600 15px var(--font-mono);padding-top:6px;font-variant-numeric:tabular-nums}
+.tl-dot{width:26px;height:26px;border-radius:50%;background:var(--surface);border:1.5px solid var(--magenta);color:var(--magenta);display:flex;align-items:center;justify-content:center;margin-top:3px;z-index:1;margin-left:2px}
+.tl-dot .ico{width:15px;height:15px}
+.tl-body{display:block;min-width:0}
+.tl-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.tl-head b{font-size:18px}
+.pos{display:block;font:400 13px var(--font-mono);color:var(--ink-2);margin-top:2px}
+.wind{display:inline-flex;align-items:center;gap:4px;font:500 13px var(--font-mono);border:1px solid var(--line);border-radius:3px;padding:1px 6px;background:var(--surface-2)}
+.wind svg{width:12px;height:12px}
+.tl-text{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:4px;font-size:16px}
+.thumbs{display:flex;gap:6px;margin-top:6px}
+.thumb{width:56px;height:56px;border:1px solid var(--ink);border-radius:2px;overflow:hidden;background:var(--water-shallow)}
+.thumb img,.thumb svg{width:100%;height:100%;object-fit:cover;display:block}
+/* chips */
+fieldset{border:0;margin:0;padding:0;min-width:0}
+legend{padding:0;margin-bottom:8px;font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;padding:6px 12px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--ink-2);border-radius:22px;background:var(--surface);font-size:16px}
+.chip[aria-pressed="true"],.chip[aria-checked="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid3 .chip{border-radius:6px;flex-direction:column;gap:2px;justify-content:center;font-size:14px;padding:6px 4px;text-align:center}
+/* sheet */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:30;opacity:0;transition:opacity .2s}
+.scrim.open{opacity:1}
+.sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:480px;height:92%;max-height:92%;z-index:31;background:var(--bg);border-radius:14px 14px 0 0;box-shadow:var(--shadow);border-top:3px double var(--ink);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .26s ease-out}
+.sheet.open{transform:none}
+.sh-head{padding:8px 16px 10px;border-bottom:1px solid var(--line)}
+.grab{width:44px;height:4px;border-radius:2px;background:var(--ink-2);margin:0 auto 8px;opacity:.5}
+.sh-row{display:flex;align-items:center;gap:12px}
+.sh-row>div{flex:1;min-width:0}
+.sh-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px;overscroll-behavior:contain}
+.sh-body>*+*{margin-top:20px}
+.sh-foot{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--surface);display:flex;gap:12px;flex-wrap:wrap}
+.btn{min-height:48px;padding:8px 18px;border-radius:6px;border:1.5px solid var(--ink);font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--surface)}
+.btn.primary{background:var(--magenta);border-color:var(--magenta);color:var(--on-magenta)}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn.block{width:100%}
+.sh-foot .primary{flex:1}
+.confirm{width:100%;border:1.5px solid var(--danger);border-radius:6px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.confirm p{margin:0;flex:1 1 100%;font-weight:600;color:var(--danger)}
+/* rose */
+.rose-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
+.rose{width:min(100%,264px);height:auto}
+.rose .w{fill:var(--surface-2);stroke:var(--ink-2);stroke-width:.6;cursor:pointer}
+.rose .w.card4{fill:var(--water-shallow)}
+.rose .w[aria-checked="true"]{fill:var(--magenta)}
+.rose .w:focus-visible{outline:none;stroke:var(--magenta);stroke-width:2.5}
+.rose text{font:500 8.5px var(--font-mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.rose .ctr{font:600 14px var(--font-mono)}
+.windbar{display:flex;align-items:center;gap:12px}
+.windbar output{font:600 16px var(--font-mono);min-width:150px;text-align:center}
+.bft{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.bft button{min-height:48px;border:1px solid var(--ink-2);border-radius:4px;font:600 17px var(--font-mono);background:color-mix(in srgb,var(--magenta) calc(var(--lv)*32%),var(--surface))}
+.bft button[aria-pressed="true"]{background:var(--magenta);color:var(--on-magenta);border-color:var(--magenta)}
+.bft-desc{margin-top:8px;font-size:17px}
+.bft-desc small{font:400 13px var(--font-mono);color:var(--ink-2);margin-left:6px}
+/* forms */
+label.f{display:block}
+label.f>span{display:block;font-size:14px;color:var(--ink-2);margin-bottom:4px;font-weight:600}
+input[type=text],input[type=date],input[type=number],select,textarea{width:100%;min-height:48px;padding:10px 12px;border:1px solid var(--ink-2);border-radius:6px;background:var(--surface);color:var(--ink)}
+textarea{min-height:110px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+details.opt{border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+details.opt summary{min-height:48px;padding:0 12px;display:flex;align-items:center;cursor:pointer;font-weight:600}
+details.opt .in{padding:0 12px 12px}
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.slotwrap{position:relative;aspect-ratio:1}
+.slot{position:absolute;inset:0;border:1.5px dashed var(--ink-2);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:13px;color:var(--ink-2);overflow:hidden;cursor:pointer;background:var(--surface)}
+.slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.slotwrap input:focus-visible~.slot{outline:3px solid var(--magenta);outline-offset:2px}
+.slot-x{position:absolute;top:0;right:0;width:44px;height:44px;display:flex;align-items:flex-start;justify-content:flex-end;padding:4px}
+.slot-x span{width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center}
+.slot-x .ico{width:16px;height:16px}
+/* tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:480px;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tab{min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:600;color:var(--ink-2);border-top:3px solid transparent}
+.tab[aria-current="page"]{color:var(--ink);border-top-color:var(--magenta)}
+.tab[aria-current="page"] .ico{color:var(--magenta)}
+/* lists */
+.daycard{display:grid;grid-template-columns:56px 1fr;gap:12px;width:100%;text-align:left;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:6px;min-height:64px}
+.daycard+.daycard{margin-top:12px}
+.dn{font:600 12px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.dn b{display:block;font-size:30px;color:var(--magenta);line-height:1}
+.route{font-weight:700;font-size:18px}
+.dmeta{font:400 13px var(--font-mono);color:var(--ink-2)}
+.lead{margin:4px 0 0;font-size:15px;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.back{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-weight:700;color:var(--magenta)}
+.toggle{display:flex;align-items:center;gap:14px;width:100%;min-height:56px;text-align:left}
+.toggle .track{flex:none;width:56px;height:32px;border-radius:16px;background:var(--surface-2);border:1.5px solid var(--ink-2);position:relative}
+.toggle .track::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--ink-2);transition:transform .15s}
+.toggle[aria-checked="true"] .track{background:var(--magenta);border-color:var(--magenta)}
+.toggle[aria-checked="true"] .track::after{transform:translateX(24px);background:var(--on-magenta)}
+.crew{list-style:none;margin:0;padding:0}
+.crew li{display:flex;align-items:center;gap:10px;min-height:52px;border-bottom:1px solid var(--line)}
+.crew li b{flex:1}
+.role{font:500 12px var(--font-mono);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--magenta);color:var(--magenta);border-radius:3px;padding:1px 6px}
+.boatpic{height:140px;border:1px solid var(--ink);border-radius:2px;overflow:hidden;position:relative;background:var(--water-mid)}
+.boatpic svg,.boatpic img{width:100%;height:100%;object-fit:cover;display:block}
+.pick{position:absolute;right:8px;bottom:8px}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));margin:0 auto;max-width:448px;z-index:60;background:var(--toast-bg);color:var(--toast-ink);padding:12px 16px;border-radius:6px;font:500 14px/1.4 var(--font-mono);opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .2s,transform .2s}
+.toast.show{opacity:1;transform:none}
+.err{color:var(--danger);font-size:14px;font-weight:600;margin-top:4px}
+/* onboarding */
+.onb{position:fixed;inset:0;z-index:50;background:var(--bg);overflow-y:auto}
+.onb-in{max-width:480px;margin:0 auto;padding:16px 16px calc(24px + env(safe-area-inset-bottom,0px));min-height:100%;display:flex;flex-direction:column;gap:16px}
+.steps{display:flex;gap:6px}
+.steps i{flex:1;height:6px;border:1px solid var(--ink);border-radius:3px}
+.steps i.on{background:var(--magenta);border-color:var(--magenta)}
+.onb-nav{margin-top:auto;display:flex;gap:12px;padding-top:12px}
+.onb-nav .primary{flex:1}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
+
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><b>Logbuch</b><span id="tb-sub">Dänische Südsee 2026 · Tag 3</span></div>
+    <span class="rec" id="rec" hidden><i></i><span id="rec-t">00:00</span></span>
+    <button class="icon-btn" id="theme-btn" aria-label="Darstellung wechseln (Tag / Nachtfahrt)"></button>
+  </header>
+
+  <!-- 1 HEUTE -->
+  <main class="screen" id="s-heute">
+    <button class="fix" id="fix" type="button"><span id="fix-ico"></span><span class="lbl"><span id="fix-lbl">Eintrag jetzt</span><small id="fix-sub">1 Tap · GPS und Uhrzeit</small></span></button>
+    <div class="mapframe"><div id="map-today"></div></div>
+    <div class="stats" id="stats-today"></div>
+    <div class="legend">Tag 3 · Mo 10.08. · Svendborg → Faaborg</div>
+    <ol class="tl" id="tl-today"></ol>
+  </main>
+
+  <!-- 3 TÖRN-TAGE -->
+  <main class="screen" id="s-tage" hidden>
+    <h2>Törn-Tage</h2>
+    <div class="muted">Tippe auf einen Tag für Tagesbericht und Einträge.</div>
+    <div id="days"></div>
+  </main>
+  <main class="screen" id="s-tag" hidden></main>
+
+  <!-- 4 KARTE -->
+  <main class="screen" id="s-karte" hidden>
+    <h2>Törnkarte</h2>
+    <div class="chips" id="map-filter" role="group" aria-label="Tage anzeigen"></div>
+    <div class="mapframe"><div id="map-all"></div></div>
+    <div class="muted num" id="map-info"></div>
+    <div class="card">
+      <button class="btn block" id="gpx-btn" type="button"><span id="ico-gpx"></span>GPX importieren</button>
+      <input class="sr-only" id="gpx-file" type="file" accept=".gpx,application/gpx+xml" aria-label="GPX-Datei wählen">
+      <ul class="muted" id="gpx-list" style="margin:0;padding-left:18px"></ul>
+    </div>
+    <div class="card">
+      <button class="toggle" id="sw-live" role="switch" aria-checked="false" type="button"><span class="track"></span><span><b>Live-Route aufzeichnen</b><br><span class="muted">Bildschirm bleibt an</span></span></button>
+      <p class="muted" id="live-hint" style="margin:0">Standardmäßig aus. Die Aufzeichnung läuft nur im Vordergrund und hält den Bildschirm wach – das kostet spürbar Akku. Die Route ergibt sich auch aus deinen Einträgen.</p>
+    </div>
+  </main>
+
+  <!-- 5 TÖRN -->
+  <main class="screen" id="s-toern" hidden>
+    <h2>Törn</h2>
+    <div class="card">
+      <div class="legend">Törndaten</div>
+      <label class="f"><span>Name</span><input type="text" id="t-name" value="Dänische Südsee 2026"></label>
+      <div class="row2">
+        <label class="f"><span>Von</span><input type="date" id="t-from" value="2026-08-08"></label>
+        <label class="f"><span>Bis</span><input type="date" id="t-to" value="2026-08-15"></label>
+      </div>
+      <label class="f"><span>Revier (optional)</span><input type="text" id="t-area" value="Kieler Bucht · Dänische Südsee"></label>
+      <button class="btn block" id="t-save" type="button">Törndaten speichern</button>
+    </div>
+    <div class="card">
+      <div class="legend">Boot</div>
+      <div class="boatpic" id="boatpic"></div>
+      <button class="btn block" id="boat-pick" type="button"><span id="ico-cam1"></span>Foto wählen</button>
+      <input class="sr-only" id="boat-photo" type="file" accept="image/*" aria-label="Bootsfoto wählen">
+      <label class="f"><span>Name</span><input type="text" id="b-name" value="Seeschwalbe"></label>
+      <div class="row2">
+        <label class="f"><span>Typ</span><input type="text" id="b-type" value="Bavaria 34"></label>
+        <label class="f"><span>Länge (m)</span><input type="number" inputmode="decimal" id="b-len" value="10.3" step="0.1"></label>
+      </div>
+      <div class="row2">
+        <label class="f"><span>Heimathafen</span><input type="text" id="b-home" value="Kiel"></label>
+        <label class="f"><span>Rufzeichen / MMSI</span><input type="text" id="b-call" value="DK 4412"></label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="legend">Crew</div>
+      <ul class="crew" id="crew"></ul>
+      <div class="row2">
+        <label class="f"><span>Name</span><input type="text" id="c-name" autocomplete="off"></label>
+        <label class="f"><span>Rolle</span><select id="c-role"><option>Crew</option><option>Skipper</option><option>Co-Skipper</option></select></label>
+      </div>
+      <button class="btn block" id="c-add" type="button">Crew hinzufügen</button>
+    </div>
+    <div class="card">
+      <div class="legend">Export</div>
+      <p class="muted" style="margin:0" id="exp-info"></p>
+      <button class="btn primary block" id="exp-zip" type="button"><span id="ico-zip"></span>ZIP mit Bildern</button>
+      <button class="btn block" id="exp-json" type="button">Einzelnes JSON (Bilder als Base64)</button>
+    </div>
+    <button class="btn block" id="new-toern" type="button">Neuen Törn anlegen …</button>
+  </main>
+
+  <nav class="tabbar" aria-label="Hauptnavigation">
+    <button class="tab" data-go="heute" aria-current="page"><span data-ico="tab-heute"></span>Heute</button>
+    <button class="tab" data-go="tage"><span data-ico="tab-tage"></span>Törn-Tage</button>
+    <button class="tab" data-go="karte"><span data-ico="tab-karte"></span>Karte</button>
+    <button class="tab" data-go="toern"><span data-ico="tab-toern"></span>Törn</button>
+  </nav>
+</div>
+
+<!-- 2 EINTRAG-DETAIL -->
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-title" hidden>
+  <div class="sh-head">
+    <div class="grab"></div>
+    <div class="sh-row">
+      <div><h2 id="sh-title">Eintrag</h2><div class="mono muted" id="sh-pos"></div></div>
+      <button class="icon-btn" id="sh-close" type="button" aria-label="Schließen"></button>
+    </div>
+  </div>
+  <div class="sh-body">
+    <fieldset><legend>Typ</legend><div class="chips" id="f-type" role="radiogroup" aria-label="Eintragstyp"></div></fieldset>
+    <fieldset><legend>Windrichtung (Wind aus …)</legend>
+      <div class="rose-wrap">
+        <svg class="rose" id="rose" viewBox="0 0 200 200" role="radiogroup" aria-label="Windrichtung"></svg>
+        <div class="windbar">
+          <button class="icon-btn" id="wd-prev" type="button" aria-label="Eine Richtung zurück" data-ico="chev-l"></button>
+          <output id="wd-out" for="rose">keine Angabe</output>
+          <button class="icon-btn" id="wd-next" type="button" aria-label="Eine Richtung weiter" data-ico="chev-r"></button>
+        </div>
+      </div>
+    </fieldset>
+    <fieldset><legend>Windstärke (Beaufort)</legend>
+      <div class="bft" id="f-bft"></div>
+      <div class="bft-desc" id="bft-desc">Nicht gesetzt</div>
+    </fieldset>
+    <fieldset><legend>Wetter</legend><div class="grid3" id="f-wx"></div></fieldset>
+    <fieldset><legend>Seegang</legend><div class="chips" id="f-sea"></div></fieldset>
+    <details class="opt"><summary>Luftdruck &amp; Temperatur (optional)</summary>
+      <div class="in row2">
+        <label class="f"><span>Luftdruck (hPa)</span><input type="number" inputmode="numeric" id="f-hpa" placeholder="1015"></label>
+        <label class="f"><span>Temperatur (°C)</span><input type="number" inputmode="decimal" id="f-temp" placeholder="19"></label>
+      </div>
+    </details>
+    <label class="f"><span>Text</span><textarea id="f-text" placeholder="Was ist passiert? Kurs, Segelstellung, Stimmung …"></textarea></label>
+    <fieldset><legend>Fotos (bis zu 3)</legend><div class="slots" id="f-photos"></div></fieldset>
+  </div>
+  <div class="sh-foot">
+    <div class="confirm" id="del-confirm" hidden>
+      <p>Diesen Eintrag wirklich löschen?</p>
+      <button class="btn" id="del-no" type="button">Abbrechen</button>
+      <button class="btn danger" id="del-yes" type="button">Endgültig löschen</button>
+    </div>
+    <button class="btn danger" id="f-del" type="button"><span data-ico="trash"></span>Löschen</button>
+    <button class="btn primary" id="f-save" type="button">Speichern</button>
+  </div>
+</section>
+
+<!-- ONBOARDING -->
+<div class="onb" id="onb" role="dialog" aria-modal="true" aria-labelledby="onb-title" hidden>
+  <div class="onb-in">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="legend" style="flex:1" id="onb-step">Schritt 1 von 3</div>
+      <button class="icon-btn" id="onb-x" type="button" aria-label="Abbrechen" data-ico="x"></button>
+    </div>
+    <div class="steps" aria-hidden="true"><i></i><i></i><i></i></div>
+    <h2 id="onb-title">Neuer Törn</h2>
+    <section id="ob-1">
+      <label class="f"><span>Name des Törns</span><input type="text" id="o-name" placeholder="z. B. Sommertörn 2027"></label>
+      <div class="err" id="o-err" hidden>Bitte gib dem Törn einen Namen.</div>
+      <div class="row2" style="margin-top:12px">
+        <label class="f"><span>Von</span><input type="date" id="o-from"></label>
+        <label class="f"><span>Bis</span><input type="date" id="o-to"></label>
+      </div>
+      <label class="f" style="margin-top:12px"><span>Revier (optional)</span><input type="text" id="o-area"></label>
+    </section>
+    <section id="ob-2" hidden>
+      <div class="boatpic" id="o-boatpic" style="margin-bottom:12px"></div>
+      <button class="btn block" id="o-bpick" type="button" style="margin-bottom:12px">Foto wählen (optional)</button>
+      <input class="sr-only" id="o-bphoto" type="file" accept="image/*" aria-label="Bootsfoto wählen">
+      <label class="f"><span>Bootsname</span><input type="text" id="o-bname"></label>
+      <div class="row2" style="margin-top:12px">
+        <label class="f"><span>Typ / Modell</span><input type="text" id="o-btype"></label>
+        <label class="f"><span>Länge (m)</span><input type="number" inputmode="decimal" id="o-blen" step="0.1"></label>
+      </div>
+      <label class="f" style="margin-top:12px"><span>Heimathafen</span><input type="text" id="o-bhome"></label>
+    </section>
+    <section id="ob-3" hidden>
+      <ul class="crew" id="o-crew"></ul>
+      <div class="row2" style="margin-top:12px">
+        <label class="f"><span>Name</span><input type="text" id="o-cname" autocomplete="off"></label>
+        <label class="f"><span>Rolle</span><select id="o-crole"><option>Skipper</option><option selected>Crew</option><option>Co-Skipper</option></select></label>
+      </div>
+      <button class="btn block" id="o-cadd" type="button" style="margin-top:12px">Crew hinzufügen</button>
+    </section>
+    <div class="onb-nav">
+      <button class="btn" id="onb-back" type="button">Zurück</button>
+      <button class="btn primary" id="onb-next" type="button">Weiter</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const ICON={
+  eintrag:'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+  ablegen:'<path d="M4 4v16M8 12h12M15 7l5 5-5 5"/>',
+  hafen:'<path d="M8 20v-9a4 4 0 0 1 8 0v9M5 20h14M9 11h6"/>',
+  anker:'<circle cx="12" cy="5" r="2"/><path d="M12 7v14M8 11h8M4 14a8 8 0 0 0 16 0M4 14l-1.5 2M20 14l1.5 2"/>',
+  boje:'<path d="M12 2v4M9 6h6l2 9H7zM5 19c2 1.500 3.500 1.500 5 0s3-1.500 5 0 2.500 1 4 0"/>',
+  segelan:'<path d="M12 3v15M12 4l6 11h-6M12 8l-5 7h5M5 20h14"/>',
+  segelab:'<path d="M11 3v15M11 5l-3 11h3M5 20h14M18 6v8M15 11l3 3 3-3"/>',
+  motor:'<circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M5.600 18.400l2.100-2.100M16.300 7.700l2.100-2.100"/>',
+  sichtung:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  sonst:'<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.500"/>',
+  sonne:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.900 4.900l1.400 1.400M17.700 17.700l1.400 1.400M4.900 19.100l1.400-1.400M17.700 6.300l1.400-1.400"/>',
+  leicht:'<circle cx="8" cy="8" r="3"/><path d="M8 2v1M2 8h1M3.800 3.800l.7.700M12.200 3.800l-.7.700"/><path d="M8 20h9a3.500 3.500 0 0 0 .5-6.900A5 5 0 0 0 8 14a3 3 0 0 0 0 6z"/>',
+  bewoelkt:'<path d="M7 19h10a4 4 0 0 0 .5-7.900A6 6 0 0 0 6 12.500 3.300 3.300 0 0 0 7 19z"/>',
+  regen:'<path d="M7 15h10a4 4 0 0 0 .5-7.900A6 6 0 0 0 6 8.500 3.300 3.300 0 0 0 7 15zM8 21l1-3M12 21l1-3M16 21l1-3"/>',
+  gewitter:'<path d="M7 14h10a4 4 0 0 0 .5-7.900A6 6 0 0 0 6 7.500 3.300 3.300 0 0 0 7 14zM12.500 14l-2.500 4h4l-2.500 4"/>',
+  nebel:'<path d="M4 8h16M3 12h14M6 16h15M4 20h10"/>',
+  'tab-heute':'<circle cx="12" cy="12" r="9"/><path d="M15.500 8.500l-2 5-5 2 2-5z"/>',
+  'tab-tage':'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/>',
+  'tab-karte':'<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/>',
+  'tab-toern':'<path d="M3 15h18l-3 5H6zM12 3v12M12 4l6 9h-6"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>', 'chev-l':'<path d="M15 5l-7 7 7 7"/>', 'chev-r':'<path d="M9 5l7 7-7 7"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+  cam:'<path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.500"/>',
+  moon:'<path d="M20 14.500A8 8 0 1 1 9.500 4a6.500 6.500 0 0 0 10.500 10.500z"/>',
+  up:'<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>', down:'<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>',
+  wind:'<path d="M12 3v16M6 13l6 6 6-6"/>'
+};
+const ico=(n,s=22)=>`<svg class="ico" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+
+/* ---------- Domäne ---------- */
+const TYPES=[['eintrag','Eintrag'],['ablegen','Ablegen'],['hafen','Hafen'],['anker','Ankerplatz'],['boje','Boje'],['segelan','Segel setzen'],['segelab','Segel bergen'],['motor','Motor an/aus'],['sichtung','Sichtung'],['sonst','Sonstiges']];
+const TLABEL=Object.fromEntries(TYPES);
+const WX=[['sonne','Sonne'],['leicht','Leicht bewölkt'],['bewoelkt','Bewölkt'],['regen','Regen'],['gewitter','Gewitter'],['nebel','Nebel']];
+const SEA=['glatt','leicht','mäßig','grob','sehr grob'];
+const DIRS=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const BFT=[['Windstille','< 1'],['leiser Zug','1–3'],['leichte Brise','4–6'],['schwache Brise','7–10'],['mäßige Brise','11–16'],['frische Brise','17–21'],['starker Wind','22–27'],['steifer Wind','28–33'],['stürmischer Wind','34–40'],['Sturm','41–47'],['schwerer Sturm','48–55'],['orkanartiger Sturm','56–63'],['Orkan','≥ 64']];
+let nid=1;
+const E=(day,t,lat,lon,type,dir,bft,wx,sea,text,np=0,hpa=null,temp=null)=>({id:'e'+(nid++),day,t,lat,lon,acc:6,type,dir,bft,wx,sea,text,hpa,temp,photos:Array.from({length:np},(_,i)=>({mock:nid+i}))});
+const entries=[
+  E(1,'08:20',54.4229,10.1743,'ablegen',10,3,'leicht','leicht','Leinen los in Schilksee. Alle an Bord, Rettungswesten an, Kaffee ist durch.',0,1016,17),
+  E(1,'09:35',54.4990,10.2740,'segelan',10,4,'sonne','leicht','Großsegel im ersten Reff, Genua voll. Kurs 040°, Marstal.',1),
+  E(1,'11:50',54.6150,10.3600,'sichtung',10,4,'sonne','mäßig','Schweinswale querab, zwei Tiere, etwa zehn Minuten lang neben dem Boot.',1),
+  E(1,'14:10',54.7300,10.4300,'eintrag',11,5,'bewoelkt','mäßig','Wind legt zu, 5 Bft aus WSW. Halbwindkurs, 6,5 kn über Grund.'),
+  E(1,'16:25',54.8200,10.5000,'segelab',11,4,'bewoelkt','leicht','Segel runter vor Marstal, Motor an.'),
+  E(1,'17:05',54.8555,10.5200,'hafen',10,3,'sonne','glatt','Fest in Marstal, Gästehafen Box 14. Fischbrötchen für alle.',2),
+  E(2,'10:10',54.8555,10.5200,'ablegen',8,2,'sonne','glatt','Ablegen nach dem Frühstück. Kaum Wind.'),
+  E(2,'11:30',54.9300,10.5900,'segelan',9,3,'leicht','leicht','Segel gesetzt, Kurs Nord am Wind.'),
+  E(2,'13:15',54.9900,10.6100,'eintrag',10,4,'regen','mäßig','Kurze Schauer vor Langeland, Ölzeug an. Danach wieder Sonne.',0,1009,15),
+  E(2,'15:00',55.0350,10.5950,'segelab',10,4,'bewoelkt','leicht','Segel runter vor dem Svendborgsund.'),
+  E(2,'15:40',55.0590,10.6100,'hafen',12,3,'leicht','glatt','Fest in Svendborg. Eis am Hafen.',1),
+  E(3,'09:05',55.0590,10.6100,'ablegen',10,3,'leicht','glatt','Ablegen in Svendborg, Brücke ohne Wartezeit passiert.'),
+  E(3,'09:50',55.0350,10.4800,'segelan',10,4,'sonne','leicht','Hinter dem Sund Segel gesetzt. Kurs West, Faaborg.',1,1014,19),
+  E(3,'11:20',55.0350,10.3800,'sichtung',10,4,'sonne','leicht','Seehunde auf der Sandbank, zwei Dutzend.',2),
+  E(3,'12:40',55.0500,10.3100,'eintrag',10,5,'leicht','mäßig','SW 5, Vorsegel gerefft. Boot läuft 7 kn.'),
+  E(3,'13:25',55.0760,10.2650,'eintrag',11,4,'sonne','leicht','Mittagspause im Cockpit, Nudelsalat. Faaborg schon in Sicht.')
+];
+const days=[
+  {n:1,dl:'Sa 08.08.',from:'Kiel-Schilksee',to:'Marstal',title:'Raus aus der Förde',text:'Früher Start bei leichtem Südwest. Ab Kiel Leuchtturm bis Marstal fast durchgehend am Wind, am Nachmittag mit 5 Bft anspruchsvoll, aber gut machbar. Schweinswale am Vormittag.'},
+  {n:2,dl:'So 09.08.',from:'Marstal',to:'Svendborg',title:'Kurzer Schlag nach Fünen',text:'Gemütlicher Törn ohne Eile. Eine Schauer-Front vor Langeland, sonst sonnig. Abends Eis und Fisch in Svendborg.'},
+  {n:3,dl:'Mo 10.08.',from:'Svendborg',to:'Faaborg',title:'',text:''}
+];
+const TODAY=3;
+const crew=[{n:'Jonas Brandt',r:'Skipper'},{n:'Lena Hartmann',r:'Co-Skipper'},{n:'Tom Weber',r:'Crew'},{n:'Mira Sander',r:'Crew'}];
+let fixCount=0;
+
+const R=3440.065;
+function nm(a,b){const r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lon-a.lon);const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+const dayEs=d=>entries.filter(e=>e.day===d).sort((a,b)=>a.t.localeCompare(b.t));
+const mins=t=>+t.slice(0,2)*60+ +t.slice(3);
+function stats(d){const es=dayEs(d);let s=0;for(let i=1;i<es.length;i++)s+=nm(es[i-1],es[i]);const m=es.length>1?mins(es[es.length-1].t)-mins(es[0].t):0;return{sm:s,min:m,n:es.length};}
+const f1=n=>n.toFixed(1).replace('.',',');
+const dur=m=>`${Math.floor(m/60)} h ${String(m%60).padStart(2,'0')} min`;
+function fc(v,p,n,lon,dec){const h=v>=0?p:n;v=Math.abs(v);let d=Math.floor(v),m=((v-d)*60).toFixed(dec);if(+m>=60){d++;m=(0).toFixed(dec);}return String(d).padStart(lon?3:2,'0')+'°'+m.padStart(2+(dec?dec+1:0),'0').replace('.',',')+'′'+h;}
+const fpos=(e,dec=1)=>fc(e.lat,'N','S',false,dec)+' '+fc(e.lon,'E','W',true,dec);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- Karte ---------- */
+const P=(la,lo)=>[(lo-9.95)*400,(55.2-la)*347];
+const LAND=[
+  [[54.25,9.95],[54.25,10.95],[54.33,10.95],[54.34,10.67],[54.40,10.37],[54.41,10.22],[54.43,10.17],[54.46,10.19],[54.45,10.10],[54.47,10.0],[54.52,9.95]],
+  [[54.90,10.50],[54.87,10.525],[54.84,10.50],[54.83,10.40],[54.86,10.30],[54.90,10.33],[54.92,10.42]],
+  [[54.75,10.65],[54.80,10.58],[54.90,10.68],[55.0,10.78],[55.0,10.86],[54.85,10.76]],
+  [[55.30,10.0],[55.30,10.95],[55.08,10.95],[55.07,10.85],[55.055,10.615],[55.07,10.45],[55.10,10.24],[55.13,10.10],[55.22,10.0]],
+  [[55.00,10.58],[55.03,10.64],[55.02,10.69],[54.99,10.65]]
+];
+const PLACES=[['Kiel',54.4229,10.1743],['Marstal',54.8555,10.52],['Svendborg',55.059,10.61],['Faaborg',55.0945,10.24]];
+const AREAS=[['SCHLESWIG-HOLSTEIN',54.30,10.45],['FYN',55.17,10.42],['ÆRØ',54.875,10.40],['LANGELAND',54.84,10.72]];
+const SOUND=[[54.68,10.20,'23'],[54.95,10.42,'12'],[55.01,10.30,'8'],[54.60,10.66,'19'],[54.47,10.45,'14']];
+function bbox(es,aspect=.55,minW=130){const p=es.map(e=>P(e.lat,e.lon)),xs=p.map(a=>a[0]),ys=p.map(a=>a[1]);const w=Math.max((Math.max(...xs)-Math.min(...xs))*1.4,(Math.max(...ys)-Math.min(...ys))*1.4/aspect,minW),h=w*aspect;return[(Math.min(...xs)+Math.max(...xs))/2-w/2,(Math.min(...ys)+Math.max(...ys))/2-h/2,w,h];}
+function mapSVG(dayList,vb,sel,label){
+  const [vx,vy,vw,vh]=vb,u=vw/368,f=n=>n.toFixed(1);
+  const land=LAND.map(pl=>'M'+pl.map(([a,o])=>P(a,o).map(f).join(',')).join('L')+'Z').join('');
+  let s=`<svg viewBox="${vb.map(f).join(' ')}" role="img" aria-label="${esc(label)}">`;
+  s+=`<rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="var(--water-deep)"/>`;
+  s+=`<path d="${land}" fill="var(--water-mid)" stroke="var(--water-mid)" stroke-width="${f(76*u)}" stroke-linejoin="round"/>`;
+  s+=`<path d="${land}" fill="var(--water-shallow)" stroke="var(--water-shallow)" stroke-width="${f(34*u)}" stroke-linejoin="round"/>`;
+  const step=(vw>220?10:5)/60;
+  for(let la=Math.ceil(54.25/step)*step;la<55.3;la+=step){const y=P(la,0)[1];if(y<vy||y>vy+vh)continue;
+    s+=`<line x1="${vx}" x2="${vx+vw}" y1="${f(y)}" y2="${f(y)}" stroke="var(--grid)" stroke-width=".7" vector-effect="non-scaling-stroke"/><text x="${f(vx+4*u)}" y="${f(y-3*u)}" font-size="${f(9*u)}" font-family="IBM Plex Mono,monospace" fill="var(--ink-2)">${fc(la,'N','S',false,0)}</text>`;}
+  for(let lo=Math.ceil(9.95/step)*step;lo<10.95;lo+=step){const x=P(0,lo)[0];if(x<vx||x>vx+vw)continue;
+    s+=`<line y1="${vy}" y2="${vy+vh}" x1="${f(x)}" x2="${f(x)}" stroke="var(--grid)" stroke-width=".7" vector-effect="non-scaling-stroke"/><text x="${f(x+3*u)}" y="${f(vy+11*u)}" font-size="${f(9*u)}" font-family="IBM Plex Mono,monospace" fill="var(--ink-2)">${fc(lo,'E','W',true,0)}</text>`;}
+  s+=`<path d="${land}" fill="var(--land)" stroke="var(--land-edge)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
+  AREAS.forEach(([n,la,lo])=>{const[x,y]=P(la,lo);s+=`<text x="${f(x)}" y="${f(y)}" text-anchor="middle" font-size="${f(10*u)}" font-style="italic" letter-spacing="${f(2*u)}" fill="var(--land-edge)" font-family="Source Sans 3,sans-serif">${n}</text>`;});
+  SOUND.forEach(([la,lo,n])=>{const[x,y]=P(la,lo);s+=`<text x="${f(x)}" y="${f(y)}" font-size="${f(9*u)}" font-style="italic" fill="var(--ink-2)" opacity=".8" font-family="IBM Plex Mono,monospace">${n}</text>`;});
+  const shown=dayList.flatMap(d=>dayEs(d));
+  dayList.forEach(d=>{const pts=dayEs(d).map(e=>P(e.lat,e.lon).map(f).join(',')).join(' ');s+=`<polyline points="${pts}" fill="none" stroke="var(--magenta)" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke" ${d===TODAY||dayList.length>1?'':''}/>`;});
+  PLACES.forEach(([n,la,lo])=>{const[x,y]=P(la,lo);s+=`<text x="${f(x+7*u)}" y="${f(y+14*u)}" font-size="${f(12*u)}" font-weight="700" fill="var(--ink)" paint-order="stroke" stroke="var(--water-deep)" stroke-width="${f(3*u)}" font-family="Source Sans 3,sans-serif">${n}</text>`;});
+  shown.forEach(e=>{const[x,y]=P(e.lat,e.lon),on=e.id===sel,r=(on?7:4.5)*u;
+    s+=`<g class="mk" data-open="${e.id}" role="button" tabindex="0" aria-label="Eintrag ${e.t}, ${TLABEL[e.type]}"><circle cx="${f(x)}" cy="${f(y)}" r="${f(22*u)}" fill="transparent"/><circle class="ring" cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="${on?'var(--magenta)':'var(--surface)'}" stroke="var(--magenta)" stroke-width="2.2" vector-effect="non-scaling-stroke"/></g>`;});
+  const cx=vx+vw-26*u,cy=vy+vh-30*u,k=u*16;
+  s+=`<g stroke="var(--magenta)" fill="none" stroke-width="1.2" vector-effect="non-scaling-stroke"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(k*.8)}" vector-effect="non-scaling-stroke"/><path d="M${f(cx)} ${f(cy-k*1.1)}L${f(cx+k*.28)} ${f(cy)}L${f(cx)} ${f(cy+k*1.1)}L${f(cx-k*.28)} ${f(cy)}Z" fill="var(--magenta)" vector-effect="non-scaling-stroke"/></g><text x="${f(cx)}" y="${f(cy-k*1.2)}" text-anchor="middle" font-size="${f(9*u)}" font-weight="700" fill="var(--magenta)" font-family="IBM Plex Mono,monospace">N</text>`;
+  const bh=5/60*347,bx=vx+14*u,by=vy+vh-12*u-bh;
+  s+=`<path d="M${f(bx)} ${f(by)}v${f(bh)}M${f(bx-3*u)} ${f(by)}h${f(6*u)}M${f(bx-3*u)} ${f(by+bh)}h${f(6*u)}" stroke="var(--ink)" stroke-width="1.5" vector-effect="non-scaling-stroke" fill="none"/><text x="${f(bx+6*u)}" y="${f(by+bh/2+3*u)}" font-size="${f(9*u)}" fill="var(--ink)" font-family="IBM Plex Mono,monospace">5 sm</text>`;
+  return s+'</svg>';
+}
+
+/* ---------- Render ---------- */
+const thumb=(p,i=0)=>typeof p==='string'?`<img src="${p}" alt="Foto">`:`<svg viewBox="0 0 40 40" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="40" height="40" fill="var(--water-shallow)"/><circle cx="${8+(p.mock*7)%24}" cy="9" r="4" fill="var(--land)"/><rect y="${20+(p.mock%3)*2}" width="40" height="20" fill="var(--ink)" opacity=".35"/><path d="M${14+(p.mock*5)%10} ${22+(p.mock%3)*2}l5-11 5 11z" fill="var(--surface)" stroke="var(--ink)" stroke-width=".8"/></svg>`;
+const windChip=e=>e.dir==null&&e.bft==null?'':`<span class="wind num">${e.dir!=null?`<svg viewBox="0 0 24 24" style="transform:rotate(${e.dir*22.5+180}deg)" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" aria-hidden="true"><path d="M12 20V4M6 10l6-6 6 6"/></svg>${DIRS[e.dir]}`:''} ${e.bft!=null?e.bft+' Bft':''}</span>`;
+function tl(list){return list.map(e=>`<li><button class="tl-item" type="button" data-open="${e.id}" aria-label="Eintrag ${e.t} ${TLABEL[e.type]} öffnen">
+  <span class="tl-time">${e.t}</span><span class="tl-dot">${ico(e.type,15)}</span>
+  <span class="tl-body"><span class="tl-head"><b>${TLABEL[e.type]}</b>${windChip(e)}${e.wx?`<span class="wind" style="background:none;border:0;padding:0">${ico(e.wx,18)}</span>`:''}</span>
+  <span class="pos">${fpos(e)}</span>${e.text?`<span class="tl-text">${esc(e.text)}</span>`:''}
+  ${e.photos.length?`<span class="thumbs">${e.photos.map(thumb).map(t=>`<span class="thumb">${t}</span>`).join('')}</span>`:''}</span></button></li>`).join('');}
+const statHTML=st=>`<div><b>${f1(st.sm)}</b><span>sm</span></div><div><b>${st.min?`${Math.floor(st.min/60)}:${String(st.min%60).padStart(2,'0')}`:'–'}</b><span>Fahrtzeit h</span></div><div><b>${st.n}</b><span>Einträge</span></div>`;
+let selId=null;
+function renderToday(){
+  const es=dayEs(TODAY);
+  $('#map-today').innerHTML=mapSVG([TODAY],bbox(es),selId,'Karte der heutigen Route Svendborg nach Faaborg');
+  $('#stats-today').innerHTML=statHTML(stats(TODAY));
+  $('#tl-today').innerHTML=tl(es.slice().reverse());
+}
+function renderDays(){
+  $('#days').innerHTML=days.map(d=>{const st=stats(d.n);return `<button class="daycard" type="button" data-day="${d.n}"><span class="dn">Tag<b>${d.n}</b></span><span><span class="dmeta">${d.dl}2026</span><br><span class="route">${d.from} → ${d.to}</span><br><span class="dmeta">${f1(st.sm)} sm · ${st.n} Einträge</span>${d.text?`<p class="lead">${esc((d.title?d.title+'. ':'')+d.text)}</p>`:`<p class="lead">Noch kein Tagesbericht.</p>`}</span></button>`;}).join('');
+}
+function renderTag(n){
+  const d=days[n-1],st=stats(n),es=dayEs(n);
+  $('#s-tag').innerHTML=`<button class="back" type="button" data-go="tage">${ico('chev-l',20)}Törn-Tage</button>
+  <div><div class="dmeta">Tag ${n} · ${d.dl}2026</div><h2>${d.from} → ${d.to}</h2></div>
+  <div class="mapframe">${mapSVG([n],bbox(es,.55,160),null,'Karte Tag '+n)}</div>
+  <div class="stats">${statHTML(st)}</div>
+  <div class="card"><div class="legend">Tagesbericht</div>
+    <label class="f"><span>Titel (optional)</span><input type="text" id="r-title" value="${esc(d.title)}"></label>
+    <label class="f"><span>Reisebericht</span><textarea id="r-text" style="min-height:160px">${esc(d.text)}</textarea></label>
+    <button class="btn primary block" id="r-save" type="button">Tagesbericht speichern</button></div>
+  <div class="legend">Einträge</div><ol class="tl">${tl(es)}</ol>`;
+  $('#r-save').onclick=()=>{d.title=$('#r-title').value;d.text=$('#r-text').value;toast('Tagesbericht Tag '+n+' gespeichert');};
+  show('tag',n);
+}
+let mapFilter=0;
+function renderKarte(){
+  $('#map-filter').innerHTML=[0,1,2,3].map(i=>`<button class="chip" type="button" data-mf="${i}" aria-pressed="${mapFilter===i}">${i?'Tag '+i:'Alle'}</button>`).join('');
+  const l=mapFilter?[mapFilter]:[1,2,3],es=l.flatMap(dayEs);
+  $('#map-all').innerHTML=mapSVG(l,mapFilter?bbox(es,.82,140):[0,0,400,330],null,'Törnkarte');
+  const sm=l.reduce((a,d)=>a+stats(d).sm,0);
+  $('#map-info').textContent=`${f1(sm)} sm · ${es.length} Einträge · Kiel → Faaborg`;
+}
+function renderCrew(){
+  $('#crew').innerHTML=crew.map((c,i)=>`<li><b>${esc(c.n)}</b><span class="role">${esc(c.r)}</span><button class="icon-btn" type="button" data-rmcrew="${i}" aria-label="${esc(c.n)} entfernen">${ico('x',18)}</button></li>`).join('')||'<li class="muted">Noch keine Crew.</li>';
+  const ph=entries.reduce((a,e)=>a+e.photos.length,0);
+  $('#exp-info').textContent=`${entries.length} Einträge · ${ph} Bilder · 3 Tage · ZIP enthält logbook.json, images/ und GPX der Route.`;
+}
+const boatSVG=`<svg viewBox="0 0 300 140" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="300" height="140" fill="var(--water-mid)"/><rect y="96" width="300" height="44" fill="var(--water-shallow)"/><path d="M60 98h180l-22 20H84z" fill="var(--ink)"/><path d="M148 22v74M148 24l56 66h-56M144 40l-48 50h48" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/></svg>`;
+
+/* ---------- Navigation ---------- */
+const screens=['heute','tage','tag','karte','toern'];
+function show(id,arg){
+  screens.forEach(s=>$('#s-'+s).hidden=s!==id);
+  const tab=id==='tag'?'tage':id;
+  $$('.tab').forEach(t=>t.toggleAttribute('aria-current',t.dataset.go===tab)); $$('.tab').forEach(t=>{if(t.dataset.go===tab)t.setAttribute('aria-current','page');else t.removeAttribute('aria-current');});
+  if(id==='tage')renderDays(); if(id==='karte')renderKarte(); if(id==='toern')renderCrew(); if(id==='heute')renderToday();
+  window.scrollTo(0,0);
+}
+let toastT;
+function toast(m,ms=3400){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),ms);}
+
+/* ---------- Sheet ---------- */
+let draft=null,editing=null,lastFocus=null;
+function buildSheet(){
+  $('#f-type').innerHTML=TYPES.map(([id,l])=>`<button class="chip" type="button" role="radio" data-type="${id}" id="type-${id}">${ico(id,18)}${l}</button>`).join('');
+  $('#f-wx').innerHTML=WX.map(([id,l])=>`<button class="chip" type="button" data-wx="${id}" id="wx-${id}" aria-pressed="false">${ico(id,26)}${l}</button>`).join('');
+  $('#f-sea').innerHTML=SEA.map(l=>`<button class="chip" type="button" data-sea="${l}" id="sea-${l.replace(' ','-')}" aria-pressed="false">${l}</button>`).join('');
+  $('#f-bft').innerHTML=BFT.map((b,i)=>`<button type="button" data-bft="${i}" id="bft-${i}" style="--lv:${i/12}" aria-pressed="false" aria-label="${i} Beaufort, ${b[0]}">${i}</button>`).join('');
+  $('#f-photos').innerHTML=[0,1,2].map(i=>`<div class="slotwrap"><input class="sr-only" type="file" accept="image/*" id="photo-${i}" aria-label="Foto ${i+1} wählen"><label class="slot" for="photo-${i}" id="slot-${i}"></label><button class="slot-x" type="button" data-rmphoto="${i}" id="rmphoto-${i}" aria-label="Foto ${i+1} entfernen" hidden><span>${ico('x',16)}</span></button></div>`).join('');
+  const sv=$('#rose'),c=100,r0=30,r1=78,pt=(r,a)=>[c+r*Math.sin(a*Math.PI/180),c-r*Math.cos(a*Math.PI/180)].map(n=>n.toFixed(2));
+  let h='';
+  DIRS.forEach((d,i)=>{const a=i*22.5,[x0,y0]=pt(r1,a-11.25),[x1,y1]=pt(r1,a+11.25),[x2,y2]=pt(r0,a+11.25),[x3,y3]=pt(r0,a-11.25),[tx,ty]=pt(66,a);
+    h+=`<path class="w ${i%4==0?'card4':''}" role="radio" tabindex="0" aria-checked="false" aria-label="Wind aus ${d}" data-dir="${i}" id="dir-${i}" d="M${x0} ${y0}A${r1} ${r1} 0 0 1 ${x1} ${y1}L${x2} ${y2}A${r0} ${r0} 0 0 0 ${x3} ${y3}Z"/>`;});
+  DIRS.forEach((d,i)=>{if(i%2)return;const[tx,ty]=pt(90,i*22.5);h+=`<text x="${tx}" y="${ty}" ${i%4==0?'style="font-weight:700"':''}>${d}</text>`;});
+  h+=`<text class="ctr" id="rose-ctr" x="100" y="100">–</text>`;
+  sv.innerHTML=h;
+}
+function syncSheet(){
+  const d=draft;
+  $$('#f-type .chip').forEach(b=>b.setAttribute('aria-checked',b.dataset.type===d.type));
+  $$('#rose .w').forEach(p=>p.setAttribute('aria-checked',+p.dataset.dir===d.dir));
+  $('#rose-ctr').textContent=d.dir==null?'–':DIRS[d.dir];
+  $('#wd-out').textContent=d.dir==null?'keine Angabe':`aus ${DIRS[d.dir]} · ${Math.round(d.dir*22.5)}°`;
+  $$('#f-bft button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.bft===d.bft));
+  $('#bft-desc').innerHTML=d.bft==null?'Nicht gesetzt':`<b>${d.bft} – ${BFT[d.bft][0]}</b><small>ca. ${BFT[d.bft][1]} kn</small>`;
+  $$('#f-wx .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.wx===d.wx));
+  $$('#f-sea .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.sea===d.sea));
+  for(let i=0;i<3;i++){const p=d.photos[i];$('#slot-'+i).innerHTML=p?thumb(p).replace('<svg','<svg style="position:absolute;inset:0"'):`${ico('cam',24)}Foto ${i+1}`;$('#rmphoto-'+i).hidden=!p;}
+}
+function openSheet(id,isNew){
+  const e=entries.find(x=>x.id===id);if(!e)return;
+  editing=e;draft={...e,photos:e.photos.slice()};
+  lastFocus=document.activeElement;
+  $('#sh-title').textContent=(isNew?'Eintrag ergänzen · ':'Eintrag · ')+e.t;
+  $('#sh-pos').textContent=`${fpos(e,3)} · ± ${e.acc} m`;
+  $('#f-text').value=draft.text||'';$('#f-hpa').value=draft.hpa??'';$('#f-temp').value=draft.temp??'';
+  $('#del-confirm').hidden=true;$('#f-del').hidden=false;$('#f-save').hidden=false;
+  syncSheet();
+  const sh=$('#sheet'),sc=$('#scrim');sh.hidden=false;sc.hidden=false;$('.sh-body').scrollTop=0;
+  requestAnimationFrame(()=>{sh.classList.add('open');sc.classList.add('open');});
+  $('#sh-close').focus();
+  selId=id;renderToday();
+}
+function closeSheet(){
+  const sh=$('#sheet'),sc=$('#scrim');if(sh.hidden)return;
+  sh.classList.remove('open');sc.classList.remove('open');
+  setTimeout(()=>{sh.hidden=true;sc.hidden=true;},240);
+  selId=null;editing=null;renderToday();
+  if(lastFocus&&document.contains(lastFocus))lastFocus.focus();
+}
+function refreshAll(){renderToday();if(!$('#s-tage').hidden)renderDays();if(!$('#s-tag').hidden){const n=+($('#s-tag .dmeta').textContent.match(/Tag (\d)/)||[0,TODAY])[1];renderTag(n);}if(!$('#s-karte').hidden)renderKarte();}
+
+/* ---------- Fix simulieren ---------- */
+let busy=false;
+function doFix(){
+  if(busy)return;busy=true;
+  const b=$('#fix');b.classList.add('busy');$('#fix-ico').innerHTML=ico('motor',40);$('#fix-lbl').textContent='Position wird bestimmt …';$('#fix-sub').textContent='GPS-Fix, ± 5 m';
+  setTimeout(()=>{
+    const t=`14:${String(32+fixCount).padStart(2,'0')}`,e=E(TODAY,t,55.0838+fixCount*.0007,10.2562-fixCount*.0011,'eintrag',null,null,null,null,'');e.acc=5;fixCount++;
+    entries.push(e);b.classList.remove('busy');$('#fix-ico').innerHTML=ico('eintrag',40);$('#fix-lbl').textContent='Eintrag jetzt';$('#fix-sub').textContent='1 Tap · GPS und Uhrzeit';busy=false;
+    toast(`Eintrag ${t} gespeichert · ${fpos(e)}`,3800);renderToday();
+    setTimeout(()=>openSheet(e.id,true),650);
+  },1100);
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click',ev=>{
+  const g=ev.target.closest('[data-go]');if(g){const t=g.dataset.go;show(t);return;}
+  const o=ev.target.closest('[data-open]');if(o){openSheet(o.dataset.open,false);return;}
+  const dd=ev.target.closest('[data-day]');if(dd){renderTag(+dd.dataset.day);return;}
+  const mf=ev.target.closest('[data-mf]');if(mf){mapFilter=+mf.dataset.mf;renderKarte();return;}
+  const rc=ev.target.closest('[data-rmcrew]');if(rc){const c=crew.splice(+rc.dataset.rmcrew,1)[0];renderCrew();toast(c.n+' entfernt');return;}
+  const ty=ev.target.closest('[data-type]');if(ty&&draft){draft.type=ty.dataset.type;syncSheet();return;}
+  const dr=ev.target.closest('[data-dir]');if(dr&&draft){draft.dir=draft.dir===+dr.dataset.dir?null:+dr.dataset.dir;syncSheet();return;}
+  const bf=ev.target.closest('[data-bft]');if(bf&&draft){draft.bft=draft.bft===+bf.dataset.bft?null:+bf.dataset.bft;syncSheet();return;}
+  const wx=ev.target.closest('[data-wx]');if(wx&&draft){draft.wx=draft.wx===wx.dataset.wx?null:wx.dataset.wx;syncSheet();return;}
+  const se=ev.target.closest('[data-sea]');if(se&&draft){draft.sea=draft.sea===se.dataset.sea?null:se.dataset.sea;syncSheet();return;}
+  const rp=ev.target.closest('[data-rmphoto]');if(rp&&draft){draft.photos.splice(+rp.dataset.rmphoto,1);$('#photo-'+rp.dataset.rmphoto).value='';syncSheet();return;}
+});
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){if(!$('#sheet').hidden)closeSheet();else if(!$('#onb').hidden)closeOnb();}
+  if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.rose .w,.mk')){ev.preventDefault();ev.target.dispatchEvent(new MouseEvent('click',{bubbles:true}));}
+});
+$('#fix').onclick=doFix;
+$('#sh-close').onclick=closeSheet;$('#scrim').onclick=closeSheet;
+const stepDir=k=>{draft.dir=draft.dir==null?(k>0?0:15):(draft.dir+k+16)%16;syncSheet();};
+$('#wd-prev').onclick=()=>stepDir(-1);$('#wd-next').onclick=()=>stepDir(1);
+$('#f-save').onclick=()=>{
+  Object.assign(editing,draft,{text:$('#f-text').value,hpa:$('#f-hpa').value===''?null:+$('#f-hpa').value,temp:$('#f-temp').value===''?null:+$('#f-temp').value});
+  const t=editing.t;closeSheet();refreshAll();toast(`Eintrag ${t} gespeichert`);
+};
+$('#f-del').onclick=()=>{$('#del-confirm').hidden=false;$('#f-del').hidden=true;$('#f-save').hidden=true;$('#del-no').focus();};
+$('#del-no').onclick=()=>{$('#del-confirm').hidden=true;$('#f-del').hidden=false;$('#f-save').hidden=false;$('#f-del').focus();};
+$('#del-yes').onclick=()=>{const t=editing.t;entries.splice(entries.indexOf(editing),1);closeSheet();refreshAll();toast(`Eintrag ${t} gelöscht`);};
+document.addEventListener('change',ev=>{
+  const t=ev.target;
+  if(t.matches('#f-photos input')&&t.files[0]){const i=+t.id.slice(-1),rd=new FileReader();rd.onload=()=>{const a=draft.photos.filter(Boolean);if(draft.photos[i])draft.photos[i]=rd.result;else a.push(rd.result),draft.photos=a;syncSheet();};rd.readAsDataURL(t.files[0]);}
+  if(t.id==='gpx-file'&&t.files[0]){const n=t.files[0].name;$('#gpx-list').insertAdjacentHTML('beforeend',`<li>${esc(n)} <span class="num">· 1.240 Trackpunkte (Demo)</span></li>`);toast(`GPX „${n}“ importiert · Tracks Tagen zugeordnet`);t.value='';}
+  if(t.id==='boat-photo'&&t.files[0]){const rd=new FileReader();rd.onload=()=>{$('#boatpic').innerHTML=`<img src="${rd.result}" alt="Bootsfoto">`;toast('Bootsfoto übernommen');};rd.readAsDataURL(t.files[0]);}
+  if(t.id==='o-bphoto'&&t.files[0]){const rd=new FileReader();rd.onload=()=>{$('#o-boatpic').innerHTML=`<img src="${rd.result}" alt="Bootsfoto">`;};rd.readAsDataURL(t.files[0]);}
+});
+$('#gpx-btn').onclick=()=>$('#gpx-file').click();
+$('#boat-pick').onclick=()=>$('#boat-photo').click();
+$('#o-bpick').onclick=()=>$('#o-bphoto').click();
+$('#t-save').onclick=()=>{$('#tb-sub').textContent=$('#t-name').value+' · Tag 3';toast('Törndaten gespeichert');};
+$('#c-add').onclick=()=>{const n=$('#c-name').value.trim();if(!n){toast('Bitte einen Namen eingeben');$('#c-name').focus();return;}crew.push({n,r:$('#c-role').value});$('#c-name').value='';renderCrew();toast(n+' zur Crew hinzugefügt');};
+$('#exp-zip').onclick=()=>toast(`logbook.zip bereit · ${entries.length} Einträge, ${entries.reduce((a,e)=>a+e.photos.length,0)} Bilder, GPX (Prototyp: kein Download)`,4200);
+$('#exp-json').onclick=()=>toast('logbook.json bereit · Bilder als Base64 (Prototyp: kein Download)',4000);
+$('#sw-live').onclick=function(){
+  const on=this.getAttribute('aria-checked')!=='true';this.setAttribute('aria-checked',on);
+  clearInterval(recT);$('#rec').hidden=!on;
+  if(on){let s=0;$('#rec-t').textContent='REC 00:00';recT=setInterval(()=>{s++;$('#rec-t').textContent='REC '+String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');},1000);toast('Aufzeichnung läuft · Bildschirm bleibt an, Akku wird stärker belastet');}
+  else toast('Aufzeichnung beendet');
+};
+let recT;
+$('#theme-btn').onclick=()=>{const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?'light':'dark';themeIcon();};
+function themeIcon(){const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;$('#theme-btn').innerHTML=ico(dark?'sonne':'moon',22);}
+
+/* ---------- Onboarding ---------- */
+let ostep=1;const ocrew=[];
+function renderOnb(){
+  [1,2,3].forEach(i=>$('#ob-'+i).hidden=i!==ostep);
+  $$('.steps i').forEach((x,i)=>x.classList.toggle('on',i<ostep));
+  $('#onb-step').textContent=`Schritt ${ostep} von 3 · ${['Törn','Boot','Crew'][ostep-1]}`;
+  $('#onb-back').hidden=ostep===1;$('#onb-next').textContent=ostep===3?'Törn anlegen':'Weiter';
+  $('#o-crew').innerHTML=ocrew.map((c,i)=>`<li><b>${esc(c.n)}</b><span class="role">${esc(c.r)}</span><button class="icon-btn" type="button" data-orm="${i}" aria-label="${esc(c.n)} entfernen">${ico('x',18)}</button></li>`).join('')||'<li class="muted" style="border:0">Noch niemand an Bord – füge mindestens den Skipper hinzu.</li>';
+}
+function openOnb(){ostep=1;ocrew.length=0;$$('#onb input[type=text],#onb input[type=number],#onb input[type=date]').forEach(i=>i.value='');$('#o-boatpic').innerHTML=boatSVG;$('#o-err').hidden=true;renderOnb();$('#onb').hidden=false;$('#o-name').focus();}
+function closeOnb(){$('#onb').hidden=true;}
+$('#new-toern').onclick=openOnb;$('#onb-x').onclick=closeOnb;
+$('#onb-back').onclick=()=>{ostep--;renderOnb();};
+$('#onb-next').onclick=()=>{
+  if(ostep===1&&!$('#o-name').value.trim()){$('#o-err').hidden=false;$('#o-name').focus();return;}
+  if(ostep<3){ostep++;renderOnb();window.scrollTo(0,0);return;}
+  const n=$('#o-name').value.trim();closeOnb();toast(`Törn „${n}“ angelegt (Prototyp: Demo-Daten bleiben aktiv)`,4200);
+};
+$('#o-cadd').onclick=()=>{const n=$('#o-cname').value.trim();if(!n){$('#o-cname').focus();return;}ocrew.push({n,r:$('#o-crole').value});$('#o-cname').value='';renderOnb();};
+$('#o-crew').addEventListener('click',ev=>{const b=ev.target.closest('[data-orm]');if(b){ocrew.splice(+b.dataset.orm,1);renderOnb();}});
+
+/* ---------- Init ---------- */
+$$('[data-ico]').forEach(el=>el.innerHTML=ico(el.dataset.ico,el.classList.contains('icon-btn')?22:24));
+$('#sh-close').innerHTML=ico('x',22);$('#fix-ico').innerHTML=ico('eintrag',40);
+$('#ico-gpx').innerHTML=ico('up',20);$('#ico-zip').innerHTML=ico('down',20);$('#ico-cam1').innerHTML=ico('cam',20);
+$('#boatpic').innerHTML=boatSVG;
+buildSheet();themeIcon();renderToday();
+</script>

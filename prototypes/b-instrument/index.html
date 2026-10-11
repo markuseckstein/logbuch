@@ -1,0 +1,845 @@
+<title>Logbuch Instrument</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#07090b; --surface:#11161a; --surface2:#1b2228; --line:#303b43;
+  --fg:#f2f5f7; --fg-dim:#9fadb6; --accent:#ffb81c; --on-accent:#1a1100;
+  --accent2:#35d0e8; --ok:#5fd38d; --danger:#ff7a6b; --on-danger:#1a0000; --seg-off:#222b32;
+  --f-num:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --f-txt:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --nav-h:68px;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg:#f7f8f5; --surface:#ffffff; --surface2:#e8ebe6; --line:#98a3aa;
+    --fg:#000000; --fg-dim:#39434a; --accent:#9a5b00; --on-accent:#ffffff;
+    --accent2:#005f73; --ok:#0b6b34; --danger:#b00020; --on-danger:#ffffff; --seg-off:#d5dad4;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#f7f8f5; --surface:#ffffff; --surface2:#e8ebe6; --line:#98a3aa;
+  --fg:#000000; --fg-dim:#39434a; --accent:#9a5b00; --on-accent:#ffffff;
+  --accent2:#005f73; --ok:#0b6b34; --danger:#b00020; --on-danger:#ffffff; --seg-off:#d5dad4;
+}
+:root[data-night]{
+  color-scheme: dark;
+  --bg:#000000; --surface:#110000; --surface2:#1e0202; --line:#561212;
+  --fg:#ff4b3a; --fg-dim:#cf3f2f; --accent:#ff3b2a; --on-accent:#000000;
+  --accent2:#e0503f; --ok:#ff6a58; --danger:#ff8a78; --on-danger:#000000; --seg-off:#2a0505;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:400 16px/1.4 var(--f-txt);font-variant-numeric:tabular-nums;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent2);outline-offset:2px}
+[hidden]{display:none!important}
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-family:var(--f-num);font-weight:600;letter-spacing:.01em}
+
+#app{position:fixed;inset:0;display:flex;flex-direction:column;max-width:560px;margin:0 auto;background:var(--bg)}
+header.top{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line);flex:none}
+.brand{flex:1;min-width:0}
+.brand b{display:block;font:600 24px/1 var(--f-num);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand span{font-size:12px;color:var(--fg-dim)}
+.gps{display:flex;align-items:flex-end;gap:2px;height:20px}
+.gps i{width:4px;background:var(--accent2);display:block}
+.hbtn{min-width:56px;height:52px;border:1px solid var(--line);background:var(--surface);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:600 10px/1 var(--f-txt);letter-spacing:.08em;text-transform:uppercase;padding:0 6px}
+.hbtn[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+main{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth}
+.view{padding:12px 16px 24px}
+nav.tabs{flex:none;position:fixed;left:0;right:0;bottom:0;display:none}
+.tabbar{flex:none;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:2px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbar button{height:var(--nav-h);border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:600 12px/1 var(--f-txt);letter-spacing:.1em;text-transform:uppercase;color:var(--fg-dim);border-top:4px solid transparent;margin-top:-2px}
+.tabbar button[aria-current="page"]{color:var(--accent);border-top-color:var(--accent);background:var(--surface2)}
+
+.lbl{font:600 12px/1 var(--f-txt);letter-spacing:.14em;text-transform:uppercase;color:var(--fg-dim)}
+.unit{font:600 14px/1 var(--f-txt);letter-spacing:.08em;color:var(--fg-dim);text-transform:uppercase}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0;text-align:left}
+.tile .big{font:600 56px/.95 var(--f-num);letter-spacing:.01em}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.span2{grid-column:1/-1}
+.pos{font:600 52px/1 var(--f-num);letter-spacing:.02em;white-space:nowrap}
+.pos small{font-size:.5em;color:var(--fg-dim);margin-left:6px}
+.segs{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;height:10px}
+.segs i{background:var(--seg-off);display:block}
+.segs i.on{background:var(--accent)}
+.segs i.hi{background:var(--accent2)}
+button.tile{color:inherit;width:100%}
+.last-row{display:flex;align-items:center;gap:12px}
+.last-row .ic{width:32px;height:32px;color:var(--accent)}
+.last-row b{font:600 30px/1 var(--f-num)}
+
+.logwrap{position:sticky;bottom:0;padding:12px 0 4px;margin-top:4px;background:linear-gradient(to top,var(--bg) 78%,transparent)}
+.logbtn{position:relative;width:100%;min-height:168px;border:0;border-radius:10px;background:var(--accent);color:var(--on-accent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;overflow:hidden;box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--accent)}
+.logbtn:active{transform:scale(.985)}
+.logbtn .t{font:700 110px/.9 var(--f-num);letter-spacing:.12em;padding-left:.12em}
+.logbtn .s{font:600 13px/1 var(--f-txt);letter-spacing:.16em;text-transform:uppercase}
+.logbtn.fixing .t,.logbtn.done .t{font-size:60px}
+.fixbar{display:none;grid-template-columns:repeat(10,1fr);gap:4px;width:70%;height:12px}
+.fixbar i{background:rgba(0,0,0,.25);display:block}
+.logbtn.fixing .fixbar{display:grid}
+.logbtn.fixing .fixbar i{animation:sweep 1s steps(1,end) both}
+.fixbar i:nth-child(n){animation-delay:calc(var(--n)*85ms)}
+@keyframes sweep{from{background:rgba(0,0,0,.25)}to{background:var(--on-accent)}}
+
+h2.sec{font:600 28px/1 var(--f-num);letter-spacing:.08em;text-transform:uppercase;margin:6px 0 12px}
+h3.sec{font:600 14px/1 var(--f-txt);letter-spacing:.14em;text-transform:uppercase;color:var(--fg-dim);margin:20px 0 8px}
+.btn{min-height:56px;padding:0 18px;border:2px solid var(--fg);background:transparent;border-radius:6px;font:700 14px/1 var(--f-txt);letter-spacing:.1em;text-transform:uppercase;display:inline-flex;align-items:center;justify-content:center;gap:10px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.dng{border-color:var(--danger);color:var(--danger)}
+.btn.dng.solid{background:var(--danger);color:var(--on-danger)}
+.btn.block{width:100%}
+.btn.sm{min-height:48px;padding:0 12px;font-size:12px}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{min-width:0}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field label{font:600 12px/1 var(--f-txt);letter-spacing:.14em;text-transform:uppercase;color:var(--fg-dim)}
+input[type=text],input[type=date],input[type=number],input[type=time],select,textarea{width:100%;min-height:52px;background:var(--surface);border:2px solid var(--line);border-radius:6px;padding:10px 12px;font-size:18px}
+input:focus,select:focus,textarea:focus{border-color:var(--accent2);outline:none}
+textarea{min-height:120px;resize:vertical;line-height:1.4}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px}
+
+/* Eintrag-Panel */
+.panel{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;max-width:560px;margin:0 auto}
+.panel>header{flex:none;display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line)}
+.panel>header h2{flex:1;margin:0;font:600 26px/1 var(--f-num);letter-spacing:.08em;text-transform:uppercase}
+.panel>header .sub{font:500 13px/1.2 var(--f-txt);color:var(--fg-dim);letter-spacing:0;text-transform:none;display:block;margin-top:4px}
+.iconbtn{width:52px;height:52px;border:1px solid var(--line);background:var(--surface);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.pbody{flex:1;min-height:0;overflow-y:auto;padding:12px 16px 24px}
+.pfoot{flex:none;display:flex;gap:8px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border-top:2px solid var(--line);background:var(--surface)}
+.pfoot .btn{flex:1}
+.pfoot .confirm{flex:1;display:flex;flex-direction:column;gap:8px}
+.pfoot .confirm p{margin:0;font-weight:600}
+.tg{display:grid;gap:8px}
+.tg.c3{grid-template-columns:repeat(3,1fr)}
+.tg.c2{grid-template-columns:repeat(2,1fr)}
+.opt{min-height:76px;border:2px solid var(--line);background:var(--surface);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px 4px;font:600 13px/1.1 var(--f-txt);text-align:center}
+.opt .ic{width:30px;height:30px}
+.opt[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.opt.h{flex-direction:row;justify-content:flex-start;gap:10px;padding:6px 12px;min-height:60px;text-align:left}
+.bars{display:flex;align-items:flex-end;gap:2px;height:22px}
+.bars i{width:5px;background:currentColor;display:block}
+.rosewrap{display:flex;flex-direction:column;align-items:center}
+svg.rose{width:100%;max-width:340px;height:auto;touch-action:manipulation}
+.rose .w{fill:var(--surface2);stroke:var(--line);stroke-width:1;cursor:pointer}
+.rose .w:hover{stroke:var(--accent2)}
+.rose .w:focus-visible{outline:none;stroke:var(--accent2);stroke-width:3}
+.rose g[aria-pressed="true"] .w{fill:var(--accent)}
+.rose text{fill:var(--fg);font:600 12px var(--f-num);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.rose text.m{font-size:20px;font-weight:700}
+.rose g[aria-pressed="true"] text{fill:var(--on-accent)}
+.rose .ctr{fill:var(--bg);stroke:var(--line)}
+.rose .ctxt{font:700 34px var(--f-num);fill:var(--fg)}
+.rose .csub{font:600 9px var(--f-txt);fill:var(--fg-dim);letter-spacing:.1em}
+.bft{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px}
+.bft button{min-height:52px;border:2px solid var(--line);background:var(--surface);border-radius:4px;font:600 26px/1 var(--f-num)}
+.bft button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.step{display:grid;grid-template-columns:72px 1fr 72px;gap:8px;align-items:stretch}
+.step .btn{padding:0;min-height:64px}
+.bftinfo{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 12px;text-align:center}
+.bftinfo .num{font-size:44px;line-height:1}
+.bftinfo div:last-child{font-size:14px;color:var(--fg-dim)}
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.slot{position:relative;aspect-ratio:1;border:2px dashed var(--line);border-radius:6px;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--fg-dim);overflow:hidden}
+.slot label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.slot .rm{position:absolute;top:4px;right:4px;width:44px;height:44px;border-radius:6px;border:0;background:var(--bg);color:var(--fg);display:flex;align-items:center;justify-content:center;z-index:2;opacity:.92}
+.slot input{position:absolute;opacity:0;width:1px;height:1px}
+.slot:focus-within{border-color:var(--accent2)}
+
+/* Sheet */
+.backdrop{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:560px;background:var(--surface);border-top:3px solid var(--accent);padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.sheet .ok{display:flex;align-items:center;gap:10px;font:600 28px/1 var(--f-num);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px}
+.sheet .ok .ic{color:var(--ok);width:32px;height:32px;stroke-width:3}
+.toast{position:fixed;left:16px;right:16px;top:72px;z-index:80;max-width:528px;margin:0 auto;background:var(--fg);color:var(--bg);padding:14px 16px;border-radius:6px;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+
+/* Logbuch */
+.day{margin-bottom:18px}
+.dayhead{background:var(--surface2);border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dayhead .d{font:600 26px/1 var(--f-num);letter-spacing:.04em}
+.dayhead .rt{flex:1 1 100%;font-weight:600}
+.dayhead .sm{font:600 30px/1 var(--f-num);color:var(--accent);margin-left:auto}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:0 0 6px 6px;background:var(--surface)}
+table{border-collapse:collapse;min-width:680px;width:100%;font-size:14px}
+th{font:600 11px/1 var(--f-txt);letter-spacing:.12em;text-transform:uppercase;color:var(--fg-dim);text-align:left;padding:10px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:0;border-bottom:1px solid var(--line);vertical-align:top}
+td>button{display:block;width:100%;text-align:left;background:none;border:0;padding:12px 10px;min-height:48px;font-size:14px}
+td.tm>button{font:600 22px/1 var(--f-num)}
+td.ty>button{white-space:nowrap;font-weight:600}
+td.ty .ic{width:18px;height:18px;vertical-align:-3px;margin-right:6px;color:var(--accent)}
+td.ps>button{white-space:nowrap;font-family:var(--f-num);font-size:17px;font-weight:500}
+td.rm>button{min-width:200px}
+tr:last-child td{border-bottom:0}
+.rep{padding:10px 12px;font-size:14px;color:var(--fg-dim);border-top:1px solid var(--line);font-style:italic}
+
+/* Karte */
+.mapbox{border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden}
+svg.map{display:block;width:100%;height:auto}
+.map .sea{fill:var(--bg)} .map .land{fill:var(--surface2);stroke:var(--line);stroke-width:1}
+.map .grid{stroke:var(--line);stroke-width:.5;opacity:.6}
+.map .trk{fill:none;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+.map .pt{fill:var(--bg);stroke-width:2.5;cursor:pointer}
+.map .lab{fill:var(--fg);font:700 12px var(--f-txt);paint-order:stroke;stroke:var(--bg);stroke-width:3px}
+.map .cur{fill:var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0;font-size:13px}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:22px;height:0;border-top:4px solid}
+.switch{display:flex;align-items:center;gap:14px;width:100%;min-height:72px;background:var(--surface);border:2px solid var(--line);border-radius:6px;padding:8px 12px;text-align:left}
+.switch .knob{flex:none;width:64px;height:36px;border-radius:18px;background:var(--seg-off);border:2px solid var(--line);position:relative}
+.switch .knob::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:var(--fg-dim);transition:transform .15s}
+.switch[aria-checked="true"] .knob{background:var(--accent);border-color:var(--accent)}
+.switch[aria-checked="true"] .knob::after{transform:translateX(28px);background:var(--on-accent)}
+.switch b{display:block}
+.switch small{color:var(--fg-dim);font-size:13px;line-height:1.3;display:block}
+.warn{border-left:6px solid var(--accent);background:var(--surface);padding:10px 12px;margin-top:8px;font-size:14px}
+
+/* Törn */
+.boatph{width:96px;height:96px;flex:none;border:2px dashed var(--line);border-radius:6px;position:relative;display:flex;align-items:center;justify-content:center;color:var(--fg-dim);overflow:hidden;background:var(--surface)}
+.boatph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.boatph input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.crew{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:6px}
+.crew li{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 4px 4px 12px;min-height:56px}
+.crew li b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.crew li span{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-dim)}
+.link{background:none;border:0;color:var(--accent2);font-weight:700;text-decoration:underline;min-height:48px;padding:0 4px;font-size:16px}
+.prog{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:16px}
+.prog div{height:10px;background:var(--seg-off)}
+.prog div.on{background:var(--accent)}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms!important;animation-delay:0s!important;transition:none!important;scroll-behavior:auto!important}
+  .logbtn.fixing .fixbar i{animation:none;background:var(--on-accent)}
+}
+@media (min-width:420px){ .pos{font-size:60px} .tile .big{font-size:64px} }
+</style>
+
+<div id="app">
+  <header class="top">
+    <div class="brand"><b id="brandName">Seeschwalbe</b><span id="brandSub">Ostsee-Törn 2026</span></div>
+    <div class="gps" id="gpsBars" aria-label="GPS-Signal gut" role="img"><i style="height:6px"></i><i style="height:10px"></i><i style="height:14px"></i><i style="height:18px"></i><i style="height:20px"></i></div>
+    <button class="hbtn" id="themeBtn" type="button" aria-label="Darstellung wechseln"></button>
+    <button class="hbtn" id="nightBtn" type="button" aria-pressed="false" aria-label="Nachtsicht"></button>
+  </header>
+
+  <main id="main">
+    <!-- COCKPIT -->
+    <section class="view" id="v-cockpit">
+      <div class="grid2">
+        <div class="tile span2">
+          <span class="lbl">Position</span>
+          <div class="pos" id="cLat">--</div>
+          <div class="pos" id="cLon">--</div>
+        </div>
+        <div class="tile">
+          <span class="lbl">Uhrzeit</span>
+          <div class="big" id="cTime">--:--</div>
+          <span class="unit" id="cDate">&nbsp;</span>
+        </div>
+        <div class="tile">
+          <span class="lbl">Tagesdistanz</span>
+          <div class="big"><span id="cDist">0,0</span></div>
+          <span class="unit">sm</span>
+        </div>
+        <div class="tile">
+          <span class="lbl">SOG</span>
+          <div class="big"><span id="cSog">0,0</span> <span class="unit">kn</span></div>
+          <div class="segs" id="cSegs" aria-hidden="true"></div>
+        </div>
+        <div class="tile">
+          <span class="lbl">COG</span>
+          <div class="row" style="justify-content:space-between">
+            <div class="big"><span id="cCog">000</span><span class="unit">°</span></div>
+            <svg class="ic" id="cArrow" viewBox="0 0 24 24" style="width:44px;height:44px;color:var(--accent2)"><path d="M12 3l6 17-6-4-6 4z"/></svg>
+          </div>
+          <span class="unit" id="cCogT">&nbsp;</span>
+        </div>
+        <button class="tile span2" id="cLast" type="button" aria-label="Letzten Eintrag bearbeiten">
+          <span class="lbl">Letzter Eintrag</span>
+          <div class="last-row" id="cLastBody"></div>
+        </button>
+      </div>
+      <div class="logwrap">
+        <button class="logbtn" id="logBtn" type="button" aria-live="polite">
+          <span class="t" id="logT">LOG</span>
+          <span class="fixbar" aria-hidden="true"><i style="--n:0"></i><i style="--n:1"></i><i style="--n:2"></i><i style="--n:3"></i><i style="--n:4"></i><i style="--n:5"></i><i style="--n:6"></i><i style="--n:7"></i><i style="--n:8"></i><i style="--n:9"></i></span>
+          <span class="s" id="logS">1 Tap &middot; Position + Zeit</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- LOGBUCH -->
+    <section class="view" id="v-logbuch" hidden>
+      <h2 class="sec">Logbuch</h2>
+      <div id="days"></div>
+    </section>
+
+    <!-- KARTE -->
+    <section class="view" id="v-karte" hidden>
+      <h2 class="sec">Karte</h2>
+      <div class="mapbox"><svg class="map" id="mapSvg" viewBox="0 0 340 480" role="img" aria-label="Schematische Karte mit Törn-Track"></svg></div>
+      <div class="legend" id="legend"></div>
+      <div class="card" id="ptInfo" aria-live="polite">Punkt antippen für Details.</div>
+      <h3 class="sec">Track</h3>
+      <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml" hidden>
+      <button class="btn block" id="gpxBtn" type="button"><svg class="ic"><use/></svg>GPX importieren</button>
+      <div style="height:10px"></div>
+      <button class="switch" id="liveSw" type="button" role="switch" aria-checked="false">
+        <span class="knob"></span>
+        <span><b>Live-Route aufzeichnen</b><small>Bildschirm bleibt an</small></span>
+      </button>
+      <div class="warn" id="liveWarn">Akku-Hinweis: Aufzeichnung nur im Vordergrund. Display bleibt an, der Akkuverbrauch steigt deutlich. Powerbank bereithalten.</div>
+    </section>
+
+    <!-- TÖRN -->
+    <section class="view" id="v-toern" hidden>
+      <h2 class="sec">Törn</h2>
+      <div class="card">
+        <div class="field"><label for="t-name">Törnname</label><input type="text" id="t-name"></div>
+        <div class="grid2">
+          <div class="field"><label for="t-from">Von</label><input type="date" id="t-from"></div>
+          <div class="field"><label for="t-to">Bis</label><input type="date" id="t-to"></div>
+        </div>
+        <div class="field" style="margin:0"><label for="t-area">Revier</label><input type="text" id="t-area"></div>
+      </div>
+
+      <h3 class="sec">Boot</h3>
+      <div class="card">
+        <div class="row" style="align-items:flex-start;margin-bottom:12px">
+          <div class="boatph" id="boatPh"><span class="lbl" style="text-align:center">Foto</span><input type="file" id="b-photo" accept="image/*" aria-label="Bootsfoto wählen"></div>
+          <div style="flex:1;min-width:0">
+            <div class="field"><label for="b-name">Name</label><input type="text" id="b-name"></div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label for="b-type">Typ</label><input type="text" id="b-type"></div>
+          <div class="field"><label for="b-len">Länge (m)</label><input type="number" id="b-len" inputmode="decimal" step="0.1"></div>
+        </div>
+        <div class="grid2">
+          <div class="field" style="margin:0"><label for="b-port">Heimathafen</label><input type="text" id="b-port"></div>
+          <div class="field" style="margin:0"><label for="b-call">Rufzeichen</label><input type="text" id="b-call" placeholder="optional"></div>
+        </div>
+      </div>
+
+      <h3 class="sec">Crew</h3>
+      <ul class="crew" id="crewList"></ul>
+      <div class="card">
+        <div class="field"><label for="c-name">Name</label><input type="text" id="c-name" placeholder="Neues Crewmitglied"></div>
+        <div class="row">
+          <select id="c-role" aria-label="Rolle"><option>Crew</option><option>Skipper</option><option>Co-Skipper</option></select>
+          <button class="btn pri" id="c-add" type="button" style="flex:none"><svg class="ic"><use/></svg>Hinzufügen</button>
+        </div>
+      </div>
+
+      <h3 class="sec">Export</h3>
+      <div class="grid2">
+        <button class="btn" id="exZip" type="button"><svg class="ic"><use/></svg>ZIP + Bilder</button>
+        <button class="btn" id="exJson" type="button"><svg class="ic"><use/></svg>JSON</button>
+      </div>
+
+      <h3 class="sec">Weiteres</h3>
+      <button class="link" id="newTour" type="button">Neuen Törn anlegen</button>
+    </section>
+  </main>
+
+  <div class="tabbar" id="tabbar" role="tablist" aria-label="Hauptnavigation"></div>
+</div>
+
+<!-- Quick-Sheet -->
+<div class="backdrop" id="quick" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qTitle">
+    <div class="ok"><svg class="ic"><use/></svg><span id="qTitle">Eintrag gespeichert</span></div>
+    <span class="lbl">Typ ergänzen</span>
+    <div class="tg c3" id="qTypes" style="margin:8px 0 12px"></div>
+    <div class="row">
+      <button class="btn" id="qMore" type="button" style="flex:1">Wind / Wetter / Foto</button>
+      <button class="btn pri" id="qDone" type="button" style="flex:1">Fertig</button>
+    </div>
+  </div>
+</div>
+
+<!-- Eintrag ergänzen -->
+<div class="panel" id="edPanel" role="dialog" aria-modal="true" aria-labelledby="edTitle" hidden>
+  <header>
+    <h2 id="edTitle">Eintrag ergänzen<span class="sub" id="edSub"></span></h2>
+    <button class="iconbtn" id="edClose" type="button" aria-label="Schließen"></button>
+  </header>
+  <div class="pbody">
+    <div class="field"><label for="ed-time">Uhrzeit</label><input type="time" id="ed-time"></div>
+    <span class="lbl">Typ</span>
+    <div class="tg c3" id="ed-types" style="margin:8px 0 18px"></div>
+
+    <span class="lbl">Windrichtung (Wind aus)</span>
+    <div class="rosewrap" id="ed-rose" style="margin:8px 0 18px"></div>
+
+    <span class="lbl">Windstärke Beaufort</span>
+    <div style="height:8px"></div>
+    <div class="bft" id="ed-bft"></div>
+    <div class="step">
+      <button class="btn" id="ed-bft-m" type="button" aria-label="Beaufort verringern"><svg class="ic"><use/></svg></button>
+      <div class="bftinfo" aria-live="polite"><div class="num" id="ed-bft-n">--</div><div id="ed-bft-d">nicht erfasst</div></div>
+      <button class="btn" id="ed-bft-p" type="button" aria-label="Beaufort erhöhen"><svg class="ic"><use/></svg></button>
+    </div>
+
+    <h3 class="sec">Wetter</h3>
+    <div class="tg c3" id="ed-wx"></div>
+    <h3 class="sec">Seegang</h3>
+    <div class="tg c3" id="ed-sea" style="grid-template-columns:repeat(5,1fr)"></div>
+
+    <h3 class="sec">Optional</h3>
+    <div class="grid2">
+      <div class="field"><label for="ed-press">Luftdruck hPa</label><input type="number" id="ed-press" inputmode="numeric" placeholder="1013"></div>
+      <div class="field"><label for="ed-temp">Temperatur °C</label><input type="number" id="ed-temp" inputmode="decimal" placeholder="18"></div>
+    </div>
+    <div class="field"><label for="ed-text">Bemerkung</label><textarea id="ed-text" placeholder="Was ist passiert?"></textarea></div>
+    <span class="lbl">Fotos (max. 3)</span>
+    <div class="photos" id="ed-photos" style="margin-top:8px"></div>
+  </div>
+  <div class="pfoot" id="edFoot"></div>
+</div>
+
+<!-- Tagesbericht -->
+<div class="panel" id="repPanel" role="dialog" aria-modal="true" aria-labelledby="repTitleH" hidden>
+  <header>
+    <h2 id="repTitleH">Tagesbericht<span class="sub" id="repSub"></span></h2>
+    <button class="iconbtn" id="repClose" type="button" aria-label="Schließen"></button>
+  </header>
+  <div class="pbody">
+    <div class="field"><label for="rep-title">Titel (optional)</label><input type="text" id="rep-title"></div>
+    <div class="field"><label for="rep-text">Reisebericht</label><textarea id="rep-text" style="min-height:300px"></textarea></div>
+  </div>
+  <div class="pfoot"><button class="btn" id="rep-cancel" type="button">Abbrechen</button><button class="btn pri" id="rep-save" type="button">Speichern</button></div>
+</div>
+
+<!-- Onboarding -->
+<div class="panel" id="obPanel" role="dialog" aria-modal="true" aria-labelledby="obTitle" hidden>
+  <header>
+    <h2 id="obTitle">Neuer Törn<span class="sub" id="obSub"></span></h2>
+    <button class="iconbtn" id="obClose" type="button" aria-label="Abbrechen"></button>
+  </header>
+  <div class="pbody">
+    <div class="prog" id="obProg"><div></div><div></div><div></div></div>
+    <div id="ob1">
+      <div class="field"><label for="ob-name">Törnname</label><input type="text" id="ob-name" placeholder="z. B. Dänische Südsee"></div>
+      <div class="grid2">
+        <div class="field"><label for="ob-from">Von</label><input type="date" id="ob-from"></div>
+        <div class="field"><label for="ob-to">Bis</label><input type="date" id="ob-to"></div>
+      </div>
+      <div class="field"><label for="ob-area">Revier (optional)</label><input type="text" id="ob-area"></div>
+    </div>
+    <div id="ob2" hidden>
+      <div class="field"><label for="ob-bname">Bootsname</label><input type="text" id="ob-bname"></div>
+      <div class="field"><label for="ob-btype">Typ / Modell</label><input type="text" id="ob-btype"></div>
+      <div class="grid2">
+        <div class="field"><label for="ob-blen">Länge (m)</label><input type="number" id="ob-blen" inputmode="decimal" step="0.1"></div>
+        <div class="field"><label for="ob-bport">Heimathafen</label><input type="text" id="ob-bport"></div>
+      </div>
+      <div class="field"><label for="ob-bphoto">Foto (optional)</label><input type="file" id="ob-bphoto" accept="image/*"></div>
+    </div>
+    <div id="ob3" hidden>
+      <ul class="crew" id="obCrew"></ul>
+      <div class="field"><label for="ob-cname">Name</label><input type="text" id="ob-cname"></div>
+      <div class="row">
+        <select id="ob-crole" aria-label="Rolle"><option>Skipper</option><option>Co-Skipper</option><option selected>Crew</option></select>
+        <button class="btn pri" id="ob-cadd" type="button" style="flex:none"><svg class="ic"><use/></svg>Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><button class="btn" id="obBack" type="button">Zurück</button><button class="btn pri" id="obNext" type="button">Weiter</button></div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=(n,l=2)=>String(n).padStart(l,'0');
+
+/* ---------- Icons ---------- */
+const P={
+ pen:'M4 20l1-4L16 5l3 3L8 19z M14 7l3 3',
+ ablegen:'M3 20h18 M5 20V6 M5 13h10 M12 9l4 4-4 4',
+ hafen:'M3 20h18 M6 20V10l6-5 6 5v10 M10 20v-5h4v5',
+ anker:'M12 3a2 2 0 100 4 2 2 0 000-4z M12 7v14 M7 11h10 M5 15c0 3 3 6 7 6s7-3 7-6',
+ boje:'M12 3v4 M8 7h8l2 9H6z M4 20c3-2 5 2 8 0s5 2 8 0',
+ segelauf:'M12 3v16 M12 4c4 3 6 8 6 13h-6 M12 9c-3 2-5 5-5 8h5 M4 21h16',
+ segelab:'M12 3v9 M12 7c3 1 5 3 6 6h-6 M12 7c-3 1-5 3-6 6h6 M12 16v5 M9 18l3 3 3-3',
+ motor:'M7 8h8l3 3v6H7z M4 11h3 M10 5h4 M12 5v3 M18 13h3',
+ sicht:'M2 12c3-5 7-7 10-7s7 2 10 7c-3 5-7 7-10 7s-7-2-10-7z M12 9a3 3 0 100 6 3 3 0 000-6z',
+ mehr:'M5 12h.01 M12 12h.01 M19 12h.01',
+ sonne:'M12 8a4 4 0 100 8 4 4 0 000-8z M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M19 5l-2 2 M7 17l-2 2',
+ leicht:'M7 3v2 M2 8h2 M3.5 4.5L5 6 M11 6a3 3 0 012 5 M7 21h10a4 4 0 000-8 5 5 0 00-9.5 1.5A3.3 3.3 0 007 21z',
+ wolke:'M7 19h10a4 4 0 000-8 5 5 0 00-9.5 1.5A3.3 3.3 0 007 19z',
+ regen:'M7 14h10a4 4 0 000-8 5 5 0 00-9.5 1.5A3.3 3.3 0 007 14z M8 17l-1 3 M12 17l-1 3 M16 17l-1 3',
+ blitz:'M13 2L5 14h6l-1 8 8-12h-6z',
+ nebel:'M4 7h16 M2 11h16 M6 15h16 M4 19h12',
+ close:'M5 5l14 14 M19 5L5 19',
+ check:'M4 12l5 5L20 6',
+ plus:'M12 4v16 M4 12h16',
+ minus:'M4 12h16',
+ trash:'M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13',
+ camera:'M4 8h4l2-3h4l2 3h4v11H4z M12 11a3 3 0 100 6 3 3 0 000-6z',
+ cockpit:'M4 18a8 8 0 1116 0 M12 18l4-6 M3 18h2 M19 18h2',
+ buch:'M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z M5 17a3 3 0 013-3h11',
+ karte:'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z M9 4v14 M15 6v14',
+ toern:'M3 15h18l-3 5H6z M12 3v10 M12 4c3 2 5 5 5 9h-5',
+ moon:'M20 14A8 8 0 019.5 4 8 8 0 1020 14z',
+ upload:'M12 16V4 M7 9l5-5 5 5 M4 20h16',
+ auto:'M4 5h16v11H4z M9 20h6 M12 16v4'
+};
+const ic=(n,sw)=>'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"'+(sw?' style="stroke-width:'+sw+'"':'')+'><path d="'+(P[n]||'')+'"/></svg>';
+function fillIcons(){ // statische <svg class="ic"><use/></svg> Platzhalter belegen
+  const map={'#gpxBtn':'upload','#exZip':'upload','#exJson':'upload','#c-add':'plus','#ob-cadd':'plus','#ed-bft-m':'minus','#ed-bft-p':'plus'};
+  for(const k in map){const b=$(k); const s=b.querySelector('svg'); if(s) s.outerHTML=ic(map[k]);}
+  const q=$('#quick .ok svg'); if(q) q.outerHTML=ic('check',3);
+  ['#edClose','#repClose','#obClose'].forEach(s=>$(s).innerHTML=ic('close'));
+}
+
+/* ---------- Domäne ---------- */
+const TYPES=[
+ {k:'eintrag',l:'Eintrag',i:'pen'},{k:'ablegen',l:'Ablegen',i:'ablegen'},{k:'hafen',l:'Hafen',i:'hafen'},
+ {k:'anker',l:'Ankerplatz',i:'anker'},{k:'boje',l:'Boje',i:'boje'},{k:'segelauf',l:'Segel setzen',i:'segelauf'},
+ {k:'segelab',l:'Segel bergen',i:'segelab'},{k:'motor',l:'Motor an/aus',i:'motor'},{k:'sicht',l:'Sichtung',i:'sicht'},{k:'sonst',l:'Sonstiges',i:'mehr'}];
+const TY=Object.fromEntries(TYPES.map(t=>[t.k,t]));
+const WX=[{k:'sonne',l:'Sonne',i:'sonne'},{k:'leicht',l:'Leicht bewölkt',i:'leicht'},{k:'bewoelkt',l:'Bewölkt',i:'wolke'},{k:'regen',l:'Regen',i:'regen'},{k:'gewitter',l:'Gewitter',i:'blitz'},{k:'nebel',l:'Nebel',i:'nebel'}];
+const WXM=Object.fromEntries(WX.map(w=>[w.k,w]));
+const SEA=['glatt','leicht','mäßig','grob','sehr grob'];
+const BFT=[
+ ['Windstille','0–1 kn'],['Leiser Zug','1–3 kn'],['Leichte Brise','4–6 kn'],['Schwache Brise','7–10 kn'],['Mäßige Brise','11–16 kn'],
+ ['Frische Brise','17–21 kn'],['Starker Wind','22–27 kn'],['Steifer Wind','28–33 kn'],['Stürmischer Wind','34–40 kn'],
+ ['Sturm','41–47 kn'],['Schwerer Sturm','48–55 kn'],['Orkanartiger Sturm','56–63 kn'],['Orkan','ab 64 kn']];
+const DIRS=['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const WD=['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+const ST={
+ tour:{name:'Ostsee-Törn 2026',from:'2026-08-08',to:'2026-08-15',area:'Kieler Bucht, Dänische Südsee'},
+ boat:{name:'Seeschwalbe',type:'Bavaria 34',len:'10.3',port:'Kiel-Schilksee',call:'DJ 4711',photo:null},
+ crew:[{n:'Markus Eckstein',r:'Skipper'},{n:'Anja Brandt',r:'Co-Skipper'},{n:'Jonas Lindner',r:'Crew'},{n:'Mette Holm',r:'Crew'}],
+ days:[
+  {d:'2026-08-08',from:'Kiel',to:'Marstal',title:'Raus aus der Förde',text:'Um 08:40 aus Holtenau abgelegt, Westwind Stärke 4. In der Kieler Bucht lief die Seeschwalbe auf Halbwindkurs schön. Gegen Mittag Schweinswale an Backbord. Nachmittags Marstal erreicht.'},
+  {d:'2026-08-09',from:'Marstal',to:'Svendborg',title:'Badestopp vor Anker',text:''},
+  {d:'2026-08-10',from:'Svendborg',to:'Faaborg',title:'',text:''}],
+ entries:[
+  e('e1','2026-08-08','08:40','ablegen',54.3700,10.1460,'W',4,'sonne','leicht','Ablegen Kiel-Holtenau, Crew vollzählig.',1017,17),
+  e('e2','2026-08-08','09:15','segelauf',54.4550,10.2850,'WSW',4,'sonne','leicht','Groß und Genua gesetzt.',1017,18),
+  e('e3','2026-08-08','11:30','eintrag',54.6000,10.4500,'W',5,'leicht','mäßig','Etwas Welle, Kurs 030°.',1016,19),
+  e('e4','2026-08-08','13:45','sicht',54.7400,10.5000,'WNW',5,'leicht','mäßig','Schweinswale backbord voraus.',1016,20),
+  e('e5','2026-08-08','15:20','segelab',54.8350,10.5350,'W',4,'sonne','leicht','Segel runter, Motor bis zum Hafen.',1015,21),
+  e('e6','2026-08-08','15:50','hafen',54.8567,10.5190,'W',3,'sonne','leicht','Fest in Marstal, Box 14.',1015,21),
+  e('e7','2026-08-09','09:30','ablegen',54.8567,10.5190,'SW',3,'sonne','glatt','',1014,19),
+  e('e8','2026-08-09','10:05','segelauf',54.8800,10.5500,'SW',3,'sonne','leicht','',1014,20),
+  e('e9','2026-08-09','12:10','anker',54.9750,10.4550,'SSW',2,'sonne','glatt','Mittagspause vor Anker, Baden.',1014,23),
+  e('e10','2026-08-09','14:30','motor',55.0100,10.5400,'SO',1,'leicht','glatt','Flaute, Motor an.',1013,23),
+  e('e11','2026-08-09','16:20','hafen',55.0625,10.6100,'S',2,'leicht','glatt','Fest im Yachthafen Frederiksholm.',1013,22),
+  e('e12','2026-08-10','09:40','ablegen',55.0625,10.6100,'SW',4,'bewoelkt','leicht','',1011,18),
+  e('e13','2026-08-10','10:20','segelauf',55.0350,10.5200,'SW',4,'bewoelkt','mäßig','',1010,18),
+  e('e14','2026-08-10','11:45','eintrag',55.0200,10.3800,'WSW',5,'regen','mäßig','Regenschauer, ersten Reff eingebunden.',1009,16),
+  e('e15','2026-08-10','12:50','sicht',55.0300,10.3000,'WSW',5,'bewoelkt','mäßig','Fähre Avernakø quert vor uns.',1009,16)]
+};
+function e(id,date,time,type,lat,lon,dir,bft,wx,sea,text,press,temp){return {id,date,time,type,lat,lon,dir,bft,wx,sea,text,press,temp,photos:[]};}
+const HAFEN={Kiel:[54.370,10.146],Marstal:[54.8567,10.519],Svendborg:[55.0625,10.610],Faaborg:[55.0950,10.242]};
+const LIVE0={lat:55.040,lon:10.270};
+let cur={lat:LIVE0.lat,lon:LIVE0.lon,sog:5.8,cog:344};
+let nextId=100;
+
+function fmtC(v,isLat,dec){
+  const h=isLat?(v>=0?'N':'S'):(v>=0?'O':'W'); const a=Math.abs(v); const d=Math.floor(a); const m=(a-d)*60;
+  dec=dec==null?3:dec;
+  return pad(d,isLat?2:3)+'°'+pad(m.toFixed(dec).replace('.',','),dec?3+dec:2)+'′'+h;
+}
+function hav(a,b){const R=3440.065,r=Math.PI/180;const dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r;
+  const x=Math.sin(dl/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+function dayEntries(d){return ST.entries.filter(x=>x.date===d);}
+function dayDist(d,live){const es=dayEntries(d);let s=0;for(let i=1;i<es.length;i++)s+=hav(es[i-1],es[i]);
+  if(live&&es.length)s+=hav(es[es.length-1],cur);return s;}
+const lastDay=()=>ST.days[ST.days.length-1];
+const dfmt=s=>{const d=new Date(s+'T12:00:00');return WD[d.getDay()]+' '+pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.';};
+const dec=n=>n.toFixed(1).replace('.',',');
+
+/* ---------- Theme ---------- */
+const root=document.documentElement;
+let theme='auto', night=false;
+try{theme=localStorage.getItem('lb-theme')||'auto';night=localStorage.getItem('lb-night')==='1';}catch(_){}
+function applyTheme(){
+  if(theme==='auto')root.removeAttribute('data-theme'); else root.setAttribute('data-theme',theme);
+  if(night)root.setAttribute('data-night',''); else root.removeAttribute('data-night');
+  const lbl={auto:'Auto',light:'Tag',dark:'Dunkel'}[theme];
+  $('#themeBtn').innerHTML=ic(theme==='light'?'sonne':theme==='dark'?'moon':'auto')+'<span>'+lbl+'</span>';
+  const nb=$('#nightBtn'); nb.innerHTML=ic('sicht')+'<span>Nacht</span>'; nb.setAttribute('aria-pressed',String(night));
+  try{localStorage.setItem('lb-theme',theme);localStorage.setItem('lb-night',night?'1':'0');}catch(_){}
+}
+$('#themeBtn').onclick=()=>{theme={auto:'light',light:'dark',dark:'auto'}[theme];applyTheme();toast('Darstellung: '+{auto:'Automatisch',light:'Tag (Sonnenlicht)',dark:'Dunkel'}[theme]);};
+$('#nightBtn').onclick=()=>{night=!night;applyTheme();toast(night?'Nachtsicht an – rotes Licht':'Nachtsicht aus');};
+
+/* ---------- Toast / Navigation ---------- */
+let tt;
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400);}
+const TABS=[['cockpit','Cockpit','cockpit'],['logbuch','Logbuch','buch'],['karte','Karte','karte'],['toern','Törn','toern']];
+$('#tabbar').innerHTML=TABS.map(t=>'<button type="button" role="tab" data-view="'+t[0]+'">'+ic(t[2])+'<span>'+t[1]+'</span></button>').join('');
+function show(v){
+  TABS.forEach(t=>{$('#v-'+t[0]).hidden=t[0]!==v;});
+  $$('#tabbar button').forEach(b=>{const on=b.dataset.view===v;if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');b.setAttribute('aria-selected',String(on));});
+  $('#main').scrollTop=0;
+  if(v==='logbuch')renderLog(); if(v==='karte')renderMap(); if(v==='toern')renderTour(); if(v==='cockpit')renderCockpit();
+}
+$('#tabbar').onclick=ev=>{const b=ev.target.closest('button');if(b)show(b.dataset.view);};
+
+/* ---------- Cockpit ---------- */
+$('#cSegs').innerHTML=Array.from({length:12},()=>'<i></i>').join('');
+function renderCockpit(){
+  $('#cLat').innerHTML=fmtC(cur.lat,true);
+  $('#cLon').innerHTML=fmtC(cur.lon,false);
+  const n=new Date();
+  $('#cTime').innerHTML=pad(n.getHours())+':'+pad(n.getMinutes())+'<small class="unit" style="margin-left:6px">:'+pad(n.getSeconds())+'</small>';
+  $('#cDate').textContent=dfmt(lastDay().d)+' · Ortszeit';
+  $('#cSog').textContent=dec(cur.sog);
+  $$('#cSegs i').forEach((s,i)=>{s.className=i<Math.round(cur.sog)?(i>=8?'hi':'on'):'';});
+  $('#cCog').textContent=pad(Math.round(cur.cog)%360,3);
+  $('#cCogT').textContent=DIRS[Math.round((cur.cog%360)/22.5)%16];
+  $('#cArrow').style.transform='rotate('+cur.cog+'deg)';
+  $('#cDist').textContent=dec(dayDist(lastDay().d,true));
+  const es=ST.entries, l=es[es.length-1];
+  $('#cLastBody').innerHTML=l?ic(TY[l.type].i)+'<div><b>'+l.time+'</b> <span class="unit">'+esc(TY[l.type].l)+'</span><div class="num" style="font-size:20px;font-weight:500;color:var(--fg-dim)">'+fmtC(l.lat,true,1)+' '+fmtC(l.lon,false,1)+'</div></div>':'<span>Noch kein Eintrag</span>';
+}
+$('#cLast').onclick=()=>{const l=ST.entries[ST.entries.length-1];if(l)openEd(l.id);};
+setInterval(()=>{
+  const dist=cur.sog*12/3600, r=Math.PI/180;
+  cur.sog=Math.max(0,5.8+(Math.random()-.5)*.8); cur.cog=344+(Math.random()-.5)*8;
+  cur.lat+=dist*Math.cos(cur.cog*r)/60; cur.lon+=dist*Math.sin(cur.cog*r)/(60*Math.cos(cur.lat*r));
+  if(hav(cur,{lat:HAFEN.Faaborg[0],lon:HAFEN.Faaborg[1]})<0.3){cur.lat=LIVE0.lat;cur.lon=LIVE0.lon;}
+  if(!$('#v-cockpit').hidden)renderCockpit();
+},1000);
+
+let logBusy=false;
+$('#logBtn').onclick=()=>{
+  if(logBusy)return; logBusy=true;
+  const b=$('#logBtn'); b.classList.add('fixing'); b.setAttribute('aria-busy','true');
+  $('#logT').textContent='FIX…'; $('#logS').textContent='GPS-Position wird erfasst';
+  setTimeout(()=>{
+    const n=new Date(), t=pad(n.getHours())+':'+pad(n.getMinutes());
+    const en=e('e'+(nextId++),lastDay().d,t,'eintrag',cur.lat,cur.lon,null,null,null,null,'',null,null);
+    ST.entries.push(en);
+    b.classList.remove('fixing'); b.classList.add('done'); b.removeAttribute('aria-busy');
+    $('#logT').textContent='OK'; $('#logS').textContent='Eintrag '+t+' gespeichert';
+    toast('Eintrag '+t+' gespeichert'); renderCockpit();
+    setTimeout(()=>{b.classList.remove('done');$('#logT').textContent='LOG';$('#logS').textContent='1 Tap · Position + Zeit';logBusy=false;},1400);
+    openQuick(en.id);
+  },1000);
+};
+
+/* ---------- Quick-Sheet ---------- */
+let quickId=null;
+const QT=['ablegen','hafen','anker','segelauf','segelab','motor'];
+function openQuick(id){
+  quickId=id; const en=ST.entries.find(x=>x.id===id);
+  $('#qTitle').textContent='Eintrag '+en.time+' gespeichert';
+  drawQ(); $('#quick').hidden=false; setTimeout(()=>$('#qDone').focus(),30);
+}
+function drawQ(){
+  const en=ST.entries.find(x=>x.id===quickId);
+  $('#qTypes').innerHTML=QT.map(k=>'<button type="button" class="opt" data-k="'+k+'" aria-pressed="'+(en.type===k)+'">'+ic(TY[k].i)+TY[k].l+'</button>').join('');
+}
+$('#qTypes').onclick=ev=>{const b=ev.target.closest('.opt');if(!b)return;const en=ST.entries.find(x=>x.id===quickId);en.type=en.type===b.dataset.k?'eintrag':b.dataset.k;drawQ();renderCockpit();};
+$('#qDone').onclick=()=>{$('#quick').hidden=true;};
+$('#quick').onclick=ev=>{if(ev.target.id==='quick')$('#quick').hidden=true;};
+$('#qMore').onclick=()=>{$('#quick').hidden=true;openEd(quickId);};
+
+/* ---------- Eintrag-Panel ---------- */
+let E=null, confirming=false;
+function buildStatic(){
+  $('#ed-types').innerHTML=TYPES.map(t=>'<button type="button" class="opt" data-k="'+t.k+'" aria-pressed="false">'+ic(t.i)+t.l+'</button>').join('');
+  $('#ed-wx').innerHTML=WX.map(w=>'<button type="button" class="opt" data-k="'+w.k+'" aria-pressed="false">'+ic(w.i)+w.l+'</button>').join('');
+  $('#ed-sea').innerHTML=SEA.map((s,i)=>'<button type="button" class="opt" data-k="'+s+'" aria-pressed="false" style="padding:6px 2px"><span class="bars" aria-hidden="true">'+Array.from({length:5},(_,j)=>'<i style="height:'+(5+j*4)+'px;opacity:'+(j<=i?1:.25)+'"></i>').join('')+'</span>'+s+'</button>').join('');
+  $('#ed-bft').innerHTML=BFT.map((_,i)=>'<button type="button" data-b="'+i+'" aria-pressed="false" aria-label="Beaufort '+i+'">'+i+'</button>').join('');
+  $('#ed-photos').innerHTML=[0,1,2].map(i=>'<div class="slot" id="slot'+i+'"><label for="ed-photo-'+i+'" aria-label="Foto '+(i+1)+' hinzufügen">'+ic('camera')+'</label><input type="file" id="ed-photo-'+i+'" accept="image/*" data-i="'+i+'"></div>').join('');
+  $('#ed-bft-m').innerHTML=ic('minus',3); $('#ed-bft-p').innerHTML=ic('plus',3);
+  buildRose();
+}
+const pt=(r,a)=>{const x=a*Math.PI/180;return [(r*Math.sin(x)).toFixed(2),(-r*Math.cos(x)).toFixed(2)];};
+function buildRose(){
+  const r0=50,r1=126; let s='<svg class="rose" viewBox="-130 -130 260 260" role="group" aria-label="Windrose, 16 Richtungen">';
+  DIRS.forEach((d,i)=>{
+    const a0=i*22.5-11.25+1.1,a1=i*22.5+11.25-1.1,A=pt(r1,a0),B=pt(r1,a1),C=pt(r0,a1),D=pt(r0,a0),T=pt((r0+r1)/2+2,i*22.5);
+    s+='<g data-i="'+i+'" role="button" tabindex="0" aria-label="'+d+'" aria-pressed="false"><path class="w" d="M'+D+' L'+A+' A'+r1+' '+r1+' 0 0 1 '+B+' L'+C+' A'+r0+' '+r0+' 0 0 0 '+D+'Z"/><text class="'+(i%4===0?'m':'')+'" x="'+T[0]+'" y="'+T[1]+'">'+d+'</text></g>';
+  });
+  s+='<circle class="ctr" r="'+(r0-4)+'"/><text class="ctxt" id="roseT" x="0" y="-4">--</text><text class="csub" id="roseS" x="0" y="20">KEIN WIND</text></svg>';
+  $('#ed-rose').innerHTML=s;
+}
+function syncEd(){
+  $$('#ed-types .opt').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.k===E.type)));
+  $$('#ed-wx .opt').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.k===E.wx)));
+  $$('#ed-sea .opt').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.k===E.sea)));
+  $$('#ed-rose g').forEach(g=>g.setAttribute('aria-pressed',String(E.dir===DIRS[+g.dataset.i])));
+  const di=DIRS.indexOf(E.dir); $('#roseT').textContent=di<0?'--':E.dir; $('#roseS').textContent=di<0?'KEIN WIND':'AUS '+Math.round(di*22.5)+'°';
+  $$('#ed-bft button').forEach(b=>b.setAttribute('aria-pressed',String(E.bft===+b.dataset.b)));
+  $('#ed-bft-n').textContent=E.bft==null?'--':E.bft;
+  $('#ed-bft-d').textContent=E.bft==null?'nicht erfasst':BFT[E.bft][0]+' · '+BFT[E.bft][1];
+  [0,1,2].forEach(i=>{
+    const sl=$('#slot'+i); sl.querySelectorAll('img,.rm').forEach(n=>n.remove());
+    if(E.photos[i]){sl.insertAdjacentHTML('afterbegin','<img src="'+E.photos[i]+'" alt="Foto '+(i+1)+'"><button type="button" class="rm" data-i="'+i+'" aria-label="Foto '+(i+1)+' entfernen">'+ic('close')+'</button>');}
+  });
+}
+function footNormal(){
+  $('#edFoot').innerHTML='<button class="btn dng" id="edDel" type="button">'+ic('trash')+'Löschen</button><button class="btn pri" id="edSave" type="button" style="flex:2">'+ic('check',3)+'Speichern</button>';
+}
+function openEd(id){
+  const src=ST.entries.find(x=>x.id===id); E=JSON.parse(JSON.stringify(src)); confirming=false;
+  $('#edSub').textContent=dfmt(E.date)+' · '+fmtC(E.lat,true)+' '+fmtC(E.lon,false);
+  $('#ed-time').value=E.time; $('#ed-press').value=E.press==null?'':E.press; $('#ed-temp').value=E.temp==null?'':E.temp; $('#ed-text').value=E.text||'';
+  footNormal(); syncEd(); $('#edPanel').hidden=false; $('.pbody',$('#edPanel'))&&0; $('#edPanel .pbody').scrollTop=0;
+}
+$('#edClose').onclick=()=>{$('#edPanel').hidden=true;};
+$('#ed-types').onclick=ev=>{const b=ev.target.closest('.opt');if(b){E.type=b.dataset.k;syncEd();}};
+$('#ed-wx').onclick=ev=>{const b=ev.target.closest('.opt');if(b){E.wx=E.wx===b.dataset.k?null:b.dataset.k;syncEd();}};
+$('#ed-sea').onclick=ev=>{const b=ev.target.closest('.opt');if(b){E.sea=E.sea===b.dataset.k?null:b.dataset.k;syncEd();}};
+$('#ed-bft').onclick=ev=>{const b=ev.target.closest('button');if(b){E.bft=+b.dataset.b;syncEd();}};
+$('#ed-bft-m').onclick=()=>{E.bft=E.bft==null?0:Math.max(0,E.bft-1);syncEd();};
+$('#ed-bft-p').onclick=()=>{E.bft=E.bft==null?1:Math.min(12,E.bft+1);syncEd();};
+function roseSel(g){if(!g)return;const d=DIRS[+g.dataset.i];E.dir=E.dir===d?null:d;syncEd();}
+$('#ed-rose').onclick=ev=>roseSel(ev.target.closest('g[data-i]'));
+$('#ed-rose').onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();roseSel(ev.target.closest('g[data-i]'));}};
+$('#ed-photos').onchange=ev=>{
+  const inp=ev.target; if(!inp.files||!inp.files[0])return; const i=+inp.dataset.i, fr=new FileReader();
+  fr.onload=()=>{E.photos[i]=fr.result;syncEd();}; fr.readAsDataURL(inp.files[0]); inp.value='';
+};
+$('#ed-photos').onclick=ev=>{const b=ev.target.closest('.rm');if(b){E.photos[+b.dataset.i]=null;E.photos=E.photos.filter(Boolean);syncEd();}};
+$('#edFoot').onclick=ev=>{
+  const b=ev.target.closest('button'); if(!b)return;
+  if(b.id==='edSave'){
+    const t=$('#ed-time').value||E.time; E.time=t;
+    E.press=$('#ed-press').value===''?null:+$('#ed-press').value; E.temp=$('#ed-temp').value===''?null:+$('#ed-temp').value; E.text=$('#ed-text').value.trim();
+    const i=ST.entries.findIndex(x=>x.id===E.id); ST.entries[i]=E;
+    $('#edPanel').hidden=true; toast('Eintrag '+E.time+' gespeichert'); refresh();
+  }else if(b.id==='edDel'){
+    $('#edFoot').innerHTML='<div class="confirm"><p>Eintrag '+esc(E.time)+' wirklich löschen?</p><div class="row"><button class="btn" id="edNo" type="button" style="flex:1">Abbrechen</button><button class="btn dng solid" id="edYes" type="button" style="flex:1">Ja, löschen</button></div></div>';
+    $('#edNo').focus();
+  }else if(b.id==='edNo'){footNormal();}
+  else if(b.id==='edYes'){
+    ST.entries=ST.entries.filter(x=>x.id!==E.id); $('#edPanel').hidden=true; toast('Eintrag gelöscht'); refresh();
+  }
+};
+function refresh(){renderCockpit();if(!$('#v-logbuch').hidden)renderLog();if(!$('#v-karte').hidden)renderMap();}
+
+/* ---------- Logbuch ---------- */
+function renderLog(){
+  $('#days').innerHTML=ST.days.slice().reverse().map(d=>{
+    const es=dayEntries(d.d), live=d===lastDay();
+    const rows=es.map(x=>{
+      const wind=x.dir||x.bft!=null?esc((x.dir||'–')+(x.bft!=null?' · '+x.bft+' Bft':'')):'–';
+      const wx=(x.wx?esc(WXM[x.wx].l):'–')+(x.sea?', See '+esc(x.sea):'');
+      const rem=esc(x.text||'')+(x.photos.length?' ['+x.photos.length+' Foto]':'');
+      const b=c=>'<td class="'+c[0]+'"><button type="button" data-id="'+x.id+'">'+c[1]+'</button></td>';
+      return '<tr>'+b(['tm',x.time])+b(['ty',ic(TY[x.type].i)+esc(TY[x.type].l)])+b(['ps',fmtC(x.lat,true,1)+'<br>'+fmtC(x.lon,false,1)])+b(['wd',wind])+b(['wx',wx])+b(['rm',rem||'–'])+'</tr>';
+    }).join('');
+    return '<div class="day"><div class="dayhead"><span class="d">'+dfmt(d.d)+(d.title?' · '+esc(d.title):'')+'</span><span class="sm">'+dec(dayDist(d.d,live))+' sm</span><span class="rt">'+esc(d.from)+' → '+esc(d.to)+'</span><button class="btn sm" type="button" data-rep="'+d.d+'">'+ic('pen')+'Tagesbericht</button></div>'+
+      '<div class="tw" tabindex="0" role="region" aria-label="Einträge '+dfmt(d.d)+'"><table><thead><tr><th>Zeit</th><th>Typ</th><th>Position</th><th>Wind</th><th>Wetter</th><th>Bemerkung</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      (d.text?'<div class="rep">'+esc(d.text.length>110?d.text.slice(0,110)+'…':d.text)+'</div>':'')+'</div>';
+  }).join('');
+}
+$('#days').onclick=ev=>{
+  const r=ev.target.closest('[data-rep]'); if(r)return openRep(r.dataset.rep);
+  const b=ev.target.closest('button[data-id]'); if(b)openEd(b.dataset.id);
+};
+let repDay=null;
+function openRep(d){const day=ST.days.find(x=>x.d===d);repDay=day;$('#repSub').textContent=dfmt(d)+' · '+day.from+' → '+day.to;$('#rep-title').value=day.title||'';$('#rep-text').value=day.text||'';$('#repPanel').hidden=false;setTimeout(()=>$('#rep-text').focus(),30);}
+$('#repClose').onclick=$('#rep-cancel').onclick=()=>{$('#repPanel').hidden=true;};
+$('#rep-save').onclick=()=>{repDay.title=$('#rep-title').value.trim();repDay.text=$('#rep-text').value.trim();$('#repPanel').hidden=true;toast('Tagesbericht gespeichert');renderLog();};
+
+/* ---------- Karte ---------- */
+const BB={la0:54.30,la1:55.15,lo0:9.95,lo1:10.95}, SC=565, KX=Math.cos(54.7*Math.PI/180);
+const mx=(lat,lon)=>[((lon-BB.lo0)*KX*SC).toFixed(1),((BB.la1-lat)*SC).toFixed(1)];
+const LAND=[
+ [[54.3,9.95],[54.62,9.95],[54.58,10.05],[54.50,10.16],[54.46,10.27],[54.44,10.45],[54.40,10.68],[54.35,10.95],[54.3,10.95]],
+ [[54.84,10.28],[54.90,10.40],[54.93,10.50],[54.88,10.56],[54.85,10.53],[54.84,10.40]],
+ [[54.80,10.78],[54.95,10.80],[55.08,10.78],[55.10,10.86],[55.00,10.92],[54.85,10.90],[54.80,10.85]],
+ [[55.15,9.95],[55.10,9.95],[55.09,10.24],[55.12,10.35],[55.05,10.50],[55.06,10.58],[55.10,10.70],[55.15,10.78]]];
+const DCOL=['var(--accent2)','var(--accent)','var(--fg)'], DDASH=['','8 5','2 5'];
+let gpxExtra=false;
+function renderMap(){
+  let s='<rect class="sea" width="340" height="480"/>';
+  for(let la=54.4;la<=55.1;la+=.2){const y=mx(la,0)[1];s+='<line class="grid" x1="0" x2="340" y1="'+y+'" y2="'+y+'"/>';}
+  for(let lo=10.0;lo<=10.9;lo+=.2){const x=mx(0,lo)[0];s+='<line class="grid" y1="0" y2="480" x1="'+x+'" x2="'+x+'"/>';}
+  LAND.forEach(p=>{s+='<polygon class="land" points="'+p.map(c=>mx(c[0],c[1]).join(',')).join(' ')+'"/>';});
+  ST.days.forEach((d,di)=>{
+    const es=dayEntries(d.d); if(!es.length)return;
+    s+='<polyline class="trk" stroke="'+DCOL[di%3]+'" stroke-dasharray="'+DDASH[di%3]+'" points="'+es.map(x=>mx(x.lat,x.lon).join(',')).join(' ')+'"/>';
+  });
+  if(gpxExtra){const g=[[55.095,10.242],[55.07,10.22],[55.04,10.19],[55.00,10.16]];s+='<polyline class="trk" stroke="var(--ok)" stroke-dasharray="1 6" points="'+g.map(c=>mx(c[0],c[1]).join(',')).join(' ')+'"/>';}
+  ST.entries.forEach(x=>{const di=ST.days.findIndex(d=>d.d===x.date),p=mx(x.lat,x.lon);
+    s+='<circle class="pt" stroke="'+DCOL[di%3]+'" cx="'+p[0]+'" cy="'+p[1]+'" r="6" data-id="'+x.id+'"><title>'+x.time+' '+esc(TY[x.type].l)+'</title></circle>';});
+  Object.keys(HAFEN).forEach(k=>{const p=mx(HAFEN[k][0],HAFEN[k][1]);s+='<text class="lab" x="'+(+p[0]+9)+'" y="'+(+p[1]+4)+'">'+k+'</text>';});
+  const c=mx(cur.lat,cur.lon); s+='<path class="cur" d="M0-9L7 7 0 3-7 7z" transform="translate('+c[0]+' '+c[1]+') rotate('+cur.cog+')"/>';
+  s+='<g transform="translate(310 34)"><path d="M0-22L7 0-0 -5-7 0z" fill="var(--fg)"/><text class="lab" x="0" y="16" text-anchor="middle">N</text></g>';
+  s+='<g transform="translate(16 466)"><line x1="0" x2="'+(60*KX*SC/60).toFixed(0)+'" y1="0" y2="0" stroke="var(--fg)" stroke-width="3"/><text class="lab" x="0" y="-8">1 sm</text></g>';
+  $('#mapSvg').innerHTML=s;
+  $('#legend').innerHTML=ST.days.map((d,i)=>'<span><i style="border-top-color:'+DCOL[i%3]+';border-top-style:'+(DDASH[i%3]?'dashed':'solid')+'"></i>'+dfmt(d.d)+' '+esc(d.from)+'–'+esc(d.to)+'</span>').join('')+(gpxExtra?'<span><i style="border-top-color:var(--ok);border-top-style:dotted"></i>GPX</span>':'')+'<span>▲ Aktuelle Position</span>';
+}
+$('#mapSvg').onclick=ev=>{const c=ev.target.closest('circle[data-id]');if(!c)return;const x=ST.entries.find(q=>q.id===c.dataset.id);
+  $('#ptInfo').innerHTML='<b class="num" style="font-size:22px">'+dfmt(x.date)+' '+x.time+'</b> · '+esc(TY[x.type].l)+'<br><span class="num" style="font-size:18px">'+fmtC(x.lat,true)+' '+fmtC(x.lon,false)+'</span>'+(x.text?'<br>'+esc(x.text):'');};
+$('#gpxBtn').onclick=()=>$('#gpxFile').click();
+$('#gpxFile').onchange=ev=>{const f=ev.target.files[0];if(!f)return;gpxExtra=true;toast('GPX „'+f.name+'“ importiert (Mock)');ev.target.value='';renderMap();};
+$('#liveSw').onclick=function(){const on=this.getAttribute('aria-checked')!=='true';this.setAttribute('aria-checked',String(on));
+  $('#liveWarn').innerHTML=on?'<b>Aufzeichnung läuft.</b> Bildschirm bleibt an – Akku im Blick behalten, App im Vordergrund lassen.':'Akku-Hinweis: Aufzeichnung nur im Vordergrund. Display bleibt an, der Akkuverbrauch steigt deutlich. Powerbank bereithalten.';
+  toast(on?'Live-Route an – Bildschirm bleibt an':'Live-Route aus');};
+
+/* ---------- Törn ---------- */
+function bindInput(id,obj,key){const el=$(id);el.addEventListener('input',()=>{obj[key]=el.value;if(obj===ST.boat&&key==='name')$('#brandName').textContent=el.value||'Boot';if(obj===ST.tour&&key==='name')$('#brandSub').textContent=el.value;});}
+bindInput('#t-name',ST.tour,'name');bindInput('#t-from',ST.tour,'from');bindInput('#t-to',ST.tour,'to');bindInput('#t-area',ST.tour,'area');
+bindInput('#b-name',ST.boat,'name');bindInput('#b-type',ST.boat,'type');bindInput('#b-len',ST.boat,'len');bindInput('#b-port',ST.boat,'port');bindInput('#b-call',ST.boat,'call');
+function boatPhoto(){const p=$('#boatPh');p.querySelectorAll('img').forEach(i=>i.remove());if(ST.boat.photo)p.insertAdjacentHTML('afterbegin','<img src="'+ST.boat.photo+'" alt="Bootsfoto">');}
+function readImg(file,cb){const fr=new FileReader();fr.onload=()=>cb(fr.result);fr.readAsDataURL(file);}
+$('#b-photo').onchange=ev=>{if(ev.target.files[0])readImg(ev.target.files[0],u=>{ST.boat.photo=u;boatPhoto();});};
+function crewHtml(){return ST.crew.map((c,i)=>'<li><b>'+esc(c.n)+'</b><span>'+esc(c.r)+'</span><button class="iconbtn" type="button" data-rm="'+i+'" aria-label="'+esc(c.n)+' entfernen">'+ic('close')+'</button></li>').join('')||'<li><b style="color:var(--fg-dim)">Noch keine Crew</b></li>';}
+function renderTour(){
+  $('#t-name').value=ST.tour.name;$('#t-from').value=ST.tour.from;$('#t-to').value=ST.tour.to;$('#t-area').value=ST.tour.area;
+  ['name','type','len','port','call'].forEach(k=>$('#b-'+k).value=ST.boat[k]||'');
+  boatPhoto(); $('#crewList').innerHTML=crewHtml();
+}
+$('#crewList').onclick=ev=>{const b=ev.target.closest('[data-rm]');if(b){ST.crew.splice(+b.dataset.rm,1);$('#crewList').innerHTML=crewHtml();}};
+$('#c-add').onclick=()=>{const n=$('#c-name').value.trim();if(!n){$('#c-name').focus();return;}ST.crew.push({n,r:$('#c-role').value});$('#c-name').value='';$('#crewList').innerHTML=crewHtml();};
+$('#exZip').onclick=()=>toast('ZIP mit logbook.json, images/ und GPX erstellt (Mock)');
+$('#exJson').onclick=()=>toast('JSON mit eingebetteten Bildern erstellt (Mock)');
+
+/* ---------- Onboarding ---------- */
+let obStep=1, obCrew=[], obPhoto=null;
+function obRender(){
+  [1,2,3].forEach(i=>$('#ob'+i).hidden=i!==obStep);
+  $$('#obProg div').forEach((d,i)=>d.classList.toggle('on',i<obStep));
+  $('#obSub').textContent='Schritt '+obStep+' von 3 · '+['Törn','Boot','Crew'][obStep-1];
+  $('#obBack').textContent=obStep===1?'Abbrechen':'Zurück'; $('#obNext').textContent=obStep===3?'Törn anlegen':'Weiter';
+  $('#obCrew').innerHTML=obCrew.map((c,i)=>'<li><b>'+esc(c.n)+'</b><span>'+esc(c.r)+'</span><button class="iconbtn" type="button" data-rm="'+i+'" aria-label="'+esc(c.n)+' entfernen">'+ic('close')+'</button></li>').join('')||'<li><b style="color:var(--fg-dim)">Noch keine Crew</b></li>';
+  $('#obPanel .pbody').scrollTop=0;
+}
+$('#newTour').onclick=()=>{obStep=1;obCrew=[];obPhoto=null;['name','from','to','area'].forEach(k=>$('#ob-'+k).value='');['bname','btype','blen','bport'].forEach(k=>$('#ob-'+k).value='');$('#obPanel').hidden=false;obRender();};
+$('#obClose').onclick=()=>{$('#obPanel').hidden=true;};
+$('#obBack').onclick=()=>{if(obStep===1)$('#obPanel').hidden=true;else{obStep--;obRender();}};
+$('#ob-bphoto').onchange=ev=>{if(ev.target.files[0])readImg(ev.target.files[0],u=>obPhoto=u);};
+$('#ob-cadd').onclick=()=>{const n=$('#ob-cname').value.trim();if(!n){$('#ob-cname').focus();return;}obCrew.push({n,r:$('#ob-crole').value});$('#ob-cname').value='';obRender();};
+$('#obCrew').onclick=ev=>{const b=ev.target.closest('[data-rm]');if(b){obCrew.splice(+b.dataset.rm,1);obRender();}};
+$('#obNext').onclick=()=>{
+  if(obStep===1&&!$('#ob-name').value.trim()){$('#ob-name').focus();toast('Bitte Törnnamen eingeben');return;}
+  if(obStep<3){obStep++;obRender();return;}
+  ST.tour={name:$('#ob-name').value.trim(),from:$('#ob-from').value,to:$('#ob-to').value,area:$('#ob-area').value};
+  ST.boat={name:$('#ob-bname').value||ST.boat.name,type:$('#ob-btype').value,len:$('#ob-blen').value,port:$('#ob-bport').value,call:'',photo:obPhoto};
+  ST.crew=obCrew.slice();
+  $('#brandName').textContent=ST.boat.name;$('#brandSub').textContent=ST.tour.name;
+  $('#obPanel').hidden=true;renderTour();toast('Törn „'+ST.tour.name+'“ angelegt (Mock-Daten bleiben)');
+};
+
+/* ---------- Esc schließt oberstes Overlay ---------- */
+document.addEventListener('keydown',ev=>{if(ev.key!=='Escape')return;
+  for(const id of ['#quick','#obPanel','#repPanel','#edPanel']){const n=$(id);if(!n.hidden){n.hidden=true;break;}}});
+
+/* ---------- Start ---------- */
+fillIcons(); buildStatic(); applyTheme(); show('cockpit');
+})();
+</script>
