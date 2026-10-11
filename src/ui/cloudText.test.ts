@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertText, roleLabel, statusLabel } from './cloudText';
+import { alertText, rejectedText, roleLabel, statusLabel } from './cloudText';
 
 describe('statusLabel', () => {
   const now = Date.UTC(2026, 7, 10, 12, 0);
@@ -37,5 +37,28 @@ describe('roleLabel', () => {
     expect(roleLabel(['crew'])).toBe('Crew (schreibt mit)');
     expect(roleLabel(['readonly'])).toBe('Anderes Boot (nur lesen)');
     expect(roleLabel([])).toBe('Mitglied');
+  });
+});
+
+describe('rejectedText', () => {
+  const item = (table: string, state: 'pending' | 'resent', attempts = 1, reason = 'not authorized to add entries') =>
+    ({ table, state, attempts, reason });
+  it('says what was rejected, why, and that it is kept and re-sent', () => {
+    expect(rejectedText([item('entries', 'pending')])).toBe(
+      'Der Server hat 1 Eintrag abgelehnt (Schreibrechte noch nicht wirksam). Er bleibt auf diesem Gerät gespeichert und wird automatisch erneut gesendet.',
+    );
+  });
+  it('counts several changes and names the kinds', () => {
+    expect(rejectedText([item('entries', 'pending'), item('photos', 'pending'), item('entries', 'pending')])).toBe(
+      'Der Server hat 3 Änderungen abgelehnt (2 Einträge, 1 Foto; Schreibrechte noch nicht wirksam). Sie bleiben auf diesem Gerät gespeichert und werden automatisch erneut gesendet.',
+    );
+  });
+  it('after the automatic attempts: asks for a manual retry', () => {
+    expect(rejectedText([item('dayReports', 'pending', 3, 'boom')])).toBe(
+      'Der Server hat 1 Tagesbericht abgelehnt (vom Server abgelehnt). Er bleibt auf diesem Gerät gespeichert – bitte später erneut senden.',
+    );
+  });
+  it('while waiting for the server after a re-send', () => {
+    expect(rejectedText([item('entries', 'resent')])).toBe('1 zuvor abgelehnte Änderung wird erneut gesendet …');
   });
 });

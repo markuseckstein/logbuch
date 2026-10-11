@@ -29,7 +29,8 @@ export default defineConfig({
   projects: CLOUD
     ? [{ name: 'cloud', testMatch: /cloud\.spec\.ts/, use: { ...device, baseURL: 'http://localhost:4173' } }]
     : [{ name: 'chromium-pixel7', testIgnore: /cloud\.spec\.ts/, use: { ...device, baseURL: 'http://localhost:4175' } }],
-  ...(CLOUD ? { timeout: 300_000 } : {}),
+  // Cloud-Läufe teilen sich die Demo-Konten (alice/bob/carol): nie parallel, auch nicht mit --repeat-each
+  ...(CLOUD ? { timeout: 300_000, workers: 1 } : {}),
   webServer: CLOUD
     ? {
       command: 'npm run build && npm run preview',

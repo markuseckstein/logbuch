@@ -71,6 +71,16 @@ describe('new records inherit the realm of their trip', () => {
 });
 
 describe('cloud permissions decide for shared trips', () => {
+  it('a freshly accepted membership allows writing only once the server confirmed the realm', async () => {
+    const { trip, realmId } = await sharedTrip();
+    await setTripOwnership(db, trip.id, 'foreign');
+    await asMember(realmId, 'crew');
+    db.serverRealms = () => ['rlm-public', 'bob'];
+    expect(await canWriteTrip(db, trip.id)).toBe(false);
+    await expect(createEntry(db, trip.id, { time: 5, tzOffsetMin: 0 })).rejects.toBeInstanceOf(ReadOnlyTripError);
+    db.serverRealms = () => ['rlm-public', 'bob', realmId];
+    expect(await canWriteTrip(db, trip.id)).toBe(true);
+  });
   it('crew member (not in writableTripIds) may write', async () => {
     const { trip, realmId } = await sharedTrip();
     await setTripOwnership(db, trip.id, 'foreign');

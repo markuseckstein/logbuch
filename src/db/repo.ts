@@ -101,6 +101,7 @@ async function permissionsIn(db: LogbookDB, realmId: string, userId: string): Pr
     })),
     globalRoles,
     userId,
+    confirmedRealms: db.serverRealms(),
   });
 }
 

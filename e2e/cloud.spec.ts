@@ -68,7 +68,7 @@ async function entryWithText(page: Page, text: string, photo = false): Promise<v
 }
 
 test('Cloud: Skipper teilt, Crew schreibt mit, anderes Boot liest nur, Foto kommt an', async ({ browser }) => {
-  const run = Date.now().toString(36);
+  const run = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
   const boat = `Seeschwalbe ${run}`;
   const trip = `Cloud-Törn ${run}`;
 

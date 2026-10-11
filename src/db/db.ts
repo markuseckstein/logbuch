@@ -85,6 +85,12 @@ export class LogbookDB extends Dexie {
   /** Signed-in cloud user; undefined in local mode or when not logged in. Replaceable in tests. */
   cloudUser: () => CloudUser | undefined = () => undefined;
 
+  /**
+   * Realms the server confirmed for this user in the last sync (rights of a membership apply only then);
+   * undefined in local mode / before the first sync. Replaceable in tests.
+   */
+  serverRealms: () => readonly string[] | undefined = () => undefined;
+
   constructor(name = DEFAULT_DB_NAME, opts: DbOptions = {}) {
     const cloudUrl = opts.cloudUrl?.trim() || undefined;
     super(name, cloudUrl ? { addons: [dexieCloud] } : {});
@@ -104,6 +110,7 @@ export class LogbookDB extends Dexie {
         const u = this.cloud.currentUser.value;
         return u.isLoggedIn && u.userId ? { userId: u.userId, ...(u.email ? { email: u.email } : {}) } : undefined;
       };
+      this.serverRealms = () => this.cloud.persistedSyncState.value?.realms;
     }
   }
 }

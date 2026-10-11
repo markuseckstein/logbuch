@@ -52,6 +52,14 @@ export function useUserInteraction(): DXCUserInteraction | undefined {
   return useObservable(db.cloudEnabled ? db.cloud.userInteraction : NO_INTERACTION, undefined);
 }
 
+const NO_SYNC_STATE = constant<{ realms?: string[] } | undefined>(undefined);
+
+/** Vom Server bestätigte Realms als Schlüssel: Rechte neu berechnen, sobald eine Mitgliedschaft wirksam wird. */
+function useServerRealmsKey(): string {
+  const s = useObservable(db.cloudEnabled ? db.cloud.persistedSyncState : NO_SYNC_STATE, undefined);
+  return (s?.realms ?? []).join(' ');
+}
+
 /** Von `Root` bereitgestellt (wie die Einstellungen): sofort verfügbar, kein Flackern beim Tab-Wechsel. */
 export const WritableTripsContext = createContext<ID[] | undefined>(undefined);
 
@@ -59,13 +67,15 @@ export const WritableTripsContext = createContext<ID[] | undefined>(undefined);
 export function useWritableTripIds(): ID[] | undefined {
   const provided = useContext(WritableTripsContext);
   const userId = useCloudUser()?.userId;
-  const own = useLiveQuery(() => (provided ? undefined : listWritableTripIds(db)), [userId, provided]);
+  const realms = useServerRealmsKey();
+  const own = useLiveQuery(() => (provided ? undefined : listWritableTripIds(db)), [userId, provided, realms]);
   return provided ?? own;
 }
 
 export function useCanManage(tripId: ID): boolean {
   const userId = useCloudUser()?.userId;
-  return useLiveQuery(() => canManageTrip(db, tripId), [tripId, userId]) ?? false;
+  const realms = useServerRealmsKey();
+  return useLiveQuery(() => canManageTrip(db, tripId), [tripId, userId, realms]) ?? false;
 }
 
 export function useMembers(tripId: ID): MemberInfo[] {

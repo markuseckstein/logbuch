@@ -20,6 +20,7 @@ import { TodayScreen } from './screens/TodayScreen';
 import { TripScreen } from './screens/TripScreen';
 import { CloudLoginHost } from './cloud/LoginHost';
 import { InviteBanner, JoinWatcher } from './cloud/InviteBanner';
+import { RejectedChangesBanner, RejectionWatcher } from './cloud/RejectedChangesBanner';
 import { SyncIndicator } from './cloud/SyncIndicator';
 import { WritableTripsContext, useWritableTripIds } from './cloudHooks';
 
@@ -114,6 +115,7 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
         <div id="app">
           <Topbar trip={trip} dark={dark} onToggleTheme={onToggleTheme} />
           <InviteBanner />
+          <RejectedChangesBanner />
           {readOnly ? (
             <div className="banner">
               <Icon name="sichtung" size={20} />
@@ -198,6 +200,7 @@ export function App() {
     <ToastProvider>
       <Root />
       <JoinWatcher />
+      <RejectionWatcher />
       <CloudLoginHost />
       <UpdatePrompt />
     </ToastProvider>

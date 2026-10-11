@@ -3,8 +3,9 @@ import { tiedRealmId } from '../domain/access';
 import type { LogbookDB } from './db';
 import {
   CloudNotSignedInError, cloudStatus, inviteMember, isDemoEmail, leaveTrip, listMembers, login, logout, memberStatus,
-  removeMember, shareTripToCloud,
+  removeMember, shareTripToCloud, watchSyncRejections,
 } from './cloud';
+import { listRescued, resubmitRescued } from './syncRejections';
 import { createEntry, createTrip, getDeviceId, getSettings, loadTripData } from './repo';
 import { dispose, freshDb } from './test-helpers';
 
@@ -13,7 +14,7 @@ const cloud = { login: vi.fn(async () => undefined), logout: vi.fn(async () => u
 
 beforeEach(() => {
   db = freshDb();
-  Object.defineProperty(db, 'cloudEnabled', { value: true });
+  Object.defineProperty(db, 'cloudEnabled', { value: true, configurable: true });
   Object.defineProperty(db, 'cloud', { value: cloud, configurable: true });
   vi.clearAllMocks();
 });
@@ -148,5 +149,53 @@ describe('memberStatus', () => {
     expect(memberStatus({})).toBe('invited');
     expect(memberStatus({ accepted: new Date() })).toBe('accepted');
     expect(memberStatus({ rejected: new Date() })).toBe('rejected');
+  });
+});
+
+describe('watchSyncRejections', () => {
+  const URL_ = 'https://x.dexie.cloud';
+  let listeners: ((v: unknown) => void)[];
+  beforeEach(() => {
+    listeners = [];
+    Object.defineProperty(db, 'cloud', {
+      configurable: true,
+      value: {
+        ...cloud,
+        options: { databaseUrl: URL_ },
+        persistedSyncState: {
+          subscribe: (fn: (v: unknown) => void) => { listeners.push(fn); return { unsubscribe: () => { listeners = listeners.filter((l) => l !== fn); } }; },
+        },
+      },
+    });
+  });
+
+  it('records rejections of /sync responses and restores the rejected entry once the trip is writable', async () => {
+    const trip = await createTrip(db, { name: 'T', boat: { name: 'B' }, crew: [] });
+    const e = await createEntry(db, trip.id, { time: 1, tzOffsetMin: 0 });
+    await db.entries.update(e.id, { text: 'weg?' });
+    const original = globalThis.fetch;
+    const body = JSON.stringify({ changes: [], rejections: [{ name: 'PermissionsDeniedError', message: 'not authorized to add entries', txid: 't' }] });
+    const mock = vi.fn(async () => new Response(body)) as typeof fetch;
+    globalThis.fetch = mock;
+    const stop = watchSyncRejections(db, { retryDelayMs: 0 });
+    try {
+      await fetch(`${URL_}/sync`, { method: 'post', body: JSON.stringify({ changes: [{ table: 'entries', muts: [{ type: 'insert', keys: [e.id], txid: 't' }] }] }) });
+      expect(await listRescued(db)).toHaveLength(1);
+      await db.entries.delete(e.id); // rollback by the addon
+      await resubmitRescued(db, { force: true });
+      expect(await db.entries.get(e.id)).toMatchObject({ text: 'weg?' });
+    } finally {
+      stop();
+    }
+    expect(globalThis.fetch).toBe(mock); // wrapper removed again
+    expect(listeners).toHaveLength(0);
+    globalThis.fetch = original;
+  });
+
+  it('does nothing in local mode', () => {
+    Object.defineProperty(db, 'cloudEnabled', { value: false, configurable: true });
+    const before = globalThis.fetch;
+    watchSyncRejections(db)();
+    expect(globalThis.fetch).toBe(before);
   });
 });

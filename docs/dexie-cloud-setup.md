@@ -27,6 +27,7 @@ npx dexie-cloud import e2e/demoUsers.json         # alice@, bob@, carol@, dave@d
   mit leerer URL nach `dist-local` und läuft auf Port 4175).
 - `npm run e2e:cloud`: baut mit der URL aus `.env.local` (Port 4173, muss in der Whitelist stehen) und führt
   `e2e/cloud.spec.ts` aus (Alice teilt, Bob schreibt mit, Carol liest nur, Foto-Sync). Ohne URL wird übersprungen.
+  Immer seriell (`workers: 1`, die Läufe teilen sich die Demo-Konten), auch mit `--repeat-each`.
   Der Test löscht sein Logbuch am Ende „für alle“. Hängen gebliebene Test-Realms: `npx dexie-cloud clear-realm <realmId> --yes`
   (`E2E_KEEP=1` lässt den Realm eines fehlgeschlagenen Laufs zur Analyse stehen).
 - Entwicklungsserver (`npm run dev`): `window.__logbook` = `{ db, repo, cloud }` für manuelle Versuche (nur DEV-Build).

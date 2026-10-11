@@ -3,6 +3,7 @@ import { tiedRealmId, isSharedRealm } from '../domain/access';
 import type { ID } from '../domain/types';
 import type { LogbookDB } from './db';
 import { getDeviceId, moveTripToRealm, resetDeviceIdCache } from './repo';
+import { MAX_AUTO_ATTEMPTS, listRescued, recordSyncExchange, resubmitRescued, wrapSyncFetch } from './syncRejections';
 
 /**
  * Dexie-Cloud-Funktionen der App (Stufe 2). Konfiguration: `cloudConfig.ts` (aus `db.ts` beim Erzeugen der DB).
@@ -164,4 +165,61 @@ export async function leaveTrip(db: LogbookDB, tripId: ID): Promise<void> {
   const user = requireUser(db);
   const realmId = await sharedRealmOf(db, tripId);
   await db.members.where('[userId+realmId]').equals([user.userId, realmId]).delete();
+}
+
+export interface RejectionWatchOptions {
+  /** Erste Prüfung nach einer Ablehnung (ms); danach Backoff in `resubmitRescued`. */
+  retryDelayMs?: number;
+}
+
+/**
+ * Vom Server abgelehnte Änderungen nicht verlieren: liest jede Sync-Antwort mit, sichert abgelehnte
+ * Datensätze und schreibt sie erneut, sobald die Rechte wirken (z. B. frisch angenommene Mitgliedschaft,
+ * die der Server noch nicht überall berücksichtigt). Liefert eine Funktion zum Beenden.
+ */
+export function watchSyncRejections(db: LogbookDB, opts: RejectionWatchOptions = {}): () => void {
+  if (!db.cloudEnabled) return () => undefined;
+  const databaseUrl = db.cloud.options?.databaseUrl;
+  if (!databaseUrl) return () => undefined;
+  const delay = opts.retryDelayMs ?? 2500;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let running = false;
+
+  const retry = async (): Promise<void> => {
+    if (running) return;
+    running = true;
+    try {
+      await resubmitRescued(db);
+      const pending = (await listRescued(db)).filter((i) => i.state === 'pending' && i.attempts < MAX_AUTO_ATTEMPTS);
+      if (pending.length > 0) schedule();
+    } catch {
+      // nächster Versuch beim nächsten Sync
+    } finally {
+      running = false;
+    }
+  };
+  const schedule = (): void => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = undefined;
+      void retry();
+    }, delay);
+  };
+
+  const original = globalThis.fetch;
+  const wrapped = wrapSyncFetch(original.bind(globalThis), databaseUrl, async (req, res) => {
+    const r = await recordSyncExchange(db, req, res);
+    if (r.rejected > 0) {
+      console.warn(`Dexie Cloud: ${r.rejected} Änderung(en) abgelehnt – lokal gesichert, erneuter Versuch folgt`);
+      schedule();
+    }
+  });
+  globalThis.fetch = wrapped;
+  // jede neue Server-Bestätigung (Realms, Mitgliedschaften) kann ein Logbuch beschreibbar machen
+  const sub = db.cloud.persistedSyncState.subscribe(() => void retry());
+  return () => {
+    sub.unsubscribe();
+    if (timer !== undefined) clearTimeout(timer);
+    if (globalThis.fetch === wrapped) globalThis.fetch = original;
+  };
 }

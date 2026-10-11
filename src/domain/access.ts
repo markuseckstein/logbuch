@@ -35,6 +35,12 @@ export interface RealmAccessInput {
   /** Globale Rollen (Realm 'rlm-public') nach Name. */
   globalRoles: Readonly<Record<string, { permissions: PermissionSet }>>;
   userId: string;
+  /**
+   * Realms the server confirmed in its last sync response (`persistedSyncState.realms`); undefined = unknown
+   * (local mode/tests). A membership grants rights only once its realm is listed: the server answers the
+   * acceptance with the realm, so writes before that would be rejected.
+   */
+  confirmedRealms?: readonly string[] | undefined;
 }
 
 const TIED_PREFIX = 'rlm~';
@@ -79,10 +85,12 @@ function mergeSets(sets: readonly PermissionSet[]): PermissionSet {
   return out;
 }
 
-export function realmPermissions({ realm, selfMembers, globalRoles, userId }: RealmAccessInput): PermissionSet {
+export function realmPermissions({ realm, selfMembers, globalRoles, userId, confirmedRealms }: RealmAccessInput): PermissionSet {
   if (!realm) return {};
   if (realm.owner === userId) return { manage: '*' };
-  // Strenger als das Addon: der Server wertet Rechte erst nach angenommener Einladung (Spike 2026-10-11).
+  if (confirmedRealms && !confirmedRealms.includes(realm.realmId)) return {};
+  // Bewusst strenger als Addon und Server (der Crew-Schreibzugriffe schon ab Einladung annimmt, geprüft
+  // 2026-10-11): geschrieben wird erst nach angenommener Einladung.
   const mine = selfMembers.filter(
     (m) => m.realmId === realm.realmId && (m.userId === undefined || m.userId === userId) && !!m.accepted && !m.rejected,
   );

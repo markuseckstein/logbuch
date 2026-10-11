@@ -57,8 +57,8 @@ export function InviteBanner() {
       if (accept) {
         await inv.accept();
         toast('Einladung angenommen – das Logbuch wird geladen …', 4200);
-        // Spike: geht die Annahme im selben Sync wie die ersten Einträge hoch, prüft der Server die Einträge
-        // vor der Annahme und lehnt sie ab (lokal zurückgerollt). Daher erst die Annahme hochladen.
+        // Erst die Annahme hochladen und den Realm vom Server bestätigen lassen (Rechte wirken erst dann, siehe
+        // domain/access). Falls der Server erste Einträge trotzdem ablehnt, rettet sie db/syncRejections.
         await acceptanceUploaded();
         const tripId = tripIdOfRealm(inv.realmId);
         if (tripId) setPending({ tripId, crew: !inv.roles?.includes('readonly') });

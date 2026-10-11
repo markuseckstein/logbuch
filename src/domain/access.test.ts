@@ -49,6 +49,20 @@ describe('realmPermissions', () => {
     expect(canWriteRealm(input({ accepted: new Date(), rejected: new Date() }))).toBe(false);
     expect(canWriteRealm(input({ accepted: new Date() }))).toBe(true);
   });
+  it('membership rights apply only once the server confirmed the realm (listed in the synced realm set)', () => {
+    const input = (confirmedRealms: readonly string[] | undefined) => realmPermissions({
+      realm, userId: 'bob', globalRoles: roles, confirmedRealms,
+      selfMembers: [{ realmId: 'rlm~t', userId: 'bob', roles: ['crew'], accepted: 1 }],
+    });
+    expect(canWriteRealm(input(['rlm-public', 'bob']))).toBe(false);
+    expect(canWriteRealm(input(['rlm-public', 'bob', 'rlm~t']))).toBe(true);
+    // unknown (no cloud sync state, e.g. local tests): the membership rows decide
+    expect(canWriteRealm(input(undefined))).toBe(true);
+  });
+  it('the realm owner writes even before the server knows the new realm (created in the same sync)', () => {
+    const p = realmPermissions({ realm, selfMembers: [], globalRoles: roles, userId: 'alice', confirmedRealms: ['alice'] });
+    expect(canManageRealm(p)).toBe(true);
+  });
   it('readonly role (zero permissions) cannot write', () => {
     const p = realmPermissions({
       realm, userId: 'carol', globalRoles: roles,
