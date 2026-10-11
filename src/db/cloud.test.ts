@@ -96,7 +96,7 @@ describe('adoptOwnTrips (after login)', () => {
     await inviteToTrip(db, trip.id, { email: 'bob@demo.local', suggestedBoatId: b });
     expect(await db.members.count()).toBe(0); // not signed in: only noted
     expect((await listPeople(db, trip.id)).map((p) => [p.name, p.status, p.admin])).toEqual([
-      ['Alice', 'pending', true], ['Bob', 'pending', false],
+      ['Alice', 'accepted', true], ['Bob', 'pending', false],
     ]);
     signIn();
     expect(await adoptOwnTrips(db)).toBe(1);

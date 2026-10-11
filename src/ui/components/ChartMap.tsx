@@ -175,7 +175,8 @@ export function ChartMap({ layers, onOpenEntry, fitKey, label, compact = false, 
       } else if (pts.length === 1 || L.latLngBounds(pts).getNorthEast().equals(L.latLngBounds(pts).getSouthWest())) {
         map.setView(pts[0] as L.LatLngTuple, 13, { animate: false });
       } else {
-        map.fitBounds(L.latLngBounds(pts), { padding: [28, 28], maxZoom: 15, animate: false });
+        // Platz für Bootsnamen am Routenende und die Zoom-Knöpfe
+        map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [56, 44], paddingBottomRight: [40, 28], maxZoom: 15, animate: false });
       }
     };
 

@@ -209,7 +209,8 @@ export async function listPeople(db: LogbookDB, tripId: ID): Promise<PersonInfo[
     const row = c.email ? rows.find((m) => m.email === c.email) : undefined;
     const isOwner = !!c.email && (c.email === ownerId || (!!user && c.email === normalizeEmail(user.email ?? '') && ownerId === user.userId));
     const admin = shared ? isOwner : c.role === 'skipper';
-    const status: MemberStatus = admin && shared ? 'accepted' : row ? memberStatus(row) : 'pending';
+    // Admin und Personen ohne E-Mail (lokal) haben keine offene Einladung
+    const status: MemberStatus = admin || !c.email ? 'accepted' : row ? memberStatus(row) : 'pending';
     return {
       crewId: c.id, name: c.name, ...(c.email ? { email: c.email } : {}),
       ...(c.suggestedBoatId ? { suggestedBoatId: c.suggestedBoatId } : {}), admin, status,

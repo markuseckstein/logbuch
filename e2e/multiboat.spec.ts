@@ -15,6 +15,23 @@ const PNG = Buffer.from(
 const tab = (page: Page, name: string) => page.getByRole('navigation').getByRole('button', { name, exact: true });
 const boatSwitch = (page: Page) => page.getByRole('radiogroup', { name: 'Boot wählen' });
 
+/** Gespeicherte Stellungen des Boot-Schalters (lokale Einstellung in IndexedDB). */
+function storedSelection(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () =>
+      new Promise<string[]>((resolve) => {
+        const req = indexedDB.open('logbook-v5');
+        req.onsuccess = () => {
+          const get = req.result.transaction('settings').objectStore('settings').get('boatSelectionByTrip');
+          get.onsuccess = () => {
+            req.result.close();
+            resolve(Object.values((get.result?.value ?? {}) as Record<string, string>));
+          };
+        };
+      }),
+  );
+}
+
 /** Ein-Tipp-Eintrag; schließt das Ergänzen-Sheet wieder. */
 async function oneTap(page: Page, boat: string): Promise<void> {
   await page.getByRole('button', { name: `Eintrag jetzt · ${boat}` }).click();
@@ -57,7 +74,9 @@ test('Mehrere Boote lokal: Boot-Schalter, Pflicht-Bootwahl, Karte mit Legende, T
   await boatSwitch(page).getByRole('radio', { name: 'Möwe' }).click();
   await expect(items).toHaveCount(1);
 
-  // Auswahl bleibt nach Neuladen erhalten
+  // Auswahl bleibt nach Neuladen erhalten (erst neu laden, wenn sie gespeichert ist)
+  await expect.poll(() => storedSelection(page)).not.toContain('all');
+  await expect.poll(async () => (await storedSelection(page)).length).toBe(1);
   await page.reload();
   await expect(boatSwitch(page).getByRole('radio', { name: 'Möwe' })).toHaveAttribute('aria-checked', 'true');
 
