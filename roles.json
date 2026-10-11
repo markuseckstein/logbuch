@@ -1,32 +1,18 @@
 {
   "roles": {
-    "skipper": {
-      "displayName": "Skipper",
-      "description": "Voller Zugriff im Logbuch des Boots, lädt Crew und andere Boote ein",
+    "admin": {
+      "displayName": "Admin",
+      "description": "Hat den Törn angelegt: Boote, Einladungen, alle Einträge",
       "sortOrder": 1,
       "permissions": { "manage": "*" }
     },
-    "crew": {
-      "displayName": "Crew",
-      "description": "Schreibt im Logbuch des Boots mit: Einträge, Tagesberichte, Fotos, Tracks, Crew",
+    "member": {
+      "displayName": "Mitglied",
+      "description": "Schreibt im Törn mit: eigene Einträge, Tagesberichte, Fotos, Tracks (fremde nur lesen)",
       "sortOrder": 2,
       "permissions": {
-        "add": ["crewMembers", "entries", "photos", "dayReports", "tracks", "trackChunks"],
-        "update": {
-          "trips": "*",
-          "crewMembers": "*",
-          "entries": "*",
-          "dayReports": "*",
-          "tracks": "*",
-          "trackChunks": "*"
-        }
+        "add": ["entries", "photos", "dayReports", "tracks", "trackChunks"]
       }
-    },
-    "readonly": {
-      "displayName": "Nur lesen",
-      "description": "Andere Boote der Flottille: sehen das Logbuch, schreiben nicht",
-      "sortOrder": 3,
-      "permissions": {}
     }
   }
 }

@@ -559,6 +559,47 @@ Weitere Befunde (wichtig für die Umsetzung):
 
 **Anfrage an Dexie (Vorschlag):** „Hosted DB z8c8mdzxf, dexie-cloud-addon 4.4.15: Gelegentlich (ca. 1/20) lehnt `/sync` Inserts eines Mitglieds mit `PermissionsDeniedError … not authorized to add entries in realm rlm~…` ab, obwohl dessen Mitgliedschaft (Rolle mit `add: [entries]`) seit Sekunden angenommen ist und die vorherige Sync-Antwort den Realm in `realms` listet. Kann die Rechteprüfung nach Mitgliedschafts-/Realm-Änderungen (z. B. zwischen Instanzen) verzögert sein? Außerdem: Das Addon ignoriert `rejections` und rollt still zurück – gibt es eine API/Event, um abgelehnte Mutationen in der App anzuzeigen?“
 
+### 9.9 Spike Törn-Modell v2: Rolle `member` nur mit `add` (2026-10-11, echte DB `z8c8mdzxf`, Addon 4.4.15)
+
+Frage (siehe `docs/toern-modell.md`): Reicht für Mitglieder `add` auf `entries`, `photos`, `dayReports`, `tracks`,
+`trackChunks` ohne `update`, weil Dexie Cloud dem Owner eines Objekts das Ändern/Löschen immer erlaubt? Skript im
+Scratchpad (nicht im Repo), Playwright gegen `vite dev`, App-Oberfläche abgeschaltet (keine automatische
+Wiederholung abgelehnter Änderungen), Demo-Nutzer alice (Realm-Owner = Admin) und bob (Mitglied). Je Schritt eine
+Transaktion und ein eigener Push; ausgewertet wurden die `rejections` der Sync-Antwort und der Serverstand bei Alice.
+
+| Schritt (bob, Mitglied) | Rolle `member` (global, frisch importiert) | Mitglied mit `permissions: { add: [...] }` | zum Vergleich: Rolle `crew` |
+|---|---|---|---|
+| eigenen Eintrag anlegen | **abgelehnt** (`not authorized to add entries`) | ok | ok |
+| eigenen Eintrag ändern (Text, neues Feld `boatId`) | – (Objekt fehlt) | ok | ok |
+| Foto-Zeile anlegen, `photoIds` per `add()`/`remove()` am eigenen Eintrag | abgelehnt (add photos) | ok | ok |
+| eigene Foto-Zeile hart löschen | – | ok | ok |
+| eigenen Eintrag tombstonen (`deletedAt`) | – | ok | ok |
+| eigenen Tagesbericht-Abschnitt anlegen / ändern | abgelehnt | ok / ok | ok |
+| eigenen Track-Chunk anlegen / Punkte anhängen (update) | abgelehnt | ok / ok | ok |
+| fremden Eintrag ändern / tombstonen | abgelehnt | **abgelehnt** (`not authorized to update entries`) | ok |
+| fremden Eintrag hart löschen | abgelehnt | **abgelehnt** | abgelehnt |
+| `crewMembers` anlegen, Trip ändern, Mitglied einladen | abgelehnt | **abgelehnt** | ok, ok, abgelehnt |
+| **Admin** (alice, Realm-Owner): fremden Eintrag/Abschnitt ändern und tombstonen, Trip ändern | ok | ok | ok |
+
+Befunde:
+- **(a) gilt:** Mit reinem `add` darf ein Mitglied eigene Objekte ändern, tombstonen, hart löschen und `photoIds`
+  per `add()`/`remove()` ändern (Owner-Regel). **(b) gilt:** Änderungen an fremden Objekten lehnt der Server ab
+  (lokal zurückgerollt). **(c) gilt:** Der Realm-Owner darf alles. Der Fallback der Spezifikation („`update` für
+  Mitglieder erlauben, Eigentum nur in der UI prüfen“) ist **nicht** nötig.
+- **Neu importierte globale Rollen wirken auf dem gehosteten Server (noch) nicht:** Die Rollen `admin` und
+  `member` (per `npx dexie-cloud import roles.json`) kommen beim Client in `db.roles` an, der Server wertete sie
+  aber in mehreren Läufen über ~20 min nicht aus – auch `admin` (`manage: *`) gab keinerlei Recht, während die
+  älteren Rollen (`crew`) sofort wirkten. Vermutung [unverifiziert]: serverseitiger Rollen-Cache. Rechte direkt
+  am Mitglied (`permissions`) wirken sofort.
+- Der Import ersetzt keine Rollen, er ergänzt/aktualisiert nur: `skipper`, `crew`, `readonly` bleiben auf dem
+  Server bestehen (bewusst nicht gelöscht – andere Realms könnten sie noch nutzen).
+
+**Entscheidung (Rechte-Design):** Mitglieder bekommen `roles: ['member']` **und** dieselben Rechte explizit als
+`permissions: { add: ['entries', 'photos', 'dayReports', 'tracks', 'trackChunks'] }` am Mitgliedseintrag
+(`MEMBER_PERMISSIONS`, `db/cloud.ts`). Die Rechte sind damit unabhängig von der Verteilung globaler Rollen und
+gleich, sobald die Rolle wirkt. Admin = Realm-Owner (`manage: *` über `realm.owner`), keine Rolle nötig. Die UI
+prüft zusätzlich `canEditRecord` (`domain/access.ts`), damit fremde Einträge gar nicht erst geändert werden.
+
 ## 10. Quellenverzeichnis
 
 - Doku (abgerufen 2026-10-11): `https://dexie.org/docs/cloud/` Unterseiten `dexie-cloud-addon`, `db.cloud.configure()`, `DexieCloudOptions`, `best-practices`, `consistency`, `access-control`, `Realm`, `Role`, `Member`, `DBPermissionSet`, `db.members`, `db.realms`, `db.roles`, `db.cloud.permissions()`, `db.cloud.invites`, `db.cloud.login()`, `db.cloud.logout()`, `db.cloud.currentUser`, `db.cloud.syncState`, `SyncState`, `db.cloud.webSocketStatus`, `db.cloud.sync()`, `authentication`, `add-demo-users`, `cli`, `limits`, `rest-api`, `blob-offloading`, `gdpr-compliance`, `custom-emails`, `quickstart`; Preise: `https://dexie.org/cloud/pricing`.
