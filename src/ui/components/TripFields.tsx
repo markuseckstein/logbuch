@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { Boat, Trip } from '../../domain';
 
 export interface TripDraft {
@@ -44,11 +45,21 @@ export const tripPatchOf = (d: TripDraft) => ({
   area: opt(d.area),
 });
 
+export interface TripFieldError {
+  field: 'name' | 'endDate';
+  message: string;
+}
+
+/** Fehler samt betroffenem Feld, wenn der Entwurf nicht gespeichert werden darf. */
+export function tripFieldError(d: TripDraft): TripFieldError | undefined {
+  if (!d.name.trim()) return { field: 'name', message: 'Bitte gib dem Törn einen Namen.' };
+  if (d.startDate && d.endDate && d.endDate < d.startDate) return { field: 'endDate', message: 'Das Ende liegt vor dem Start.' };
+  return undefined;
+}
+
 /** Gibt eine Fehlermeldung zurück, wenn der Entwurf nicht gespeichert werden darf. */
 export function validateTrip(d: TripDraft): string | undefined {
-  if (!d.name.trim()) return 'Bitte gib dem Törn einen Namen.';
-  if (d.startDate && d.endDate && d.endDate < d.startDate) return 'Das Ende liegt vor dem Start.';
-  return undefined;
+  return tripFieldError(d)?.message;
 }
 
 interface FieldsProps<T> {
@@ -57,13 +68,29 @@ interface FieldsProps<T> {
   autoFocus?: boolean;
 }
 
-export function TripFields({ value, onChange, autoFocus }: FieldsProps<TripDraft>) {
+/** `error`: bei jedem neuen Objekt wird das betroffene Feld markiert und fokussiert. */
+export function TripFields({ value, onChange, autoFocus, error }: FieldsProps<TripDraft> & { error?: TripFieldError | undefined }) {
   const set = (patch: Partial<TripDraft>): void => onChange({ ...value, ...patch });
+  const nameRef = useRef<HTMLInputElement>(null);
+  const endRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (error) (error.field === 'name' ? nameRef : endRef).current?.focus();
+  }, [error]);
+  const bad = (f: TripFieldError['field']): true | undefined => (error?.field === f ? true : undefined);
+  const msg = (f: TripFieldError['field']) =>
+    error?.field === f ? (
+      <div className="err" role="alert">
+        {error.message}
+      </div>
+    ) : null;
   return (
     <>
+      <div>
       <label className="f">
         <span>Name des Törns</span>
         <input
+          ref={nameRef}
+          aria-invalid={bad('name')}
           type="text"
           autoFocus={autoFocus}
           placeholder="z. B. Sommertörn 2027"
@@ -71,6 +98,8 @@ export function TripFields({ value, onChange, autoFocus }: FieldsProps<TripDraft
           onChange={(e) => set({ name: e.target.value })}
         />
       </label>
+      {msg('name')}
+      </div>
       <div className="row2">
         <label className="f">
           <span>Von</span>
@@ -78,9 +107,16 @@ export function TripFields({ value, onChange, autoFocus }: FieldsProps<TripDraft
         </label>
         <label className="f">
           <span>Bis</span>
-          <input type="date" value={value.endDate} onChange={(e) => set({ endDate: e.target.value })} />
+          <input
+            ref={endRef}
+            aria-invalid={bad('endDate')}
+            type="date"
+            value={value.endDate}
+            onChange={(e) => set({ endDate: e.target.value })}
+          />
         </label>
       </div>
+      {msg('endDate')}
       <label className="f">
         <span>Revier (optional)</span>
         <input type="text" value={value.area} onChange={(e) => set({ area: e.target.value })} />

@@ -11,7 +11,7 @@ import { SignInDialog } from '../cloud/CloudCard';
 import { startJoin } from '../cloud/joinState';
 import { useCloudStatus, useCloudUser } from '../cloudHooks';
 import { BoatShape } from '../boats';
-import { TripFields, emptyTripDraft, tripPatchOf, validateTrip } from '../components/TripFields';
+import { TripFields, emptyTripDraft, tripFieldError, tripPatchOf, type TripFieldError } from '../components/TripFields';
 
 const STEPS = ['Neuer Törn', 'Boote', 'Crew einladen'] as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -32,6 +32,10 @@ interface InviteDraft {
   /** Index des Boots in der Liste (Vorschlag) oder undefined. */
   boat?: number;
 }
+
+type ErrorField = 'founder' | 'boat' | 'invite' | 'form';
+
+const peopleText = (n: number): string => `${n} ${n === 1 ? 'Person' : 'Personen'}`;
 
 interface OnboardingProps {
   onDone: (tripId: string) => void;
@@ -86,8 +90,8 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteBoat, setInviteBoat] = useState<number>();
   const [busy, setBusy] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [inviteError, setInviteError] = useState<string>();
+  const [error, setError] = useState<{ field: ErrorField; message: string }>();
+  const [tripErr, setTripErr] = useState<TripFieldError>();
   const [saving, setSaving] = useState(false);
   const cloud = useCloudStatus();
   const user = useCloudUser();
@@ -99,6 +103,19 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
     const all = urls.current;
     return () => all.forEach((u) => URL.revokeObjectURL(u));
   }, []);
+
+  // Fehler am Feld: markieren und fokussieren (scrollt dorthin)
+  useEffect(() => {
+    if (error && error.field !== 'form') document.querySelector<HTMLElement>(`[data-fld="${error.field}"]`)?.focus();
+  }, [error]);
+  const fail = (field: ErrorField, message: string): void => setError({ field, message });
+  const errorAt = (field: ErrorField) =>
+    error?.field === field ? (
+      <div className="err" role="alert">
+        {error.message}
+      </div>
+    ) : null;
+  const invalid = (field: ErrorField): true | undefined => (error?.field === field ? true : undefined);
 
   useEffect(() => {
     if (!onCancel) return;
@@ -127,7 +144,7 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
   const addBoat = (): boolean => {
     const name = nb.name.trim();
     if (!name) {
-      setError('Bitte dem Boot einen Namen geben.');
+      fail('boat', 'Bitte dem Boot einen Namen geben.');
       return false;
     }
     setBoats((list) => [...list, { ...nb, name, model: nb.model.trim() }]);
@@ -136,22 +153,27 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
     return true;
   };
 
-  const addInvite = (): void => {
+  /** Prüft die Adresse im Feld: Eintrag für die Liste oder Fehlermeldung. */
+  const checkInvite = (): InviteDraft | string => {
     const email = inviteEmail.trim().toLowerCase();
-    if (!EMAIL_RE.test(email)) {
-      setInviteError('Bitte eine gültige E-Mail-Adresse eingeben.');
+    if (!EMAIL_RE.test(email)) return 'Bitte eine gültige E-Mail-Adresse eingeben.';
+    if (invites.some((i) => i.email === email) || email === user?.email?.toLowerCase()) return 'Diese Adresse steht schon in der Liste.';
+    return { email, ...(inviteBoat !== undefined ? { boat: inviteBoat } : {}) };
+  };
+  const pendingInvite = inviteEmail.trim() !== '' && typeof checkInvite() !== 'string';
+
+  const addInvite = (): void => {
+    const r = checkInvite();
+    if (typeof r === 'string') {
+      fail('invite', r);
       return;
     }
-    if (invites.some((i) => i.email === email) || email === user?.email?.toLowerCase()) {
-      setInviteError('Diese Adresse steht schon in der Liste.');
-      return;
-    }
-    setInvites((list) => [...list, { email, ...(inviteBoat !== undefined ? { boat: inviteBoat } : {}) }]);
+    setInvites((list) => [...list, r]);
     setInviteEmail('');
-    setInviteError(undefined);
+    setError(undefined);
   };
 
-  const finish = async (withInvites: boolean): Promise<void> => {
+  const finish = async (withInvites: boolean, list: readonly InviteDraft[] = invites): Promise<void> => {
     setSaving(true);
     try {
       const created = await createTrip(db, {
@@ -165,7 +187,7 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
         if (b.photo && id) await setBoatPhoto(db, id, b.photo.input);
       }
       if (cover) await setTripCover(db, created.id, cover.input);
-      const sent = withInvites ? invites : [];
+      const sent = withInvites ? list : [];
       for (const inv of sent) {
         const boatId = inv.boat !== undefined ? stored[inv.boat]?.id : undefined;
         await inviteToTrip(db, created.id, { email: inv.email, name: nameFromEmail(inv.email), suggestedBoatId: boatId });
@@ -176,23 +198,29 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
       toast(`Törn „${created.name}“ angelegt · du bist Admin · ${n} Boot${n > 1 ? 'e' : ''}${extra}`, 4600);
       onDone(created.id);
     } catch {
-      setError('Der Törn konnte nicht gespeichert werden.');
+      fail('form', 'Der Törn konnte nicht gespeichert werden.');
       setSaving(false);
     }
   };
 
   const next = (): void => {
     if (step === 0) {
-      const msg = validateTrip(trip) ?? (founder.trim() ? undefined : 'Bitte gib deinen Namen an.');
-      if (msg) {
-        setError(msg);
+      const tripProblem = tripFieldError(trip);
+      if (tripProblem) {
+        setTripErr(tripProblem);
+        setError(undefined);
         return;
       }
+      if (!founder.trim()) {
+        fail('founder', 'Bitte gib deinen Namen an.');
+        return;
+      }
+      setTripErr(undefined);
     }
     if (step === 1 && boats.length === 0) {
       // ein ausgefülltes Boot zählt, auch ohne „Boot hinzufügen“
       if (!nb.name.trim()) {
-        setError('Bitte lege mindestens ein Boot an.');
+        fail('boat', 'Bitte lege mindestens ein Boot an.');
         return;
       }
       if (!addBoat()) return;
@@ -201,8 +229,22 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
     if (step < STEPS.length - 1) {
       setStep(step + 1);
       window.scrollTo(0, 0);
-    } else void finish(true);
+    } else {
+      // Eine Adresse im Feld nie still verwerfen: gültig = mitnehmen, sonst Fehler am Feld
+      let list = invites;
+      if (inviteEmail.trim() !== '') {
+        const r = checkInvite();
+        if (typeof r === 'string') {
+          fail('invite', r);
+          return;
+        }
+        list = [...invites, r];
+      }
+      void finish(true, list);
+    }
   };
+
+  const invitedCount = invites.length + (pendingInvite ? 1 : 0);
 
   return (
     <div className="onb" role="dialog" aria-modal="true" aria-labelledby="onb-title">
@@ -226,15 +268,35 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
 
         {step === 0 ? (
           <section className="onb-step">
+            {onCancel || cloud !== 'signed-out' ? null : (
+              <div className="card">
+                <b>Eingeladen oder schon dabei?</b>
+                <button className="btn block" type="button" onClick={() => startJoin()}>
+                  <Icon name="mail" size={20} />
+                  Anmelden
+                </button>
+              </div>
+            )}
+            {onCancel || cloud !== 'signed-out' ? null : <div className="legend">Oder neuen Törn anlegen</div>}
             <p className="muted">
               Du legst den Törn an und wirst damit <b>Admin</b>. Ein Törn enthält eine Flottille mit einem oder mehreren
               Booten.
             </p>
-            <TripFields value={trip} onChange={setTrip} autoFocus />
+            <TripFields value={trip} onChange={(d) => { setTrip(d); setTripErr(undefined); }} autoFocus={cloud !== 'signed-out' || !!onCancel} error={tripErr} />
+            <div>
             <label className="f">
               <span>Dein Name</span>
-              <input type="text" autoComplete="given-name" value={founder} onChange={(e) => setFounder(e.target.value)} />
+              <input
+                type="text"
+                autoComplete="given-name"
+                data-fld="founder"
+                aria-invalid={invalid('founder')}
+                value={founder}
+                onChange={(e) => setFounder(e.target.value)}
+              />
             </label>
+            {errorAt('founder')}
+            </div>
             <div className="card">
               <div className="legend">Cover-Bild (optional)</div>
               {cover ? (
@@ -261,16 +323,9 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
                 <ImportLogbook />
               </div>
             )}
-            {onCancel || cloud === 'local' ? null : (
+            {onCancel || cloud === 'local' || cloud === 'signed-out' ? null : (
               <div className="card">
-                {cloud === 'signed-out' ? (
-                  <button className="btn block" type="button" onClick={() => startJoin()}>
-                    <Icon name="mail" size={20} />
-                    Ich bin eingeladen / wieder anmelden
-                  </button>
-                ) : (
-                  <p className="muted">Angemeldet – Einladungen werden automatisch angenommen, sobald sie da sind.</p>
-                )}
+                <p className="muted">Angemeldet – Einladungen werden automatisch angenommen, sobald sie da sind.</p>
               </div>
             )}
           </section>
@@ -318,10 +373,20 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
                 />
               </div>
               <div className="row2">
+                <div>
                 <label className="f">
                   <span>Bootsname</span>
-                  <input type="text" autoComplete="off" value={nb.name} onChange={(e) => setNb({ ...nb, name: e.target.value })} />
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    data-fld="boat"
+                    aria-invalid={invalid('boat')}
+                    value={nb.name}
+                    onChange={(e) => setNb({ ...nb, name: e.target.value })}
+                  />
                 </label>
+                {errorAt('boat')}
+                </div>
                 <label className="f">
                   <span>Typ / Modell</span>
                   <input
@@ -343,12 +408,12 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
         {step === 2 ? (
           <section className="onb-step">
             <p className="muted">
-              Lade Personen per E-Mail für den ganzen Törn ein. Das Boot ist nur ein Vorschlag, alle dürfen auf jedes
-              Boot schreiben.
+              Trage die E-Mail-Adressen deiner Crew ein. Danach teilst du einen QR-Code oder Link – es wird keine Mail
+              verschickt. Das Boot ist nur ein Vorschlag, alle dürfen auf jedes Boot schreiben.
             </p>
             {cloud === 'local' ? (
               <div className="lockcard">
-                <p className="muted">Ohne Cloud-Verbindung bleibt der Törn auf diesem Gerät. Einladen geht hier nicht.</p>
+                <p className="muted">Dieser Törn bleibt nur auf diesem Handy gespeichert. Einladen geht hier nicht.</p>
               </div>
             ) : signedIn ? (
               <div className="note ok" role="note">
@@ -362,8 +427,8 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
                   <div>
                     <b>Anmeldung nötig</b>
                     <div className="muted">
-                      Einladungen werden mit deinem Cloud-Konto verschickt. Du kannst sie jetzt vormerken – sie gehen
-                      nach der Anmeldung raus – oder später einladen.
+                      Zum Teilen des QR-Codes musst du angemeldet sein. Du kannst die Adressen jetzt vormerken und später
+                      einladen.
                     </div>
                   </div>
                 </div>
@@ -375,6 +440,7 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
             )}
             {cloud === 'local' ? null : (
               <>
+                <div>
                 <label className="f">
                   <span>E-Mail-Adresse</span>
                   <input
@@ -382,10 +448,14 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
                     inputMode="email"
                     autoComplete="off"
                     placeholder="name@example.com"
+                    data-fld="invite"
+                    aria-invalid={invalid('invite')}
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                   />
                 </label>
+                {errorAt('invite')}
+                </div>
                 <fieldset>
                   <legend>Boot-Vorschlag (optional)</legend>
                   <div className="chips" role="radiogroup" aria-label="Boot-Vorschlag">
@@ -407,11 +477,6 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
                     ))}
                   </div>
                 </fieldset>
-                {inviteError ? (
-                  <div className="err" role="alert">
-                    {inviteError}
-                  </div>
-                ) : null}
                 <button className="btn block" type="button" onClick={addInvite}>
                   <Icon name="mail" size={20} />
                   Zur Liste hinzufügen
@@ -448,24 +513,22 @@ export function Onboarding({ onDone, onCancel }: OnboardingProps) {
         ) : null}
 
         {signingIn ? <SignInDialog onClose={() => setSigningIn(false)} /> : null}
-        {error ? (
-          <div className="err" role="alert">
-            {error}
-          </div>
-        ) : null}
+        {errorAt('form')}
         <div className="onb-nav">
           {step > 0 ? (
             <button className="btn" type="button" onClick={() => setStep(step - 1)}>
               Zurück
             </button>
           ) : null}
-          {step === 2 && !signedIn && cloud !== 'local' ? (
+          {step === 2 && !signedIn && cloud !== 'local' && invitedCount === 0 && inviteEmail.trim() === '' ? (
             <button className="btn" type="button" disabled={saving} onClick={() => void finish(false)}>
               Später einladen
             </button>
           ) : null}
           <button className="btn primary" type="button" disabled={saving} onClick={next}>
-            {step === STEPS.length - 1 ? 'Törn anlegen' : 'Weiter'}
+            {step === STEPS.length - 1
+              ? `Törn anlegen${invitedCount > 0 && cloud !== 'local' ? ` · ${peopleText(invitedCount)} ${signedIn ? 'einladen' : 'vorgemerkt'}` : ''}`
+              : 'Weiter'}
           </button>
         </div>
       </div>
