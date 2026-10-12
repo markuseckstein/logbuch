@@ -123,9 +123,18 @@ describe('EntrySheet', () => {
     it('Zurück-Geste (popstate) speichert und schließt', async () => {
       const { entry, onClose, user } = await setup();
       await changeText(user);
+      history.replaceState(null, ''); // Browser ist bereits zurückgegangen
       window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
       await waitFor(() => expect(onClose).toHaveBeenCalled());
       expect((await db.entries.get(entry.id))?.text).toBe('Segel gesetzt');
+    });
+
+    it('popstate bei noch vorhandenem Sheet-Eintrag (z. B. Foto-Viewer geschlossen) lässt das Sheet offen', async () => {
+      const { onClose, user } = await setup();
+      await changeText(user);
+      window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(onClose).not.toHaveBeenCalled();
     });
 
     it('ohne Änderungen: schließt ohne Speichern und ohne Toast', async () => {

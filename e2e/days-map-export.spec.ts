@@ -21,7 +21,8 @@ async function quickEntry(page: Page, type: string): Promise<void> {
   await page.getByRole('button', { name: /Eintrag jetzt/ }).click();
   const sheet = page.getByRole('dialog');
   await expect(sheet).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: 'gespeichert' })).toContainText('°');
+  await expect(page.getByRole('status').filter({ hasText: 'gespeichert' })).toContainText('Eintrag');
+  await expect(sheet).toContainText('°'); // Position steht im Sheet-Kopf
   await sheet.getByRole('radio', { name: type }).click();
   await sheet.getByRole('button', { name: 'Speichern' }).click();
   await expect(sheet).toBeHidden();

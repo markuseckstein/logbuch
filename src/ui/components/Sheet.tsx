@@ -35,6 +35,8 @@ export function Sheet({ title, subtitle, onClose, footer, children }: SheetProps
     mounted += 1;
     if (!isSheetState()) history.pushState({ ...(history.state as object | null), [HISTORY_KEY]: true }, '');
     const onPop = (): void => {
+      // Ein darüber liegender Vollbild-Viewer o. Ä. ist zurückgegangen: unser Eintrag steht noch, das Sheet bleibt
+      if (isSheetState()) return;
       void attemptClose().then((closed) => {
         if (!closed && !isSheetState()) history.pushState({ [HISTORY_KEY]: true }, '');
       });
