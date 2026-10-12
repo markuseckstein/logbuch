@@ -11,6 +11,7 @@ import {
   formatPosition,
   formatTime,
   canEditRecord,
+  parseCoordinate,
   type Boat,
   type EntryType,
   type ID,
@@ -108,14 +109,65 @@ function EntryView({
   );
 }
 
-function PositionSection({ entry }: { entry: LogEntry }) {
+const DENIED_HINT =
+  'Standort ist gesperrt. Tippe oben in der Adressleiste auf das Schloss → Berechtigungen → Standort → Zulassen.';
+
+/** Ist der Standort im Browser gesperrt? (Permissions-API, sonst unbekannt = false) */
+function useLocationBlocked(active: boolean): boolean {
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    let status: PermissionStatus | undefined;
+    const update = (): void => setBlocked(status?.state === 'denied');
+    void navigator.permissions
+      ?.query({ name: 'geolocation' })
+      .then((st) => {
+        status = st;
+        update();
+        st.addEventListener('change', update);
+      })
+      .catch(() => undefined);
+    return () => status?.removeEventListener('change', update);
+  }, [active]);
+  return blocked;
+}
+
+interface ManualPos {
+  lat: string;
+  lon: string;
+  setLat: (v: string) => void;
+  setLon: (v: string) => void;
+  /** Fehler an den Feldern (Eingabe nicht lesbar). */
+  error: string | undefined;
+  setError: (v: string | undefined) => void;
+}
+
+/** Liest die manuelle Eingabe: undefined = leer, sonst Ergebnis (Fehler gehören ans Feld). */
+function readManual(m: ManualPos): { lat: number; lon: number } | { error: string } | undefined {
+  if (m.lat.trim() === '' && m.lon.trim() === '') return undefined;
+  const la = parseCoordinate(m.lat, 'lat');
+  if (!la.ok) return { error: la.error };
+  const lo = parseCoordinate(m.lon, 'lon');
+  if (!lo.ok) return { error: lo.error };
+  return { lat: la.value, lon: lo.value };
+}
+
+function PositionSection({ entry, manual }: { entry: LogEntry; manual: ManualPos }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const [lat, setLat] = useState('');
-  const [lon, setLon] = useState('');
+  const [denied, setDenied] = useState(false);
+  const blocked = useLocationBlocked(!entry.position);
+  const details = useRef<HTMLDetailsElement>(null);
+  const latInput = useRef<HTMLInputElement>(null);
   const stopRef = useRef<(() => void) | undefined>(undefined);
   useEffect(() => () => stopRef.current?.(), []);
+  // Eingabefehler (auch beim Schließen): Bereich aufklappen und ans Feld springen
+  useEffect(() => {
+    if (!manual.error) return;
+    if (details.current) details.current.open = true;
+    latInput.current?.focus();
+  }, [manual.error]);
 
   const capture = async (): Promise<void> => {
     setBusy(true);
@@ -130,21 +182,27 @@ function PositionSection({ entry }: { entry: LogEntry }) {
     stopRef.current = stop;
     const res = await first;
     if (res.position && !improved) await setEntryPosition(db, entry.id, res.position);
-    if (!res.position) setError(`Keine Position (GPS: ${res.error ? FIX_ERROR_LABEL[res.error] : 'nicht verfügbar'})`);
+    if (!res.position) {
+      setDenied(res.error === 'denied');
+      setError(`Keine Position (GPS: ${res.error ? FIX_ERROR_LABEL[res.error] : 'nicht verfügbar'})`);
+    }
     setBusy(false);
   };
 
   const applyManual = async (): Promise<void> => {
-    const la = parseDecimal(lat);
-    const lo = parseDecimal(lon);
-    if (la === undefined || lo === undefined || Math.abs(la) > 90 || Math.abs(lo) > 180) {
-      setError('Bitte Breite (−90 bis 90) und Länge (−180 bis 180) als Dezimalgrad angeben.');
+    const r = readManual(manual);
+    if (!r) {
+      manual.setError('Bitte Breite und Länge angeben, z. B. 54°19,1 N und 010°08,4 E.');
       return;
     }
-    setError(undefined);
-    await setEntryPosition(db, entry.id, { lat: la, lon: lo });
-    setLat('');
-    setLon('');
+    if ('error' in r) {
+      manual.setError(r.error);
+      return;
+    }
+    manual.setError(undefined);
+    await setEntryPosition(db, entry.id, { lat: r.lat, lon: r.lon });
+    manual.setLat('');
+    manual.setLon('');
     toast('Position übernommen');
   };
 
@@ -155,19 +213,47 @@ function PositionSection({ entry }: { entry: LogEntry }) {
           {busy ? 'Position wird bestimmt …' : 'Position jetzt erfassen'}
         </button>
       ) : null}
-      <details className="opt">
+      {!entry.position && (blocked || denied) ? (
+        <div className="note" role="note">
+          {DENIED_HINT}
+        </div>
+      ) : null}
+      <details className="opt" ref={details}>
         <summary>Position manuell eingeben</summary>
         <div className="in">
           <div className="row2">
             <label className="f">
-              <span>Breite (°, z. B. 54.318)</span>
-              <input type="text" inputMode="decimal" value={lat} onChange={(e) => setLat(e.target.value)} />
+              <span>Breite (z. B. 54°19,1 N)</span>
+              <input
+                ref={latInput}
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                value={manual.lat}
+                aria-invalid={manual.error ? true : undefined}
+                onChange={(e) => {
+                  manual.setLat(e.target.value);
+                  manual.setError(undefined);
+                }}
+              />
             </label>
             <label className="f">
-              <span>Länge (°, z. B. 10.141)</span>
-              <input type="text" inputMode="decimal" value={lon} onChange={(e) => setLon(e.target.value)} />
+              <span>Länge (z. B. 010°08,4 E)</span>
+              <input
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                value={manual.lon}
+                aria-invalid={manual.error ? true : undefined}
+                onChange={(e) => {
+                  manual.setLon(e.target.value);
+                  manual.setError(undefined);
+                }}
+              />
             </label>
           </div>
+          <p className="muted hint">Auch möglich: 54 19,1 · 54.318 · Süd und West mit S/W oder Minus. Ost als E oder O.</p>
+          {manual.error ? <div className="err" role="alert">{manual.error}</div> : null}
           <button className="btn block" type="button" style={{ marginTop: 12 }} onClick={() => void applyManual()}>
             Position übernehmen
           </button>
@@ -217,32 +303,62 @@ function EntryForm({
   const [temp, setTemp] = useState(numText(entry.tempC));
   const [text, setText] = useState(entry.text ?? '');
   const [confirming, setConfirming] = useState(false);
+  const [manLat, setManLat] = useState('');
+  const [manLon, setManLon] = useState('');
+  const [manError, setManError] = useState<string>();
+  const manual: ManualPos = { lat: manLat, lon: manLon, setLat: setManLat, setLon: setManLon, error: manError, setError: setManError };
+  const closing = useRef(false);
   const deleteBtn = useRef<HTMLButtonElement>(null);
 
   const newTime = fromLocalInput(timeValue, entry.tzOffsetMin) ?? entry.time;
   const title = `${isNew ? 'Eintrag ergänzen' : 'Eintrag'} · ${formatTime(newTime, entry.tzOffsetMin)}`;
 
-  const save = async (): Promise<void> => {
+  const patch = {
+    boatId,
+    time: newTime,
+    type,
+    text: text.trim() === '' ? undefined : text,
+    windDirDeg: dir,
+    windBft: bft,
+    sky,
+    seaState: sea,
+    pressureHpa: parseDecimal(hpa),
+    tempC: parseDecimal(temp),
+  };
+  const dirty = (Object.keys(patch) as (keyof typeof patch)[]).some((k) => {
+    const before = k === 'text' && entry.text === '' ? undefined : entry[k];
+    return patch[k] !== before;
+  });
+
+  /**
+   * Schließen: Änderungen automatisch speichern (`force` = auch ohne Änderungen, für „Speichern“).
+   * Gibt false zurück, wenn das Sheet offen bleiben muss (Eingabefehler, Speichern fehlgeschlagen).
+   */
+  const finish = async (force: boolean): Promise<boolean> => {
+    if (closing.current) return false;
+    const man = readManual(manual);
+    if (man && 'error' in man) {
+      setManError(man.error);
+      return false;
+    }
+    if (!dirty && !force && !man) {
+      onClose();
+      return true;
+    }
+    closing.current = true;
     try {
-      await updateEntry(db, entry.id, {
-      boatId,
-      time: newTime,
-      type,
-      text: text.trim() === '' ? undefined : text,
-      windDirDeg: dir,
-      windBft: bft,
-      sky,
-      seaState: sea,
-      pressureHpa: parseDecimal(hpa),
-      tempC: parseDecimal(temp),
-      });
+      await updateEntry(db, entry.id, patch);
+      if (man) await setEntryPosition(db, entry.id, { lat: man.lat, lon: man.lon });
     } catch (e) {
+      closing.current = false;
       toast(writeErrorMessage(e, 'Eintrag konnte nicht gespeichert werden'));
-      return;
+      return false;
     }
     toast(`Eintrag ${formatTime(newTime, entry.tzOffsetMin)} gespeichert`);
     onClose();
+    return true;
   };
+  const save = (): Promise<boolean> => finish(true);
 
   const remove = async (): Promise<void> => {
     const t = formatTime(entry.time, entry.tzOffsetMin);
@@ -278,9 +394,14 @@ function EntryForm({
     </div>
   ) : (
     <>
-      <button ref={deleteBtn} className="btn danger" type="button" onClick={() => setConfirming(true)}>
-        <Icon name="trash" size={20} />
-        Löschen
+      <button
+        ref={deleteBtn}
+        className="btn danger icon-only"
+        type="button"
+        aria-label="Löschen"
+        onClick={() => setConfirming(true)}
+      >
+        <Icon name="trash" size={22} />
       </button>
       <button className="btn primary" type="button" onClick={() => void save()}>
         Speichern
@@ -289,7 +410,7 @@ function EntryForm({
   );
 
   return (
-    <Sheet title={title} subtitle={subtitle} onClose={onClose} footer={footer}>
+    <Sheet title={title} subtitle={subtitle} onClose={() => finish(false)} footer={footer}>
       {adminEdit ? (
         <div className="note" role="note">
           <b>Admin-Bearbeitung</b>
@@ -306,7 +427,7 @@ function EntryForm({
         <span>Zeit</span>
         <input type="datetime-local" value={timeValue} onChange={(e) => setTimeValue(e.target.value)} />
       </label>
-      <PositionSection entry={entry} />
+      <PositionSection entry={entry} manual={manual} />
       <fieldset>
         <legend>Typ</legend>
         <div className="chips" role="radiogroup" aria-label="Eintragstyp">

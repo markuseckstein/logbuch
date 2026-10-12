@@ -6,7 +6,6 @@ import { createEntry, setEntryPosition } from '../../db/repo';
 import {
   dayNumber,
   formatDateLong,
-  formatPosition,
   formatTime,
   localDate,
   tripDays,
@@ -18,7 +17,7 @@ import { useApp } from '../AppContext';
 import { BoatChooser, BoatShape, boatColor, useBoatSelection } from '../boats';
 import { useReadOnly, useToday } from '../hooks';
 import { Icon } from '../icons';
-import { FIX_ERROR_LABEL, boatLayers, currentTzOffsetMin, groupTrackPoints, selectionDayStats, writeErrorMessage } from '../lib';
+import { boatLayers, currentTzOffsetMin, groupTrackPoints, selectionDayStats, writeErrorMessage } from '../lib';
 import { useEnsureAuthor } from '../useEnsureAuthor';
 import { useToast } from '../toast';
 import { ChartMap } from '../components/ChartMap';
@@ -82,11 +81,10 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
       const res = await first;
       if (res.position && !improved) await setEntryPosition(db, entry.id, res.position);
       const t = formatTime(entry.time, entry.tzOffsetMin);
-      const where = res.position
-        ? formatPosition(res.position)
-        : `ohne Position${res.error ? ` (GPS: ${FIX_ERROR_LABEL[res.error]})` : ''}`;
+      // Kurz halten: die Position steht im Kopf des Sheets; ohne Position weist die Position-Karte darauf hin
+      const where = res.position ? '' : ' – ohne Position';
       const boat = boats.length > 1 ? ` · ${boats.find((b) => b.id === boatId)?.name ?? ''}` : '';
-      toast(`Eintrag ${t} gespeichert${boat} · ${where}`, 3800);
+      toast(`Eintrag ${t} gespeichert${boat}${where}`, 3800);
       openEntry(entry.id, true);
     } catch (e) {
       toast(writeErrorMessage(e, 'Eintrag konnte nicht gespeichert werden'));
@@ -112,6 +110,7 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
           className={busy ? 'fix busy' : 'fix'}
           type="button"
           disabled={busy}
+          {...(!busy && boatLabel ? { 'aria-label': `Eintrag jetzt · ${boatLabel.name}` } : {})}
           onClick={onFix}
           style={boatLabel ? boatColor(boatLabel) : undefined}
         >
@@ -119,8 +118,12 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
           <span className="lbl">
             <span>
               {busy ? 'Position wird bestimmt …' : 'Eintrag jetzt'}
-              {!busy && boatLabel ? ` · ${boatLabel.name}` : ''}
             </span>
+            {!busy && boatLabel ? (
+              <small className="fix-boat">
+                {boatLabel.name}
+              </small>
+            ) : null}
             <small>
               {busy ? 'GPS-Fix, bitte kurz warten' : selected ? '1 Tap · GPS und Uhrzeit' : 'Boot wählst du im nächsten Schritt'}
             </small>
@@ -132,7 +135,7 @@ export function TodayScreen({ trip, reports }: TodayScreenProps) {
         <BoatChooser
           title="Neuer Eintrag"
           confirmLabel="Eintrag speichern"
-          hint="Die Wahl bleibt nur auf diesem Gerät gespeichert."
+          hint="Dieses Boot schlagen wir beim nächsten Eintrag wieder vor."
           onCancel={() => setChoosing(false)}
           onConfirm={(id) => {
             setChoosing(false);

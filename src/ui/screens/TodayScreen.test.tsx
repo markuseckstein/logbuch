@@ -33,7 +33,7 @@ describe('TodayScreen – Eintrag jetzt', () => {
     expect(entries[0]?.tripId).toBe(trip.id);
     expect(entries[0]?.tzOffsetMin).toBe(-new Date().getTimezoneOffset());
     expect(screen.getByRole('status')).toHaveTextContent(
-      /Eintrag \d\d:\d\d gespeichert · ohne Position \(GPS: Zugriff verweigert\)/,
+      /^Eintrag \d\d:\d\d gespeichert – ohne Position$/,
     );
     expect(actions.openEntry).toHaveBeenCalledWith(entries[0]?.id, true);
   });
@@ -51,7 +51,7 @@ describe('TodayScreen – Eintrag jetzt', () => {
     await userEvent.setup().click(await screen.findByRole('button', { name: /Eintrag jetzt/ }));
     await waitFor(() => expect(actions.openEntry).toHaveBeenCalled(), { timeout: 4000 });
 
-    expect(screen.getByRole('status')).toHaveTextContent('· 54°19,1′N 010°08,4′E');
+    expect(screen.getByRole('status')).toHaveTextContent(/^Eintrag \d\d:\d\d gespeichert$/);
     expect((await db.entries.toArray())[0]?.position).toMatchObject({ lat: 54.3185, lon: 10.1407 });
 
     improve?.({ lat: 54.32, lon: 10.15 });

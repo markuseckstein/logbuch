@@ -59,6 +59,7 @@ describe('EntrySheet', () => {
     const { user } = await setup();
     await user.click(screen.getByRole('button', { name: 'Position jetzt erfassen' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('GPS: Zugriff verweigert');
+    expect(screen.getByText(/Standort ist gesperrt.*Schloss.*Berechtigungen.*Standort.*Zulassen/)).toBeInTheDocument();
   });
 
   it('übernimmt eine manuell eingegebene Position sofort', async () => {
@@ -89,6 +90,98 @@ describe('EntrySheet', () => {
     const { onClose, user } = await setup();
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
+  });
+
+  describe('Autosave beim Schließen', () => {
+    const changeText = async (user: ReturnType<typeof userEvent.setup>) => user.type(screen.getByLabelText('Text'), 'Segel gesetzt');
+
+    it('X speichert Änderungen und meldet es per Toast', async () => {
+      const { entry, onClose, user } = await setup();
+      await changeText(user);
+      await user.click(screen.getByRole('button', { name: 'Schließen' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect((await db.entries.get(entry.id))?.text).toBe('Segel gesetzt');
+      expect(toastEl()).toHaveTextContent(/^Eintrag \d\d:\d\d gespeichert$/);
+    });
+
+    it('Tipp auf den Hintergrund speichert ebenfalls', async () => {
+      const { entry, onClose, user } = await setup();
+      await user.click(screen.getByRole('radio', { name: 'Ablegen' }));
+      await user.click(document.querySelector('.scrim')!);
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect((await db.entries.get(entry.id))?.type).toBe('departure');
+    });
+
+    it('Escape speichert ebenfalls', async () => {
+      const { entry, onClose, user } = await setup();
+      await changeText(user);
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect((await db.entries.get(entry.id))?.text).toBe('Segel gesetzt');
+    });
+
+    it('Zurück-Geste (popstate) speichert und schließt', async () => {
+      const { entry, onClose, user } = await setup();
+      await changeText(user);
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect((await db.entries.get(entry.id))?.text).toBe('Segel gesetzt');
+    });
+
+    it('ohne Änderungen: schließt ohne Speichern und ohne Toast', async () => {
+      const { entry, onClose, user } = await setup();
+      const before = (await db.entries.get(entry.id))!;
+      await user.click(screen.getByRole('button', { name: 'Schließen' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(await db.entries.get(entry.id)).toEqual(before);
+      expect(toastEl()).not.toHaveClass('show');
+    });
+
+    it('unlesbare Position: Sheet bleibt offen, Fehler steht am Feld', async () => {
+      const { entry, onClose, user } = await setup();
+      await changeText(user);
+      await user.click(screen.getByText('Position manuell eingeben'));
+      await user.type(screen.getByLabelText(/Breite/), 'abc');
+      await user.type(screen.getByLabelText(/Länge/), '10');
+      await user.click(screen.getByRole('button', { name: 'Schließen' }));
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('Breite');
+      expect(alert).toHaveTextContent('54°19,1');
+      expect(screen.getByLabelText(/Breite/)).toHaveAttribute('aria-invalid', 'true');
+      expect(onClose).not.toHaveBeenCalled();
+      expect((await db.entries.get(entry.id))?.text).toBeUndefined();
+    });
+
+    it('lesbare, noch nicht übernommene Position wird beim Schließen mitgespeichert', async () => {
+      const { entry, onClose, user } = await setup();
+      await user.click(screen.getByText('Position manuell eingeben'));
+      await user.type(screen.getByLabelText(/Breite/), "54°19,1'N");
+      await user.type(screen.getByLabelText(/Länge/), '010 08,4 O');
+      await user.click(screen.getByRole('button', { name: 'Schließen' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      const pos = (await db.entries.get(entry.id))?.position;
+      expect(pos?.lat).toBeCloseTo(54 + 19.1 / 60, 6);
+      expect(pos?.lon).toBeCloseTo(10 + 8.4 / 60, 6);
+    });
+
+    it('fremder Eintrag (nur ansehen): Schließen speichert nichts', async () => {
+      const trip = await seedTrip('F', ['Seeschwalbe']);
+      const entry = await seedEntry(trip.id);
+      const restore = await asCloudMember(trip.id);
+      const onClose = vi.fn();
+      try {
+        const user = userEvent.setup();
+        renderUi(<EntrySheet entryId={entry.id} onClose={onClose} />);
+        await waitFor(() => expect(screen.getByRole('note')).toHaveTextContent('Nur ansehen'), { timeout: 3000 });
+        const before = (await db.entries.get(entry.id))!;
+        await user.click(screen.getByRole('button', { name: 'Schließen' }));
+        await waitFor(() => expect(onClose).toHaveBeenCalled());
+        expect(await db.entries.get(entry.id)).toEqual(before);
+        expect(toastEl()).not.toHaveClass('show');
+      } finally {
+        restore();
+      }
+    });
   });
 
   describe('Fotos', () => {
