@@ -5,7 +5,7 @@ import { useActiveTrip, useBoats, useDayReports, useEntries, useTripCrew } from 
 import { getSettings, listTrips, setActiveTrip } from '../db/repo';
 import { requestPersistentStorage } from '../db/storage';
 import { dayNumber, isViewerEmail, tripDays, type Trip } from '../domain';
-import { AppContext, type AppActions, type TabId } from './AppContext';
+import { AppContext, useApp, type AppActions, type TabId } from './AppContext';
 import { Icon, type IconName } from './icons';
 import { SettingsContext, useReadOnly, useSettings, useTheme, useToday } from './hooks';
 import { ToastProvider } from './toast';
@@ -37,8 +37,10 @@ const TABS: readonly { id: TabId; label: string; icon: IconName }[] = [
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
-function RecIndicator() {
+/** „REC 0:00:02“ in der Kopfzeile: antippbar, führt zum Live-Route-Schalter im Karte-Tab. */
+export function RecIndicator() {
   const { active, startedAt } = useLiveRoute();
+  const { focusLiveToggle } = useApp();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;
@@ -49,10 +51,15 @@ function RecIndicator() {
   const sec = Math.max(0, Math.floor((now - startedAt) / 1000));
   const text = `${Math.floor(sec / 3600)}:${pad2(Math.floor(sec / 60) % 60)}:${pad2(sec % 60)}`;
   return (
-    <div className="rec" role="status" aria-label={`Live-Route wird aufgezeichnet, ${text}`}>
+    <button
+      className="rec"
+      type="button"
+      aria-label={`Live-Route wird aufgezeichnet, ${text}. Antippen zum Beenden`}
+      onClick={focusLiveToggle}
+    >
       <i aria-hidden="true" />
       REC {text}
-    </div>
+    </button>
   );
 }
 
@@ -88,12 +95,18 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
   const [tab, setTab] = useState<TabId>('today');
   const [sheet, setSheet] = useState<{ id: string; isNew: boolean } | null>(null);
   const [onboarding, setOnboarding] = useState(false);
+  const [liveFocus, setLiveFocus] = useState(false);
 
   const actions = useMemo<AppActions>(
     () => ({
       openEntry: (id, isNew = false) => setSheet({ id, isNew }),
       goTo: setTab,
       startOnboarding: () => setOnboarding(true),
+      focusLiveToggle: () => {
+        setTab('map');
+        setLiveFocus(true);
+        window.scrollTo(0, 0);
+      },
     }),
     [],
   );
@@ -123,7 +136,7 @@ function Shell({ trip, dark, onToggleTheme }: { trip: Trip; dark: boolean; onTog
           ) : null}
           {tab === 'today' ? <TodayScreen trip={trip} reports={reports ?? []} /> : null}
           {tab === 'days' ? <DaysScreen trip={trip} /> : null}
-          {tab === 'map' ? <MapScreen trip={trip} /> : null}
+          {tab === 'map' ? <MapScreen trip={trip} focusLive={liveFocus} onFocusLiveDone={() => setLiveFocus(false)} /> : null}
           {tab === 'trip' ? <TripScreen trip={trip} /> : null}
           <nav className="tabbar" aria-label="Hauptnavigation">
             {TABS.map((t) => (

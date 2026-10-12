@@ -54,6 +54,42 @@ function DayCard({ day, onOpen }: { day: DayInfo; onOpen: () => void }) {
   );
 }
 
+/** Fotos des eigenen Abschnitts (Galerie/Kamera + Raster); die Fotos erscheinen nur hier, nicht doppelt. */
+function MyPhotos({
+  tripId, day, own, ensureAuthor,
+}: { tripId: string; day: DayInfo; own: DayReport | undefined; ensureAuthor: () => Promise<boolean> }) {
+  const toast = useToast();
+  const photoIds = own?.photoIds ?? [];
+  const allIds = sectionPhotoIds(day.sections);
+  const { onAdd: add, progress } = usePhotoImport({ kind: 'report', tripId, date: day.date, photoIds: allIds });
+  const onAdd = async (files: File[]): Promise<void> => {
+    if (await ensureAuthor()) await add(files);
+  };
+  const onRemove = async (photoId: string): Promise<void> => {
+    try {
+      await removePhotoFromDayReport(db, tripId, day.date, photoId);
+      toast('Foto entfernt');
+    } catch (e) {
+      toast(writeErrorMessage(e, 'Foto konnte nicht entfernt werden'));
+    }
+  };
+  return (
+    <section className="my-photos" aria-label="Fotos zu deinem Abschnitt">
+      <div className="legend">Fotos zu deinem Abschnitt</div>
+      <PhotoPicker
+        maxCount={MAX_PHOTOS_PER_DAY_REPORT}
+        photoIds={photoIds}
+        totalCount={allIds.length}
+        countText={`${allIds.length} / ${MAX_PHOTOS_PER_DAY_REPORT} an diesem Tag`}
+        onAdd={onAdd}
+        onRemove={onRemove}
+        progress={progress}
+        caption={photoCaption([`Tag ${day.no}`, 'Meine Fotos'])}
+      />
+    </section>
+  );
+}
+
 interface SectionProps {
   tripId: ID;
   day: DayInfo;
@@ -160,7 +196,11 @@ function ReportSection({ tripId, day, section, authorId, name, mine, admin, edit
         <>
           {section.title?.trim() ? <p><b>{section.title.trim()}</b></p> : null}
           {section.text.trim() ? <p>{section.text}</p> : null}
-          <PhotoGrid photoIds={section.photoIds} caption={photoCaption([`Tag ${day.no}`, name, time ? `${time} Uhr` : undefined])} />
+          {mine && editable ? (
+            <MyPhotos tripId={tripId} day={day} own={section} ensureAuthor={ensureAuthor} />
+          ) : (
+            <PhotoGrid photoIds={section.photoIds} caption={photoCaption([`Tag ${day.no}`, name, time ? `${time} Uhr` : undefined])} />
+          )}
           {editable ? (
             <div className="rep-act">
               <button className="btn sm" type="button" onClick={startEdit}>
@@ -173,6 +213,7 @@ function ReportSection({ tripId, day, section, authorId, name, mine, admin, edit
       ) : (
         <>
           <p className="muted">Noch kein Abschnitt von dir für diesen Tag.</p>
+          {mine && editable ? <MyPhotos tripId={tripId} day={day} own={undefined} ensureAuthor={ensureAuthor} /> : null}
           <div className="rep-act">
             <button className="btn sm" type="button" onClick={startEdit}>
               <Icon name="plus" size={18} />
@@ -182,40 +223,6 @@ function ReportSection({ tripId, day, section, authorId, name, mine, admin, edit
         </>
       )}
     </article>
-  );
-}
-
-function DayPhotos({
-  tripId, day, own, total, allIds, ensureAuthor,
-}: { tripId: string; day: DayInfo; own: DayReport | undefined; total: number; allIds: readonly string[]; ensureAuthor: () => Promise<boolean> }) {
-  const toast = useToast();
-  const photoIds = own?.photoIds ?? [];
-  const { onAdd: add, progress } = usePhotoImport({ kind: 'report', tripId, date: day.date, photoIds: allIds });
-  const onAdd = async (files: File[]): Promise<void> => {
-    if (await ensureAuthor()) await add(files);
-  };
-  const onRemove = async (photoId: string): Promise<void> => {
-    try {
-      await removePhotoFromDayReport(db, tripId, day.date, photoId);
-      toast('Foto entfernt');
-    } catch (e) {
-      toast(writeErrorMessage(e, 'Foto konnte nicht entfernt werden'));
-    }
-  };
-  return (
-    <section className="card" aria-label="Fotos des Tages">
-      <div className="legend">Meine Fotos des Tages</div>
-      <PhotoPicker
-        maxCount={MAX_PHOTOS_PER_DAY_REPORT}
-        photoIds={photoIds}
-        totalCount={total}
-        countText={`${total} / ${MAX_PHOTOS_PER_DAY_REPORT} an diesem Tag`}
-        onAdd={onAdd}
-        onRemove={onRemove}
-        progress={progress}
-        caption={photoCaption([`Tag ${day.no}`, 'Meine Fotos'])}
-      />
-    </section>
   );
 }
 
@@ -241,7 +248,6 @@ function DayView({ trip, day, onBack }: { trip: Trip; day: DayInfo; onBack: () =
   const nameOf = (id: string): string => authorName(crew, id) ?? (id ? 'Ehemaliges Mitglied' : 'Ohne Namen');
   const sections = [...day.sections].sort((a, b) => a.updatedAt - b.updatedAt);
   const own = sections.find((s) => s.authorId === me);
-  const allIds = sectionPhotoIds(day.sections);
   return (
     <main className="screen" aria-labelledby="screen-title">
       <button className="back" type="button" onClick={onBack}>
@@ -313,9 +319,6 @@ function DayView({ trip, day, onBack }: { trip: Trip; day: DayInfo; onBack: () =
         ) : null}
         {readOnly && sections.length === 0 ? <p className="muted">Kein Tagesbericht für diesen Tag.</p> : null}
       </div>
-      {readOnly ? null : (
-        <DayPhotos tripId={trip.id} day={day} own={own} total={allIds.length} allIds={allIds} ensureAuthor={ensure} />
-      )}
       {dialog}
       <div className="legend">Einträge</div>
       {day.entries.length === 0 ? (

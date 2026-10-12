@@ -85,3 +85,24 @@ describe('MapScreen – GPX', () => {
     expect(screen.getByText(/1 Einträge · 1 von 2 Booten sichtbar/)).toBeInTheDocument();
   });
 });
+
+describe('MapScreen – Live-Route', () => {
+  useCleanDb();
+
+  it('Live-Karte steht vor der GPX-Karte', async () => {
+    const trip = await seedTrip();
+    renderUi(<MapScreen trip={trip} />);
+    const live = await screen.findByRole('region', { name: 'Live-Route' });
+    const gpx = screen.getByRole('region', { name: 'GPX' });
+    expect(live.compareDocumentPosition(gpx) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('focusLive (Tipp auf REC): Schalter bekommt Fokus, danach wird zurückgemeldet', async () => {
+    const trip = await seedTrip();
+    const done = vi.fn();
+    renderUi(<MapScreen trip={trip} focusLive onFocusLiveDone={done} />);
+    const toggle = await screen.findByRole('switch', { name: /Live-Route aufzeichnen/ });
+    await waitFor(() => expect(toggle).toHaveFocus());
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+});

@@ -37,7 +37,7 @@ test('Mehrfachauswahl, Duplikate pro Tag (Eintrag und Tagesbericht)', async ({ p
   // Tagesbericht: Duplikat (photo-2 hängt am Eintrag) wird übersprungen
   await page.getByRole('button', { name: 'Törn-Tage', exact: true }).click();
   await page.getByRole('button', { name: /^Tag 1,/ }).click();
-  const day = page.getByRole('region', { name: 'Fotos des Tages' });
+  const day = page.getByRole('region', { name: 'Fotos zu deinem Abschnitt' });
   await expect(day.getByText('0 / 15')).toBeVisible();
   await day.getByLabel('Galerie').setInputFiles([fx('photo-2.png'), fx('photo-1-copy.png')]);
   await expect(toast(page)).toContainText('Kein Foto hinzugefügt · 2 übersprungen (schon an diesem Tag vorhanden)');

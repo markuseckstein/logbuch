@@ -58,7 +58,7 @@ export function PhotoPicker({ maxCount, photoIds, onAdd, onRemove, progress, cou
           onChange={(ev) => pick(ev.target.files, ev.target)}
         />
         <label className="btn" htmlFor={`${uid}-gallery`} aria-disabled={disabled}>
-          <Icon name="cam" size={20} />
+          <Icon name="image" size={20} />
           Galerie
         </label>
         <input

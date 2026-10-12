@@ -11,6 +11,8 @@ const ICONS = {
   segelab: '<path d="M11 3v15M11 5l-3 11h3M5 20h14M18 6v8M15 11l3 3 3-3"/>',
   motor:
     '<circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M5.600 18.400l2.100-2.100M16.300 7.700l2.100-2.100"/>',
+  'motor-aus':
+    '<circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M5.600 18.400l2.100-2.100M16.300 7.700l2.100-2.100M4 4l16 16"/>',
   sichtung: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   sonst: '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.500"/>',
   sonne:
@@ -75,7 +77,7 @@ export const ENTRY_ICON: Record<EntryType, IconName> = {
   'sails-up': 'segelan',
   'sails-down': 'segelab',
   'engine-on': 'motor',
-  'engine-off': 'motor',
+  'engine-off': 'motor-aus',
   sighting: 'sichtung',
   other: 'sonst',
 };

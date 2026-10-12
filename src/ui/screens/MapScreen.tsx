@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { pickFile } from '../../device';
 import { db } from '../../db/db';
 import { useAllBoats } from '../../db/hooks';
@@ -155,8 +155,20 @@ function GpxCard({ trip, tracks }: { trip: Trip; tracks: readonly Track[] }) {
   );
 }
 
-function LiveCard() {
+function LiveCard({ focus, onFocused }: { focus: boolean; onFocused: () => void }) {
   const live = useLiveRoute();
+  const toggleBtn = useRef<HTMLButtonElement>(null);
+  const doneRef = useRef(onFocused);
+  useEffect(() => {
+    doneRef.current = onFocused;
+  });
+  // Tipp auf REC: Schalter in den sichtbaren Bereich holen und fokussieren
+  useEffect(() => {
+    if (!focus) return;
+    toggleBtn.current?.focus({ preventScroll: true });
+    toggleBtn.current?.scrollIntoView?.({ block: 'center' });
+    doneRef.current();
+  }, [focus]);
   const { selected, boats } = useBoatSelection();
   const [choosing, setChoosing] = useState(false);
   const recording = boats.find((b) => b.id === live.boatId);
@@ -167,7 +179,7 @@ function LiveCard() {
   };
   return (
     <section className="card" aria-label="Live-Route">
-      <button className="toggle" type="button" role="switch" aria-checked={live.active} onClick={toggle}>
+      <button ref={toggleBtn} className="toggle" type="button" role="switch" aria-checked={live.active} onClick={toggle}>
         <span className="track" />
         <span>
           <b>Live-Route aufzeichnen</b>
@@ -197,7 +209,14 @@ function LiveCard() {
   );
 }
 
-export function MapScreen({ trip }: { trip: Trip }) {
+interface MapScreenProps {
+  trip: Trip;
+  /** Tipp auf REC: Live-Route-Schalter fokussieren und in den Blick scrollen. */
+  focusLive?: boolean;
+  onFocusLiveDone?: () => void;
+}
+
+export function MapScreen({ trip, focusLive = false, onFocusLiveDone }: MapScreenProps) {
   const data = useTripDays(trip);
   const readOnly = useReadOnly(trip.id);
   const { openEntry } = useApp();
@@ -289,8 +308,8 @@ export function MapScreen({ trip }: { trip: Trip }) {
       ) : null}
       {readOnly ? null : (
         <>
+          <LiveCard focus={focusLive} onFocused={() => onFocusLiveDone?.()} />
           <GpxCard trip={trip} tracks={data.tracks} />
-          <LiveCard />
         </>
       )}
     </main>

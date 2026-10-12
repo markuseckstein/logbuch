@@ -30,6 +30,7 @@ export function makeActions() {
     openEntry: vi.fn<AppActions['openEntry']>(),
     goTo: vi.fn<AppActions['goTo']>(),
     startOnboarding: vi.fn<AppActions['startOnboarding']>(),
+    focusLiveToggle: vi.fn<AppActions['focusLiveToggle']>(),
   };
 }
 

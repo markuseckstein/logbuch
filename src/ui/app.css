@@ -6,7 +6,7 @@
 .brand b{display:block;font:600 13px var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
 .brand span{display:block;font-size:14px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .icon-btn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
-.rec{font:600 12px var(--font-mono);color:var(--magenta);display:flex;align-items:center;gap:6px}
+.rec{font:600 12px var(--font-mono);color:var(--magenta);display:flex;align-items:center;gap:6px;min-height:44px;padding:0 4px;white-space:nowrap;text-decoration:underline;text-underline-offset:3px}
 .rec i{width:10px;height:10px;border-radius:50%;background:var(--magenta)}
 .screen{padding:16px}
 .screen>*+*{margin-top:16px}
