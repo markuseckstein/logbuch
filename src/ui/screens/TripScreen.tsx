@@ -337,8 +337,8 @@ function BoatCard({
   const suggested = people.filter((p) => p.suggestedBoatId === boat.id);
   return (
     <article className="card bcard" style={boatColor(boat)} aria-label={`Boot ${boat.name}`}>
-      <BoatPhoto boat={boat} />
       <div className="bc-head">
+        <BoatPhoto boat={boat} />
         <div>
           <h3>{boat.name}</h3>
           <div className="muted">
@@ -599,17 +599,22 @@ function PersonRow({
       </div>
       {admin ? (
         <div className="mem-acts">
-          <label className="sr-only" htmlFor={`pre-${p.crewId}`}>
-            Boot-Vorschlag für {p.name}
-          </label>
-          <select id={`pre-${p.crewId}`} value={p.suggestedBoatId ?? ''} onChange={(e) => void setSuggestion(e.target.value)}>
-            <option value="">Kein Vorschlag</option>
-            {boats.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+          <div className="sugg-row">
+            <label htmlFor={`pre-${p.crewId}`}>Boot-Vorschlag:</label>
+            <select
+              id={`pre-${p.crewId}`}
+              aria-label={`Boot-Vorschlag für ${p.name}`}
+              value={p.suggestedBoatId ?? ''}
+              onChange={(e) => void setSuggestion(e.target.value)}
+            >
+              <option value="">Kein Vorschlag</option>
+              {boats.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
           {signedIn && p.email && !p.self ? (
             <button className="btn sm" type="button" aria-label={`QR-Code für ${p.name}`} onClick={() => setQrOpen(true)}>
               QR-Code
@@ -658,7 +663,11 @@ function PeopleCard({ trip, boats, people, admin }: { trip: Trip; boats: readonl
 function IdentityCard({ trip }: { trip: Trip }) {
   const toast = useToast();
   const me = useMyCrewId(trip.id);
-  const crew = activeCrew(useTripCrew(trip.id));
+  const people = usePeople(trip.id);
+  // Nur Personen ohne E-Mail oder die schon dabei sind (vorgemerkte Adressen schreiben nicht auf diesem Gerät)
+  const crew = activeCrew(useTripCrew(trip.id)).filter(
+    (c) => !c.email || people.find((p) => p.crewId === c.id)?.status === 'accepted' || c.id === me,
+  );
   if (crew.length < 2) return null;
   return (
     <section className="card" aria-label="Ich bin …">
@@ -832,6 +841,15 @@ export function TripScreen({ trip }: { trip: Trip }) {
       <CoverHero trip={trip} admin={admin} />
       <AccountCard trip={trip} admin={admin} myName={me?.name} />
       {cloud === 'local' || cloud === 'signed-out' ? <IdentityCard trip={trip} /> : null}
+      <div className="legend">Crew · {people.length}</div>
+      {admin && cloud !== 'local' ? <InviteCard trip={trip} boats={boats} people={people} /> : null}
+      {!admin ? (
+        <div className="card" style={{ borderStyle: 'dashed', background: 'transparent' }}>
+          <p className="muted">Nur der Admin lädt Personen ein und legt Boote an.</p>
+        </div>
+      ) : null}
+      <PeopleCard trip={trip} boats={boats} people={people} admin={admin} />
+      {admin && signedIn ? <HomeViewCard trip={trip} /> : null}
       <div className="legend">Boote · {boats.length}</div>
       {boats.map((b) => (
         <BoatCard
@@ -845,15 +863,6 @@ export function TripScreen({ trip }: { trip: Trip }) {
         />
       ))}
       {admin ? <AddBoatCard trip={trip} /> : null}
-      <div className="legend">Crew · {people.length}</div>
-      {admin && cloud !== 'local' ? <InviteCard trip={trip} boats={boats} people={people} /> : null}
-      {!admin ? (
-        <div className="card" style={{ borderStyle: 'dashed', background: 'transparent' }}>
-          <p className="muted">Nur der Admin lädt Personen ein und legt Boote an.</p>
-        </div>
-      ) : null}
-      <PeopleCard trip={trip} boats={boats} people={people} admin={admin} />
-      {admin && signedIn ? <HomeViewCard trip={trip} /> : null}
       <TripDataCard key={`data-${trip.id}`} trip={trip} admin={admin} />
       {trips ? <TripList trips={trips} activeId={trip.id} /> : null}
       <ExportCard trip={trip} />

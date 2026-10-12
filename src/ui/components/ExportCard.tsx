@@ -71,8 +71,7 @@ export function ExportCard({ trip }: { trip: Trip }) {
         </div>
       ) : null}
       <p className="muted">
-        Sichere den Törn regelmäßig (ZIP) und lege die Datei an einem zweiten Ort ab – die Daten liegen nur in diesem
-        Browser. Beim Import werden Einträge mit dem vorhandenen Logbuch zusammengeführt.
+        Sichere den Törn regelmäßig als ZIP an einem zweiten Ort.
       </p>
     </section>
   );

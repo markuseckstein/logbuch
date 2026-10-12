@@ -427,3 +427,8 @@ label.f>.err{margin-top:6px}
 .home-retry{min-height:64px;font-size:21px}
 .chartmap.calm{height:40vh;min-height:240px;max-height:420px}
 .home-maphint{margin:4px 0 0}
+/* Törn-Tab: Boote kompakt (72-px-Bild neben dem Namen), Boot-Vorschlag mit sichtbarem Label */
+.bc-head>.boatpic{flex:none;width:72px;height:72px}
+.sugg-row{display:flex;align-items:center;gap:8px;flex:1 1 100%}
+.sugg-row label{flex:none;font-size:14px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.sugg-row select{flex:1;min-width:0}
