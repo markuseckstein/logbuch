@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { LogbookDB } from './db';
 import {
-  addPhotosToDayReport, createTrip, deleteDayReport, getDayReport, getPhoto, listDayReports, upsertDayReport,
+  addBoat, addPhotosToDayReport, createTrip, deleteDayReport, getDayReport, getPhoto, listDayReports, removeBoat, setBoatPhoto,
+  upsertDayReport,
 } from './repo';
 import { dispose, freshDb, tripInput } from './test-helpers';
 
@@ -30,5 +31,14 @@ describe('day report written again after it was deleted', () => {
     const [fresh] = await addPhotosToDayReport(db, tripId, '2026-07-01', [photo('c')]);
     const [report] = await listDayReports(db, tripId);
     expect(report?.photoIds).toEqual([fresh!.id]);
+  });
+});
+
+describe('removeBoat', () => {
+  it('also removes the file of the boat photo (no orphan)', async () => {
+    const extra = await addBoat(db, tripId, { name: 'Zweitboot' });
+    const p = await setBoatPhoto(db, extra.id, photo('boat'));
+    await removeBoat(db, extra.id);
+    expect(await getPhoto(db, p.id)).toBeUndefined();
   });
 });
