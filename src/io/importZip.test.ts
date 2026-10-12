@@ -77,6 +77,21 @@ describe('importZip', () => {
     await expect(importZip(mk(base))).rejects.toThrow(/unvollständig/);
   });
 
+  it('rejects records that belong to another trip or have no id (would be written into a foreign trip)', async () => {
+    const mk = (o: object) => new Blob([zipSync({ 'logbook.json': strToU8(JSON.stringify(o)) }) as Uint8Array<ArrayBuffer>]);
+    const text = new TextDecoder().decode(await blobToBytes(await exportJson(sampleBundle())));
+    const good = JSON.parse(text) as { entries: { tripId?: string; id?: string }[]; trip: { id?: string } };
+    const foreign = structuredClone(good);
+    foreign.entries[0]!.tripId = 'other-trip';
+    await expect(importZip(mk(foreign))).rejects.toThrow(/beschädigt/);
+    const noId = structuredClone(good);
+    delete noId.trip.id;
+    await expect(importZip(mk(noId))).rejects.toThrow(/beschädigt/);
+    const noEntryId = structuredClone(good);
+    delete noEntryId.entries[0]!.id;
+    await expect(importZip(mk(noEntryId))).rejects.toThrow(/beschädigt/);
+  });
+
   it('rejects a missing image file', async () => {
     const bundle = sampleBundle();
     const z = unzipWithout(await exportZip(bundle), 'images/p1.jpg');

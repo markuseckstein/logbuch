@@ -371,7 +371,7 @@ export async function updateBoat(db: LogbookDB, boatId: ID, patch: BoatPatch): P
 /** Admin: removes a boat without entries/tracks (tombstone); its crew suggestions are cleared. */
 export async function removeBoat(db: LogbookDB, boatId: ID): Promise<void> {
   const device = await getDeviceId(db);
-  await rw(db, [db.boats, db.entries, db.tracks], async () => {
+  await rw(db, [db.boats, db.entries, db.tracks, db.photos], async () => {
     const boat = await db.boats.get(boatId);
     if (!boat || boat.deletedAt !== undefined) return;
     await assertAdmin(db, boat.tripId);
@@ -384,6 +384,7 @@ export async function removeBoat(db: LogbookDB, boatId: ID): Promise<void> {
     if (activeBoats(boats).length <= 1) throw new LastBoatError();
     const at = nextAt(boat.updatedAt);
     await db.boats.update(boatId, { deletedAt: at, updatedAt: at, updatedBy: device });
+    if (boat.photoId) await db.photos.bulkDelete(await deletablePhotoIds(db, [boat.photoId]));
     for (const c of await db.crewMembers.where('tripId').equals(boat.tripId).toArray()) {
       if (c.suggestedBoatId === boatId) {
         await db.crewMembers.update(c.id, { suggestedBoatId: undefined, updatedAt: nextAt(c.updatedAt), updatedBy: device });
@@ -821,9 +822,9 @@ export async function addPhotosToDayReport(
   });
   if (existing) {
     await db.transaction('rw', db.dayReports, async () => {
-      await db.dayReports.update(id, {
-        photoIds: add(photos.map((p) => p.id)), deletedAt: undefined, updatedAt: nextAt(existing.updatedAt), updatedBy: device,
-      });
+      // a deleted section lost its photo files: start over with the new ones (plain array, no array operation)
+      const photoIds = existing.deletedAt !== undefined ? photos.map((p) => p.id) : add(photos.map((p) => p.id));
+      await db.dayReports.update(id, { photoIds, deletedAt: undefined, updatedAt: nextAt(existing.updatedAt), updatedBy: device });
     });
   }
   return photos;
@@ -870,8 +871,13 @@ export async function upsertDayReport(
       return report;
     }
     const at = nextAt(existing.updatedAt);
-    await db.dayReports.update(id, { title: input.title, text: input.text, deletedAt: undefined, updatedAt: at, updatedBy: device });
-    const merged: DayReport = { ...existing, text: input.text, updatedAt: at, updatedBy: device };
+    // a deleted section lost its photo files: do not bring the stale ids back
+    const revived = existing.deletedAt !== undefined;
+    await db.dayReports.update(id, {
+      title: input.title, text: input.text, deletedAt: undefined, updatedAt: at, updatedBy: device,
+      ...(revived ? { photoIds: [] } : {}),
+    });
+    const merged: DayReport = { ...existing, text: input.text, updatedAt: at, updatedBy: device, ...(revived ? { photoIds: [] } : {}) };
     delete merged.deletedAt;
     if (input.title !== undefined) merged.title = input.title;
     else delete merged.title;

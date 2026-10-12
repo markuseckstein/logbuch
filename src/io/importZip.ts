@@ -31,6 +31,17 @@ function validate(raw: unknown): LogbookJsonV4 {
   ) {
     throw new ImportFormatError('Der Logbuch-Export ist unvollständig oder beschädigt.');
   }
+  // Every record needs an id and must belong to the trip of the file: the merge writes records with their own
+  // tripId, so a hand-edited or mixed-up file would otherwise put data into a foreign trip.
+  const tripId = raw.trip.id;
+  const ownRecord = (r: unknown): boolean => isRecord(r) && typeof r.id === 'string' && r.id !== '' && r.tripId === tripId;
+  const lists = [raw.boats, raw.crew, raw.entries, raw.dayReports, raw.tracks, raw.trackChunks] as unknown[][];
+  if (
+    typeof tripId !== 'string' || tripId === '' || !lists.every((l) => l.every(ownRecord))
+    || !(raw.photos as unknown[]).every((p) => isRecord(p) && typeof p.id === 'string' && p.id !== '')
+  ) {
+    throw new ImportFormatError('Der Logbuch-Export ist unvollständig oder beschädigt.');
+  }
   return raw as unknown as LogbookJsonV4;
 }
 
