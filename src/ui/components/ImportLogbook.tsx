@@ -84,8 +84,8 @@ export function ImportLogbook() {
       {confirmNew ? (
         <Dialog title={`Törn importieren: ${confirmNew.trip.name}`} onClose={() => setConfirmNew(undefined)}>
           <p className="muted">
-            Du bist mit der Cloud angemeldet. Ist dieser Törn dort schon geteilt, lass dich lieber einladen: eine
-            importierte Kopie würde beim Abgleich mit der Cloud-Fassung kollidieren und wieder entfernt.
+            Du bist angemeldet. Ist dieser Törn schon mit der Crew geteilt, lass dich lieber einladen: eine
+            importierte Kopie würde sich mit der geteilten Fassung überschneiden und wieder entfernt.
           </p>
           <div className="share-choice">
             <button

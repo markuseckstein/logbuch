@@ -21,7 +21,7 @@ export function RejectedChangesBanner() {
   const prev = useRef({ count: 0, discarded: false });
   useEffect(() => {
     if (prev.current.count > 0 && items.length === 0 && !prev.current.discarded) {
-      toast('Zuvor abgelehnte Änderungen sind jetzt in der Cloud');
+      toast('Zuvor abgelehnte Änderungen sind jetzt übertragen');
     }
     prev.current = { count: items.length, discarded: false };
   }, [items.length, toast]);

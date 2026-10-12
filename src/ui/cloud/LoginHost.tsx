@@ -9,7 +9,7 @@ const TITLES: Record<DXCUserInteraction['type'], string> = {
   otp: 'Code eingeben',
   'message-alert': 'Hinweis',
   'logout-confirmation': 'Abmelden?',
-  generic: 'Cloud',
+  generic: 'Anmeldung',
 };
 
 function InteractionDialog({ ui }: { ui: DXCUserInteraction }) {

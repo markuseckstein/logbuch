@@ -10,10 +10,10 @@ const ICON: Record<Exclude<CloudStatus, 'local' | 'signed-out'>, IconName> = {
 };
 
 const LABEL: Record<Exclude<CloudStatus, 'local' | 'signed-out'>, string> = {
-  'in-sync': 'Cloud: synchronisiert',
-  syncing: 'Cloud: synchronisiert gerade',
-  offline: 'Cloud: offline',
-  error: 'Cloud: Fehler beim Synchronisieren',
+  'in-sync': 'Alles übertragen',
+  syncing: 'Wird übertragen',
+  offline: 'Offline – wird später übertragen',
+  error: 'Übertragen fehlgeschlagen',
 };
 
 /** Kleines Wolken-Symbol in der Topbar; nur sichtbar, wenn angemeldet. */

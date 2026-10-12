@@ -12,7 +12,7 @@ import { QrCode } from '../components/QrCode';
 /** Daheim-Link dieser App-Installation (Basis-Pfad aus Vite). */
 export const homeViewUrlFor = (token: string): string => buildHomeViewUrl(location.origin, import.meta.env.BASE_URL, token);
 
-/** Befehl zum einmaligen Freischalten (Demo-Konto anlegen, braucht die Cloud-Zugangsdaten im Projektordner). */
+/** Befehl zum einmaligen Freischalten (Demo-Konto anlegen, braucht die Zugangsdaten im Projektordner). */
 export const unlockCommand = (email: string): string => `npm run viewer:create -- ${email}`;
 
 type Confirm = 'renew' | 'disable' | undefined;
@@ -71,33 +71,41 @@ export function HomeViewCard({ trip }: { trip: Trip }) {
               <span className="st ok">geöffnet</span> Der Link funktioniert und wurde schon benutzt.
             </p>
           ) : (
-            <div className="note" role="note">
+            <div className="note warn" role="note">
+              <b>Noch nicht freigeschaltet</b>
               <p>
-                <b>Einmalig freischalten lassen:</b> Der Link funktioniert erst, nachdem jemand mit Zugang zur
-                Cloud-Verwaltung diesen Befehl im Projektordner ausgeführt hat:
+                Der Link funktioniert erst nach einer einmaligen Freischaltung. Verschicke ihn deshalb erst danach –
+                sonst sehen die Empfänger nur eine Fehlermeldung.
               </p>
-              <code className="cmd" data-testid="home-unlock">
-                {unlockCommand(info.email)}
-              </code>
-              <button
-                className="btn sm"
-                type="button"
-                onClick={() => void copyText(unlockCommand(info.email), toast, 'Befehl kopiert', 'Befehl konnte nicht kopiert werden')}
-              >
-                Befehl kopieren
-              </button>
+              <details className="opt">
+                <summary>Für die Person mit Admin-Zugang am Laptop</summary>
+                <div className="in">
+                  <p>Diesen Befehl einmal im Projektordner der App ausführen:</p>
+                  <code className="cmd" data-testid="home-unlock">
+                    {unlockCommand(info.email)}
+                  </code>
+                  <button
+                    className="btn sm"
+                    type="button"
+                    style={{ marginTop: 8 }}
+                    onClick={() => void copyText(unlockCommand(info.email), toast, 'Befehl kopiert', 'Befehl konnte nicht kopiert werden')}
+                  >
+                    Befehl kopieren
+                  </button>
+                </div>
+              </details>
               <p className="muted">Sobald der Link einmal geöffnet wurde, verschwindet dieser Hinweis.</p>
             </div>
           )}
           <button
-            className="btn primary block"
+            className={info.opened ? 'btn primary block' : 'btn block'}
             type="button"
             onClick={() =>
               void shareLink({ title: `Logbuch: ${trip.name}`, text: `Verfolge unseren Törn „${trip.name}“ live:`, url }, toast)
             }
           >
             <Icon name="mail" size={20} />
-            Link teilen
+            {info.opened ? 'Link teilen' : 'Link teilen (funktioniert erst nach Freischaltung)'}
           </button>
           <div className="acts">
             <button className="btn sm" type="button" disabled={busy} onClick={() => setConfirm('renew')}>

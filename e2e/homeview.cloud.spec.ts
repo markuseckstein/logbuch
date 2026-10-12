@@ -16,7 +16,7 @@ const PNG = Buffer.from(
   'base64',
 );
 const SYNC = { timeout: 45_000 };
-const INVALID = 'Dieser Daheim-Link ist nicht mehr gültig. Frag die Crew nach dem neuen Link.';
+const INVALID = 'Dieser Link funktioniert gerade nicht. Vielleicht ist er noch nicht freigeschaltet oder wurde erneuert – frag die Crew.';
 
 async function phone(browser: Browser): Promise<Page> {
   const context = await browser.newContext({ geolocation: { latitude: 54.3185, longitude: 10.1407, accuracy: 10 }, permissions: ['geolocation'] });
@@ -78,20 +78,20 @@ test('Cloud: Daheim-Link – Zuschauer ohne Anmeldung sieht den Törn live, erne
 
   await tab(alice, 'Törn').click();
   await alice.getByRole('region', { name: 'Konto' }).getByRole('button', { name: 'Anmelden' }).click();
-  const dlg = alice.getByRole('dialog', { name: 'Mit Cloud-Konto anmelden' });
+  const dlg = alice.getByRole('dialog', { name: 'Mit E-Mail anmelden' });
   await dlg.getByLabel('E-Mail-Adresse').fill('alice@demo.local');
   await dlg.getByRole('button', { name: 'Code anfordern' }).click();
-  await expect(alice.getByRole('region', { name: 'Konto' })).toContainText('Cloud-Konto · alice@demo.local', SYNC);
+  await expect(alice.getByRole('region', { name: 'Konto' })).toContainText('Angemeldet als alice@demo.local', SYNC);
 
   let failed = true;
   try {
     await card(alice).getByRole('button', { name: 'Daheim-Link erstellen' }).click();
     await expect(card(alice).getByRole('img', { name: /QR-Code Daheim-Link/ })).toBeVisible();
-    await expect(card(alice).getByText(/Einmalig freischalten lassen/)).toBeVisible();
+    await expect(card(alice).getByText(/Noch nicht freigeschaltet/)).toBeVisible();
     // kein Personeneintrag für den Zuschauer
     await expect(alice.getByRole('list', { name: 'Personen' })).not.toContainText('Daheim');
     const link = await readLink(alice);
-    await expect(alice.getByRole('img', { name: 'Cloud: synchronisiert' })).toBeVisible(SYNC);
+    await expect(alice.getByRole('img', { name: 'Alles übertragen' })).toBeVisible(SYNC);
 
     // --- Oma: frisches Gerät, Link öffnen – keine Eingabe. Noch nicht freigeschaltet: Hinweis + „Erneut versuchen“
     const oma = await phone(browser);

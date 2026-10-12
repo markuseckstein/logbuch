@@ -24,14 +24,14 @@ export function SignInDialog({ onClose, initialEmail = '' }: { onClose: () => vo
     }
     onClose();
     login(db, e).then(
-      () => toast('Angemeldet – Törns werden synchronisiert'),
+      () => toast('Angemeldet – Törns werden übertragen'),
       () => toast('Anmeldung abgebrochen'),
     );
   };
   return (
-    <Dialog title="Mit Cloud-Konto anmelden" onClose={onClose}>
+    <Dialog title="Mit E-Mail anmelden" onClose={onClose}>
       <p className="muted">
-        Du bekommst einen Code per E-Mail. Kein Passwort nötig. Ohne Anmeldung bleibt alles nur auf diesem Gerät.
+        Du bekommst einen Code per E-Mail. Kein Passwort nötig. Ohne Anmeldung bleibt alles nur auf diesem Handy.
       </p>
       <form
         onSubmit={(ev) => {
@@ -76,7 +76,7 @@ export function LogoutDialog({ onClose }: { onClose: () => void }) {
     onClose();
     try {
       await logout(db);
-      toast('Abgemeldet – lokale Daten wurden von diesem Gerät entfernt');
+      toast('Abgemeldet – die Törns wurden von diesem Handy entfernt');
     } catch {
       toast('Abmelden abgebrochen');
     }
@@ -84,13 +84,13 @@ export function LogoutDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title="Abmelden?" onClose={onClose}>
       <p className="muted">
-        Beim Abmelden werden alle Törns von diesem Gerät entfernt. In der Cloud bleiben sie erhalten und kommen nach
+        Beim Abmelden werden alle Törns von diesem Handy entfernt. Online bleiben sie erhalten und kommen nach
         erneuter Anmeldung zurück. Noch nicht übertragene Änderungen gehen verloren – exportiere vorher ein ZIP, wenn
         du offline bist.
       </p>
       <div className="share-choice">
         <button className="btn danger block" type="button" onClick={() => void out()}>
-          Abmelden und lokale Daten entfernen
+          Abmelden und Törns von diesem Handy entfernen
         </button>
         <button className="btn block" type="button" onClick={onClose}>
           Abbrechen
@@ -122,11 +122,11 @@ export function AccountCard({ trip, admin, myName }: { trip: Trip; admin: boolea
           <div className="muted" role="status">
             {loggedIn ? (
               <>
-                Cloud-Konto · {user.email ?? user.userId}
+                Angemeldet als {user.email ?? user.userId}
                 <br />
               </>
             ) : null}
-            {status === 'local' || status === 'signed-out' ? 'Lokaler Modus · Daten nur auf diesem Gerät' : statusLabel(status, lastSync, now)}
+            {status === 'local' || status === 'signed-out' ? 'Nur auf diesem Handy gespeichert' : statusLabel(status, lastSync, now)}
           </div>
         </div>
         {loggedIn ? (

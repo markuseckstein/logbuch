@@ -42,7 +42,7 @@ const people = (page: Page) => page.getByRole('list', { name: 'Personen' });
 async function signIn(page: Page, email: string, from: 'account' | 'join'): Promise<void> {
   if (from === 'account') await account(page).getByRole('button', { name: 'Anmelden' }).click();
   else await page.getByRole('main').getByRole('button', { name: 'Anmelden' }).click();
-  const dlg = page.getByRole('dialog', { name: 'Mit Cloud-Konto anmelden' });
+  const dlg = page.getByRole('dialog', { name: 'Mit E-Mail anmelden' });
   await dlg.getByLabel('E-Mail-Adresse').fill(email);
   await dlg.getByRole('button', { name: 'Code anfordern' }).click();
 }
@@ -104,7 +104,7 @@ test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, bei
 
   await tab(alice, 'Törn').click();
   await signIn(alice, 'alice@demo.local', 'account');
-  await expect(account(alice)).toContainText('Cloud-Konto · alice@demo.local', SYNC);
+  await expect(account(alice)).toContainText('Angemeldet als alice@demo.local', SYNC);
   await expect(account(alice).getByText('Admin')).toBeVisible();
   await invite(alice, 'bob@demo.local', b1);
   await invite(alice, 'carol@demo.local', b2);
@@ -112,7 +112,7 @@ test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, bei
   await expect(people(alice)).toContainText('carol@demo.local · Vorschlag: ' + b2);
   await expect(people(alice).getByText('eingeladen')).toHaveCount(2, SYNC);
   const link = await joinLink(alice);
-  await expect(alice.getByRole('img', { name: 'Cloud: synchronisiert' })).toBeVisible(SYNC);
+  await expect(alice.getByRole('img', { name: 'Alles übertragen' })).toBeVisible(SYNC);
 
   let failed = true;
   try {
@@ -182,17 +182,17 @@ test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, bei
     await expect(bob2.getByRole('heading', { name: 'Du wurdest zu einem Törn eingeladen' })).toBeVisible();
     expect(bob2.url()).not.toContain('email=');
     await bob2.getByRole('main').getByRole('button', { name: 'Anmelden' }).click();
-    const dlg = bob2.getByRole('dialog', { name: 'Mit Cloud-Konto anmelden' });
+    const dlg = bob2.getByRole('dialog', { name: 'Mit E-Mail anmelden' });
     await expect(dlg.getByLabel('E-Mail-Adresse')).toHaveValue('bob@demo.local');
     await dlg.getByRole('button', { name: 'Code anfordern' }).click();
     await expect(bob2.locator('.brand span')).toContainText(trip, SYNC);
     await expect(bob2.locator('.tl-item', { hasText: 'Ablegen in Kiel' })).toBeVisible(SYNC);
     await expect(bob2.getByText('Keine Einladung gefunden')).toHaveCount(0);
 
-    // (b) ohne Link: Onboarding „Ich bin eingeladen / wieder anmelden“
+    // (b) ohne Link: Onboarding „Eingeladen oder schon dabei? [Anmelden]“
     const bob3 = await phone(browser);
     await bob3.goto('/');
-    await bob3.getByRole('button', { name: 'Ich bin eingeladen / wieder anmelden' }).click();
+    await bob3.getByRole('button', { name: 'Anmelden', exact: true }).click();
     await signIn(bob3, 'bob@demo.local', 'join');
     await expect(bob3.locator('.brand span')).toContainText(trip, SYNC);
     await expect(boatSwitch(bob3).getByRole('radio', { name: b1 })).toHaveAttribute('aria-checked', 'true', SYNC);
@@ -202,7 +202,7 @@ test('Cloud: Admin legt 2 Boote an, lädt 2 Personen mit Boot-Vorschlag ein, bei
     // (c) Dave ist nirgends eingetragen: „Keine Einladung gefunden“
     const dave = await phone(browser);
     await dave.goto('/');
-    await dave.getByRole('button', { name: 'Ich bin eingeladen / wieder anmelden' }).click();
+    await dave.getByRole('button', { name: 'Anmelden', exact: true }).click();
     await signIn(dave, 'dave@demo.local', 'join');
     await expect(dave.getByRole('heading', { name: 'Keine Einladung gefunden' })).toBeVisible(SYNC);
     failed = false;

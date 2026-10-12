@@ -7,21 +7,21 @@ import { describeRejection } from '../domain';
 export function statusLabel(status: CloudStatus, lastSyncAt: number | undefined, now: number): string {
   switch (status) {
     case 'local':
-      return 'Nur auf diesem Gerät (keine Cloud eingerichtet)';
+      return 'Nur auf diesem Handy gespeichert';
     case 'signed-out':
-      return 'Nicht angemeldet – Daten nur auf diesem Gerät';
+      return 'Nicht angemeldet – nur auf diesem Handy gespeichert';
     case 'syncing':
-      return 'Synchronisiert gerade …';
+      return 'Wird übertragen …';
     case 'offline':
       return 'Offline – Änderungen werden später übertragen';
     case 'error':
-      return 'Fehler beim Synchronisieren';
+      return 'Übertragen fehlgeschlagen';
     case 'in-sync': {
-      if (lastSyncAt === undefined) return 'Synchronisiert';
+      if (lastSyncAt === undefined) return 'Alles übertragen';
       const min = Math.floor((now - lastSyncAt) / 60_000);
-      if (min < 1) return 'Synchronisiert – gerade eben';
-      if (min < 60) return `Synchronisiert vor ${min} min`;
-      return `Synchronisiert vor ${Math.floor(min / 60)} h`;
+      if (min < 1) return 'Alles übertragen · gerade eben';
+      if (min < 60) return `Alles übertragen · vor ${min} min`;
+      return `Alles übertragen · vor ${Math.floor(min / 60)} h`;
     }
   }
 }
@@ -39,10 +39,10 @@ export function alertText(a: DXCAlert): string {
       return 'Bitte eine gültige E-Mail-Adresse eingeben.';
     case 'LICENSE_LIMIT_REACHED':
     case 'NO_SEATS_AVAILABLE':
-      return 'Die Cloud hat keine freien Plätze mehr. Bitte den Skipper fragen.';
+      return 'Es sind keine Plätze mehr frei. Bitte den Skipper fragen.';
     case 'USER_NOT_REGISTERED':
     case 'USER_NOT_ACCEPTED':
-      return 'Diese E-Mail-Adresse ist für die Cloud nicht freigeschaltet.';
+      return 'Diese E-Mail-Adresse ist noch nicht freigeschaltet.';
     case 'USER_DEACTIVATED':
       return 'Dieses Konto ist deaktiviert.';
     case 'LOGOUT_CONFIRMATION':

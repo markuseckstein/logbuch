@@ -20,6 +20,9 @@ function useNow(intervalMs = 30_000): number {
   return now;
 }
 
+/** Touch-Gerät ohne Maus: dort lässt die ruhige Karte das Ein-Finger-Verschieben weg. */
+const touchOnly = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
+
 function Hero({ trip }: { trip: Trip }) {
   const url = usePhotoUrl(trip.coverPhotoId);
   const meta = [tripPeriod(trip), trip.area].filter(Boolean).join(' · ');
@@ -148,7 +151,8 @@ export function HomeViewScreen({ trip }: { trip: Trip }) {
           <Icon name="wolke-ok" size={22} />
           {last === undefined ? 'Noch keine Einträge' : `Zuletzt aktualisiert ${formatAgo(last, now)}`}
         </p>
-        <ChartMap label="Karte aller Boote" layers={layers} fitKey={`${data.entries.length}:${data.tracks.length}`} />
+        <ChartMap calm label="Karte aller Boote" layers={layers} fitKey={`${data.entries.length}:${data.tracks.length}`} />
+        {touchOnly ? <p className="muted home-maphint">Zum Verschieben der Karte zwei Finger benutzen.</p> : null}
         <ul className="home-boats" aria-label="Boote">
           {boats.map((b) => (
             <li key={b.id}>

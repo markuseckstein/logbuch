@@ -27,6 +27,8 @@ export interface ChartMapProps {
   fitKey: string;
   label: string;
   compact?: boolean;
+  /** Ruhige Karte (Daheim): ca. 40 vh hoch, auf Touch-Geräten ohne Ein-Finger-Verschieben, damit das Wischen die Seite scrollt. */
+  calm?: boolean;
   /** Letzte bekannte Position, falls keine Daten vorhanden sind. */
   fallback?: LatLon;
 }
@@ -134,7 +136,7 @@ interface MapState {
 }
 
 /** Leaflet-Seekarte (OSM-Kacheln auf Wasserfarbe + Gradnetz, damit sie auch ohne Kacheln lesbar bleibt). */
-export function ChartMap({ layers, onOpenEntry, fitKey, label, compact = false, fallback }: ChartMapProps) {
+export function ChartMap({ layers, onOpenEntry, fitKey, label, compact = false, calm = false, fallback }: ChartMapProps) {
   const host = useRef<HTMLDivElement>(null);
   const state = useRef<MapState | null>(null);
   const openRef = useRef(onOpenEntry);
@@ -155,7 +157,7 @@ export function ChartMap({ layers, onOpenEntry, fitKey, label, compact = false, 
       zoomAnimation: false,
       fadeAnimation: false,
       markerZoomAnimation: false,
-      dragging: !(compact && L.Browser.mobile),
+      dragging: !((compact || calm) && L.Browser.mobile),
       maxZoom: 18,
     });
     map.attributionControl.setPrefix(false);
@@ -207,7 +209,7 @@ export function ChartMap({ layers, onOpenEntry, fitKey, label, compact = false, 
       state.current = null;
       fitState.current = { key: '', sized: false };
     };
-  }, [compact]);
+  }, [compact, calm]);
 
   // Daten + Farben zeichnen (Farben bei jedem Theme-Wechsel neu aus den CSS-Variablen).
   useEffect(() => {
@@ -272,7 +274,7 @@ export function ChartMap({ layers, onOpenEntry, fitKey, label, compact = false, 
     <div className="mapframe">
       <div
         ref={host}
-        className={compact ? 'chartmap compact' : 'chartmap'}
+        className={compact ? 'chartmap compact' : calm ? 'chartmap calm' : 'chartmap'}
         role="group"
         aria-label={label}
         data-testid="chart-map"

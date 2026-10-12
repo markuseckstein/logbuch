@@ -56,7 +56,7 @@ describe('HomeViewApp (Daheim-Link)', () => {
     vi.mocked(login).mockRejectedValueOnce(new Error('Demo user not found'));
     open();
     renderApp();
-    expect(await screen.findByText('Dieser Daheim-Link ist nicht mehr gültig. Frag die Crew nach dem neuen Link.')).toBeInTheDocument();
+    expect(await screen.findByText('Dieser Link funktioniert gerade nicht. Vielleicht ist er noch nicht freigeschaltet oder wurde erneuert – frag die Crew.')).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Erneut versuchen' }));
     await waitFor(() => expect(login).toHaveBeenCalledTimes(2));
   });
@@ -100,7 +100,7 @@ describe('HomeViewApp (Daheim-Link)', () => {
     open();
     renderApp();
     expect(screen.getByRole('heading', { name: 'Törn wird geladen …' })).toBeInTheDocument();
-    expect(await screen.findByText(/Dieser Daheim-Link ist nicht mehr gültig/, undefined, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByText(/Dieser Link funktioniert gerade nicht/, undefined, { timeout: 8000 })).toBeInTheDocument();
     // Törn kommt per Sync an (geteilter Realm)
     const trip = await seedTrip('Ostsee');
     await moveTripToRealm(db, trip.id, `rlm~${trip.id}`, { name: 'Ostsee', represents: 'einen Törn' });
@@ -111,7 +111,7 @@ describe('HomeViewApp (Daheim-Link)', () => {
   it('kaputter Link: „nicht mehr gültig“ ohne Anmeldeversuch', async () => {
     open('abc');
     renderApp();
-    expect(screen.getByText(/Dieser Daheim-Link ist nicht mehr gültig/)).toBeInTheDocument();
+    expect(screen.getByText(/Dieser Link funktioniert gerade nicht/)).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 20));
     expect(login).not.toHaveBeenCalled();
   });

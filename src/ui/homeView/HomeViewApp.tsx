@@ -10,7 +10,7 @@ import { CloudLoginHost } from '../cloud/LoginHost';
 import { HomeViewScreen } from './HomeViewScreen';
 import { clearHomeViewToken, useHomeViewToken } from './state';
 
-/** Nach dem Abgleich so lange warten, bevor „nicht mehr gültig“ erscheint (Einladung/Törn treffen verzögert ein). */
+/** Nach dem Abgleich so lange warten, bevor „Link funktioniert nicht“ erscheint (Einladung/Törn treffen verzögert ein). */
 const SETTLE_MS = 5000;
 
 function Notice({ title, children }: { title: string; children: ReactNode }) {
@@ -37,15 +37,12 @@ function Loading() {
 
 function Invalid({ onRetry }: { onRetry?: () => void }) {
   return (
-    <Notice title="Link nicht gültig">
-      <p role="alert">Dieser Daheim-Link ist nicht mehr gültig. Frag die Crew nach dem neuen Link.</p>
+    <Notice title="Link funktioniert gerade nicht">
+      <p role="alert">Dieser Link funktioniert gerade nicht. Vielleicht ist er noch nicht freigeschaltet oder wurde erneuert – frag die Crew.</p>
       {onRetry ? (
-        <>
-          <p className="muted">Gerade erst bekommen? Dann ist er vielleicht noch nicht freigeschaltet.</p>
-          <button className="btn block" type="button" onClick={onRetry}>
-            Erneut versuchen
-          </button>
-        </>
+        <button className="btn primary block home-retry" type="button" onClick={onRetry}>
+          Erneut versuchen
+        </button>
       ) : null}
     </Notice>
   );

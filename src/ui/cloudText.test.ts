@@ -4,17 +4,17 @@ import { alertText, rejectedText, statusLabel } from './cloudText';
 describe('statusLabel', () => {
   const now = Date.UTC(2026, 7, 10, 12, 0);
   it('describes every state in German', () => {
-    expect(statusLabel('local', undefined, now)).toBe('Nur auf diesem Gerät (keine Cloud eingerichtet)');
-    expect(statusLabel('signed-out', undefined, now)).toBe('Nicht angemeldet – Daten nur auf diesem Gerät');
-    expect(statusLabel('syncing', undefined, now)).toBe('Synchronisiert gerade …');
+    expect(statusLabel('local', undefined, now)).toBe('Nur auf diesem Handy gespeichert');
+    expect(statusLabel('signed-out', undefined, now)).toBe('Nicht angemeldet – nur auf diesem Handy gespeichert');
+    expect(statusLabel('syncing', undefined, now)).toBe('Wird übertragen …');
     expect(statusLabel('offline', undefined, now)).toBe('Offline – Änderungen werden später übertragen');
-    expect(statusLabel('error', undefined, now)).toBe('Fehler beim Synchronisieren');
+    expect(statusLabel('error', undefined, now)).toBe('Übertragen fehlgeschlagen');
   });
   it('in sync: how long ago', () => {
-    expect(statusLabel('in-sync', now - 20_000, now)).toBe('Synchronisiert – gerade eben');
-    expect(statusLabel('in-sync', now - 5 * 60_000, now)).toBe('Synchronisiert vor 5 min');
-    expect(statusLabel('in-sync', now - 3 * 3_600_000, now)).toBe('Synchronisiert vor 3 h');
-    expect(statusLabel('in-sync', undefined, now)).toBe('Synchronisiert');
+    expect(statusLabel('in-sync', now - 20_000, now)).toBe('Alles übertragen · gerade eben');
+    expect(statusLabel('in-sync', now - 5 * 60_000, now)).toBe('Alles übertragen · vor 5 min');
+    expect(statusLabel('in-sync', now - 3 * 3_600_000, now)).toBe('Alles übertragen · vor 3 h');
+    expect(statusLabel('in-sync', undefined, now)).toBe('Alles übertragen');
   });
 });
 

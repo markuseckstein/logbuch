@@ -152,7 +152,7 @@ export function JoinScreen() {
           <Icon name="mail" size={20} />
           Anmelden
         </button>
-        <p className="muted">Der Code kommt per Mail von Dexie Cloud – schau ggf. im Spam-Ordner nach.</p>
+        <p className="muted">Der Code kommt per E-Mail (Absender: Dexie Cloud) – schau ggf. im Spam-Ordner nach.</p>
         <button className="btn block" type="button" onClick={clearJoin}>
           Abbrechen
         </button>

@@ -2,7 +2,7 @@ import type { Boat, LogEntry, Track, TrackPoint, Trip } from '../domain/types';
 import { ENTRY_TYPE_LABELS } from '../domain/labels';
 
 export class GpxParseError extends Error {
-  constructor(message = 'Die GPX-Datei ist kein gültiges XML.') {
+  constructor(message = 'Diese Datei ist keine lesbare GPX-Datei.') {
     super(message);
     this.name = 'GpxParseError';
   }

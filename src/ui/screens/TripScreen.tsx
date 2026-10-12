@@ -755,7 +755,7 @@ function DeleteTripCard({ trip, admin, signedIn }: { trip: Trip; admin: boolean;
         <Dialog title={shared ? 'Törn für alle löschen?' : 'Törn löschen?'} onClose={() => setConfirming(false)}>
           <p className="muted">
             {shared
-              ? `„${trip.name}“ wird in der Cloud und auf allen Handys der Crew gelöscht. Exportiere den Törn vorher als ZIP, wenn du ihn behalten willst.`
+              ? `„${trip.name}“ wird für die ganze Crew auf allen Handys gelöscht. Exportiere den Törn vorher als ZIP, wenn du ihn behalten willst.`
               : `Einträge, Fotos und Tracks von „${trip.name}“ werden nur auf diesem Gerät gelöscht. Exportierte Dateien bleiben unberührt.`}
           </p>
           <div className="share-choice">
