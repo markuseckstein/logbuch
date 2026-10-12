@@ -821,9 +821,9 @@ export async function addPhotosToDayReport(
   });
   if (existing) {
     await db.transaction('rw', db.dayReports, async () => {
-      await db.dayReports.update(id, {
-        photoIds: add(photos.map((p) => p.id)), deletedAt: undefined, updatedAt: nextAt(existing.updatedAt), updatedBy: device,
-      });
+      // a deleted section lost its photo files: start over with the new ones (plain array, no array operation)
+      const photoIds = existing.deletedAt !== undefined ? photos.map((p) => p.id) : add(photos.map((p) => p.id));
+      await db.dayReports.update(id, { photoIds, deletedAt: undefined, updatedAt: nextAt(existing.updatedAt), updatedBy: device });
     });
   }
   return photos;
@@ -870,8 +870,13 @@ export async function upsertDayReport(
       return report;
     }
     const at = nextAt(existing.updatedAt);
-    await db.dayReports.update(id, { title: input.title, text: input.text, deletedAt: undefined, updatedAt: at, updatedBy: device });
-    const merged: DayReport = { ...existing, text: input.text, updatedAt: at, updatedBy: device };
+    // a deleted section lost its photo files: do not bring the stale ids back
+    const revived = existing.deletedAt !== undefined;
+    await db.dayReports.update(id, {
+      title: input.title, text: input.text, deletedAt: undefined, updatedAt: at, updatedBy: device,
+      ...(revived ? { photoIds: [] } : {}),
+    });
+    const merged: DayReport = { ...existing, text: input.text, updatedAt: at, updatedBy: device, ...(revived ? { photoIds: [] } : {}) };
     delete merged.deletedAt;
     if (input.title !== undefined) merged.title = input.title;
     else delete merged.title;
