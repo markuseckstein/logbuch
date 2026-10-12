@@ -1,15 +1,12 @@
 # Projektstatus und Übergabe
 
-Stand: 2026-10-11 abends. Alles ist auf `main` gepusht und live auf https://markuseckstein.github.io/logbuch/ (GitHub Pages, Deploy per Push).
+Stand: 2026-10-12 (UX-Umsetzung lokal committet, noch nicht gepusht). Alles ist auf `main` gepusht und live auf https://markuseckstein.github.io/logbuch/ (GitHub Pages, Deploy per Push).
 
-## Nächster Schritt (2026-10-12)
-**UX-Verbesserungen umsetzen** nach `docs/ux-review-2026-10-11.md`.
-- Dort stehen die Entscheidung (welche Befundnummern), die Präzisierungen und alle Befunde.
-- Ein erster Umsetzungsversuch wurde vor Beginn abgebrochen; der Code ist unverändert.
-- Ablauf wie bisher:
-  1. Ein Subagent setzt um und committet lokal.
-  2. Der Koordinator prüft selbst: `npm test`, `typecheck`, `lint`, `build`, `e2e`, `e2e:cloud`.
-  3. Danach pushen, Deploy abwarten und live prüfen (Smoke-Test).
+## Nächster Schritt
+**UX-Review umgesetzt (2026-10-12)**, siehe `docs/ux-review-2026-10-11.md` (bewusst offen: 6, 7, 15).
+- Offen bleiben die Punkte unter „Offen / vor dem echten Törn“.
+- Vor dem Törn: Pro-Plan buchen, eigene Test-DB für die Cloud-E2E, Daheim-Link erstellen und freischalten.
+- Danach pushen, Deploy abwarten und live prüfen (Smoke-Test).
 
 ## Was fertig ist
 - **PWA-Grundlagen:**

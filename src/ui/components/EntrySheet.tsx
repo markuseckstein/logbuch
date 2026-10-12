@@ -160,13 +160,14 @@ function PositionSection({ entry, manual }: { entry: LogEntry; manual: ManualPos
   const blocked = useLocationBlocked(!entry.position);
   const details = useRef<HTMLDetailsElement>(null);
   const latInput = useRef<HTMLInputElement>(null);
+  const lonInput = useRef<HTMLInputElement>(null);
   const stopRef = useRef<(() => void) | undefined>(undefined);
   useEffect(() => () => stopRef.current?.(), []);
   // Eingabefehler (auch beim Schließen): Bereich aufklappen und ans Feld springen
   useEffect(() => {
     if (!manual.error) return;
     if (details.current) details.current.open = true;
-    latInput.current?.focus();
+    (manual.error.startsWith('Länge') ? lonInput : latInput).current?.focus();
   }, [manual.error]);
 
   const capture = async (): Promise<void> => {
@@ -240,6 +241,7 @@ function PositionSection({ entry, manual }: { entry: LogEntry; manual: ManualPos
             <label className="f">
               <span>Länge (z. B. 010°08,4 E)</span>
               <input
+                ref={lonInput}
                 type="text"
                 inputMode="text"
                 autoComplete="off"
