@@ -10,3 +10,4 @@ playwright-report
 dexie-cloud.json
 dexie-cloud.key
 .env.local
+.claude/worktrees/
