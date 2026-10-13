@@ -31,7 +31,7 @@ Stand: 2026-10-12 (UX-Umsetzung lokal committet, noch nicht gepusht). Alles ist 
   - Setup und Befehle: `docs/dexie-cloud-setup.md`.
   - Recherche und Spikes: `docs/research/dexie-cloud-integration.md` (§9.9 Rechte, §9.10 Demo-Konten/Daheim).
 - **`dexie-cloud.key`** (Admin-Zugang, gitignored, nur lokal): nie lesen, ausgeben oder in Client-Code einbetten. Die CLI darf ihn benutzen.
-- **Daten:** Am 2026-10-11 wurden alle alten Realms gelöscht; die Cloud enthält danach nur neue Daten.
+- **Daten:** Am 2026-10-13 auf Wunsch komplett geleert (alle Törns, privater Rest bei test1, altes Daheim-Konto). Übrig: Schema, Rollen, `rlm-public` und die E2E-Demo-Konten alice–dave.
 - **Demo-Konten alice/bob/carol/dave@demo.local** gibt es nur für die Cloud-E2E. Jeder, der die DB-URL kennt, kann sich damit anmelden.
 - **Cloud-E2E:** `npm run e2e:cloud` (workers: 1). Die Tests räumen ihre Törns und Daheim-Konten selbst auf.
 
