@@ -5,7 +5,7 @@ Stand: 2026-10-12 (UX-Umsetzung lokal committet, noch nicht gepusht). Alles ist 
 ## Nächster Schritt
 **UX-Review umgesetzt (2026-10-12)**, siehe `docs/ux-review-2026-10-11.md` (bewusst offen: 6, 7, 15).
 - Offen bleiben die Punkte unter „Offen / vor dem echten Törn“.
-- Vor dem Törn: Pro-Plan buchen, eigene Test-DB für die Cloud-E2E, Daheim-Link erstellen und freischalten.
+- Vor dem Törn: echte Teilnehmer im Dexie-Manager auf Produktion hochstufen, eigene Test-DB für die Cloud-E2E, Daheim-Link erstellen und freischalten.
 - Danach pushen, Deploy abwarten und live prüfen (Smoke-Test).
 
 ## Was fertig ist
@@ -27,7 +27,7 @@ Stand: 2026-10-12 (UX-Umsetzung lokal committet, noch nicht gepusht). Alles ist 
 - **Absicherung gegen stille Sync-Ablehnungen:** `syncRescue` mit Banner „Erneut senden/Verwerfen“.
 
 ## Dexie Cloud
-- **Datenbank:** https://z8c8mdzxf.dexie.cloud (Azure US East), derzeit Free-Plan.
+- **Datenbank:** https://z8c8mdzxf.dexie.cloud (Azure US East), Pro-Plan seit 2026-10-13 (25 Plätze).
   - Setup und Befehle: `docs/dexie-cloud-setup.md`.
   - Recherche und Spikes: `docs/research/dexie-cloud-integration.md` (§9.9 Rechte, §9.10 Demo-Konten/Daheim).
 - **`dexie-cloud.key`** (Admin-Zugang, gitignored, nur lokal): nie lesen, ausgeben oder in Client-Code einbetten. Die CLI darf ihn benutzen.
@@ -36,7 +36,12 @@ Stand: 2026-10-12 (UX-Umsetzung lokal committet, noch nicht gepusht). Alles ist 
 - **Cloud-E2E:** `npm run e2e:cloud` (workers: 1). Die Tests räumen ihre Törns und Daheim-Konten selbst auf.
 
 ## Offen / vor dem echten Törn
-- **Dexie Pro-Plan buchen** (ab ca. 3 €/Monat für 25 Plätze). Der Free-Plan erlaubt nur 3 Produktionsnutzer.
+- **Teilnehmer auf Produktion hochstufen** (Pro ist gebucht, 2026-10-13). Neue Nutzer starten auch mit Pro als *Evaluation*-Nutzer: nach 30 aktiven Sync-Tagen synchronisieren sie nicht mehr (App nur noch offline). Ablauf:
+  1. Törn anlegen, Crew einladen.
+  2. Jede Person meldet sich einmal an (erst dann existiert ihr Dexie-Konto).
+  3. In https://manager.dexie.cloud (mit der Admin-E-Mail anmelden) den Admin und alle Crew-Mitglieder auf *Production* setzen.
+  - Daheim-Konten (`daheim-…@demo.local`) sind Demo-Konten: kein Hochstufen nötig, belegen keinen Platz.
+  - Optional später: Skript, das per REST-API alle Mitglieder eines Törns hochstuft. Quelle: https://dexie.org/cloud/pricing (FAQ).
 - **Eigene Test-DB für die Cloud-E2E anlegen** und die Demo-Konten alice–dave aus der echten DB löschen.
 - **Daheim-Link vor Abfahrt erstellen und freischalten**, weil an Bord kein Laptop zur Hand ist.
 - **Ungeklärte Kleinigkeiten:**
