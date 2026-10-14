@@ -5,6 +5,7 @@ import { formatDateLong, type Trip } from '../../domain';
 import { Dialog } from '../components/Dialog';
 import { statusLabel } from '../cloudText';
 import { useCloudStatus, useCloudUser, useLastSyncAt } from '../cloudHooks';
+import { InstallButton } from '../InstallButton';
 import { Icon } from '../icons';
 import { initials } from '../lib';
 import { useToast } from '../toast';
@@ -158,6 +159,7 @@ export function AccountCard({ trip, admin, myName }: { trip: Trip; admin: boolea
         {trip.startDate ? ` · ${formatDateLong(trip.startDate)}` : ''}
         {trip.area ? ` · ${trip.area}` : ''}
       </div>
+      <InstallButton />
       {signingIn ? <SignInDialog onClose={() => setSigningIn(false)} /> : null}
       {loggingOut ? <LogoutDialog onClose={() => setLoggingOut(false)} /> : null}
     </section>

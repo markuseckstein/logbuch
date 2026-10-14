@@ -24,6 +24,7 @@ Stand: 2026-10-12 (UX-Umsetzung lokal committet, noch nicht gepusht). Alles ist 
   - Läuft über ein Dexie-Demo-Konto `daheim-<token>@demo.local` mit Rolle viewer.
   - **Jeder neue oder erneuerte Link muss einmal freigeschaltet werden:** `npm run viewer:create -- <Link|E-Mail|Token>` im Repo-Root. Das geht nur dort, wo `dexie-cloud.key` liegt, also auf dem Laptop des Nutzers.
   - Wer als Crew den Link aus Versehen öffnet, kommt über „Zur Crew-Anmeldung“ (unten in der Daheim-Ansicht) zurück.
+- **Button „App installieren“** (Törn-Tab › Konto, Daheim-Ansicht unten): Browser-Dialog auf Android/Chrome, sonst Anleitung (iPhone).
 - **Foto-Vollbild-Viewer** in der Crew-App und in der Daheim-Ansicht: wischen, zoomen, teilen.
 - **Absicherung gegen stille Sync-Ablehnungen:** `syncRescue` mit Banner „Erneut senden/Verwerfen“.
 

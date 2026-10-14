@@ -55,6 +55,9 @@ interface TripBundle { trip; boats; crew; entries; photos; dayReports; tracks; t
   Hinweis bei echtem Konto, Annehmen, „nicht mehr gültig“; Ausgang „Zur Crew-Anmeldung“: erst Token vergessen, dann
   abmelden), `HomeViewScreen` (Nur-Lese-Ansicht), Admin-Karte
   `ui/cloud/HomeViewCard.tsx`. Karte: `MapLayer.last` hebt die letzte Position hervor.
+- **Installieren**: `ui/InstallButton.tsx` fängt `beforeinstallprompt` früh ab (`captureInstallPrompt` in `main.tsx`,
+  unterdrückt die Mini-Infobar). Button „App installieren“ (Konto-Karte im Törn-Tab, unten in der Daheim-Ansicht)
+  öffnet damit den Browser-Dialog; ohne Angebot (iOS, schon benutzt) eine Anleitung. Als App gestartet: kein Button.
 - **Foto-Vollbild**: `ui/components/PhotoViewer.tsx` (`PhotoViewer`, `usePhotoViewer`, `classifySwipe`), genutzt von
   `PhotoGrid`, `PhotoPicker`, Timeline-Vorschau, Cover/Bootsfoto und der Daheim-Ansicht; Bildunterschrift `photoCaption`
   (`ui/lib.ts`).

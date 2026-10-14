@@ -10,6 +10,7 @@ import { ENTRY_ICON, Icon } from '../icons';
 import { authorName, boatLayers, currentTzOffsetMin, num1, photoCaption, tripPeriod, type DayInfo } from '../lib';
 import { ChartMap } from '../components/ChartMap';
 import { Dialog } from '../components/Dialog';
+import { InstallButton } from '../InstallButton';
 import { PhotoGrid } from '../components/PhotoImage';
 
 function useNow(intervalMs = 30_000): number {
@@ -116,6 +117,7 @@ function Leave({ onLeave }: { onLeave: () => void }) {
   const [asking, setAsking] = useState(false);
   return (
     <p className="home-leave">
+      <InstallButton className="btn" />
       <button className="btn" type="button" onClick={() => setAsking(true)}>
         Zur Crew-Anmeldung
       </button>

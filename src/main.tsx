@@ -10,10 +10,12 @@ import './ui/theme.css';
 import './ui/app.css';
 import { deleteLegacyDb } from './db/legacy';
 import { App } from './ui/App';
+import { captureInstallPrompt } from './ui/InstallButton';
 import { captureJoinFromUrl } from './ui/cloud/joinState';
 import { captureHomeViewFromUrl } from './ui/homeView/state';
 
 void deleteLegacyDb();
+captureInstallPrompt();
 captureJoinFromUrl();
 captureHomeViewFromUrl();
 // Daheim-Link in einen schon offenen Tab eingefügt: nur der Hash ändert sich, kein Neuladen
