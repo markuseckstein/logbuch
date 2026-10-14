@@ -9,6 +9,7 @@ import { useTripDays } from '../hooks';
 import { ENTRY_ICON, Icon } from '../icons';
 import { authorName, boatLayers, currentTzOffsetMin, num1, photoCaption, tripPeriod, type DayInfo } from '../lib';
 import { ChartMap } from '../components/ChartMap';
+import { Dialog } from '../components/Dialog';
 import { PhotoGrid } from '../components/PhotoImage';
 
 function useNow(intervalMs = 30_000): number {
@@ -110,12 +111,37 @@ function Day({ day, boats, crewName }: {
   );
 }
 
+/** Ausgang für Crew, die den Link aus Versehen geöffnet hat: nach Rückfrage `onLeave` (abmelden). */
+function Leave({ onLeave }: { onLeave: () => void }) {
+  const [asking, setAsking] = useState(false);
+  return (
+    <p className="home-leave">
+      <button className="btn" type="button" onClick={() => setAsking(true)}>
+        Zur Crew-Anmeldung
+      </button>
+      {asking ? (
+        <Dialog title="Daheim-Ansicht verlassen?" onClose={() => setAsking(false)}>
+          <p>Du kannst dich danach mit deinem Crew-Konto anmelden. Um sie wieder zu sehen, brauchst du den Link.</p>
+          <div className="share-choice">
+            <button className="btn primary block" type="button" onClick={onLeave}>
+              Verlassen
+            </button>
+            <button className="btn block" type="button" onClick={() => setAsking(false)}>
+              Abbrechen
+            </button>
+          </div>
+        </Dialog>
+      ) : null}
+    </p>
+  );
+}
+
 /**
  * Daheim-Ansicht: vereinfacht, nur lesen, große Schrift. Cover, „Zuletzt aktualisiert“, Karte aller Boote mit
  * letzter Position, darunter die Tage (neueste zuerst) mit Tagesberichten, Einträgen und Fotos. Aktualisiert sich
  * live (liveQuery über den normalen Dexie-Sync).
  */
-export function HomeViewScreen({ trip }: { trip: Trip }) {
+export function HomeViewScreen({ trip, onLeave }: { trip: Trip; onLeave: () => void }) {
   const data = useTripDays(trip);
   const loadedBoats = useBoats(trip.id);
   const boats = useMemo(() => loadedBoats ?? [], [loadedBoats]);
@@ -167,6 +193,7 @@ export function HomeViewScreen({ trip }: { trip: Trip }) {
         ) : (
           days.map((d) => <Day key={d.date} day={d} boats={allBoats} crewName={crewName} />)
         )}
+        <Leave onLeave={onLeave} />
       </main>
     </div>
   );

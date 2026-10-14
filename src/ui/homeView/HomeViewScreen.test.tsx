@@ -31,7 +31,7 @@ describe('HomeViewScreen (Daheim-Ansicht)', () => {
     await upsertDayReport(db, trip.id, '2026-08-11', { title: 'Überfahrt', text: 'Schöner Segeltag' });
     const t = (await db.trips.get(trip.id))!;
 
-    render(<ToastProvider><HomeViewScreen trip={t} /></ToastProvider>);
+    render(<ToastProvider><HomeViewScreen trip={t} onLeave={() => undefined} /></ToastProvider>);
 
     expect(await screen.findByRole('heading', { name: 'Ostsee 2026', level: 1 })).toBeInTheDocument();
     expect(screen.getByText(/^Zuletzt aktualisiert (gerade eben|vor)/)).toBeInTheDocument();
@@ -59,8 +59,26 @@ describe('HomeViewScreen (Daheim-Ansicht)', () => {
 
   it('ohne Einträge: freundlicher Hinweis', async () => {
     const trip = await seedTrip('Leer');
-    render(<ToastProvider><HomeViewScreen trip={trip} /></ToastProvider>);
+    render(<ToastProvider><HomeViewScreen trip={trip} onLeave={() => undefined} /></ToastProvider>);
     expect(await screen.findByText('Noch keine Einträge')).toBeInTheDocument();
     expect(screen.getByText('Sobald die Crew etwas einträgt, erscheint es hier.')).toBeInTheDocument();
+  });
+
+  it('„Zur Crew-Anmeldung“: erst nachfragen, dann verlassen', async () => {
+    const trip = await seedTrip('Ostsee');
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    render(<ToastProvider><HomeViewScreen trip={trip} onLeave={onLeave} /></ToastProvider>);
+
+    await user.click(await screen.findByRole('button', { name: 'Zur Crew-Anmeldung' }));
+    const dlg = screen.getByRole('dialog', { name: 'Daheim-Ansicht verlassen?' });
+    expect(dlg).toHaveTextContent('Um sie wieder zu sehen, brauchst du den Link.');
+    await user.click(within(dlg).getByRole('button', { name: 'Abbrechen' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(onLeave).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Zur Crew-Anmeldung' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Verlassen' }));
+    expect(onLeave).toHaveBeenCalledOnce();
   });
 });

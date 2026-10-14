@@ -52,7 +52,8 @@ interface TripBundle { trip; boats; crew; entries; photos; dayReports; tracks; t
   `tripAccess` → `viewer: true` ohne Rechte. `scripts/create-viewer.mjs` (`npm run viewer:create`) legt das Demo-Konto
   per CLI an bzw. löscht es (`--delete`). UI: `ui/homeView/state.ts` (Token aus dem Hash in localStorage),
   `HomeViewApp` (statt der Crew-App, sobald ein Token gemerkt oder ein Zuschauer-Konto angemeldet ist: Auto-Login,
-  Hinweis bei echtem Konto, Annehmen, „nicht mehr gültig“), `HomeViewScreen` (Nur-Lese-Ansicht), Admin-Karte
+  Hinweis bei echtem Konto, Annehmen, „nicht mehr gültig“; Ausgang „Zur Crew-Anmeldung“: erst Token vergessen, dann
+  abmelden), `HomeViewScreen` (Nur-Lese-Ansicht), Admin-Karte
   `ui/cloud/HomeViewCard.tsx`. Karte: `MapLayer.last` hebt die letzte Position hervor.
 - **Foto-Vollbild**: `ui/components/PhotoViewer.tsx` (`PhotoViewer`, `usePhotoViewer`, `classifySwipe`), genutzt von
   `PhotoGrid`, `PhotoPicker`, Timeline-Vorschau, Cover/Bootsfoto und der Daheim-Ansicht; Bildunterschrift `photoCaption`

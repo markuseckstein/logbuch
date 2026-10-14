@@ -24,7 +24,14 @@ vi.mock('../cloudHooks', () => ({
   useUserInteraction: () => undefined,
 }));
 vi.mock('../../db/cloud', () => ({ login: vi.fn(async () => undefined), logout: vi.fn(async () => undefined) }));
-vi.mock('./HomeViewScreen', () => ({ HomeViewScreen: ({ trip }: { trip: { name: string } }) => <h1>Daheim: {trip.name}</h1> }));
+vi.mock('./HomeViewScreen', () => ({
+  HomeViewScreen: ({ trip, onLeave }: { trip: { name: string }; onLeave: () => void }) => (
+    <>
+      <h1>Daheim: {trip.name}</h1>
+      <button type="button" onClick={onLeave}>Verlassen</button>
+    </>
+  ),
+}));
 
 function open(token = TOKEN): void {
   history.replaceState(null, '', `/#daheim=${token}`);
@@ -113,6 +120,22 @@ describe('HomeViewApp (Daheim-Link)', () => {
     renderApp();
     expect(screen.getByText(/Dieser Link funktioniert gerade nicht/)).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 20));
+    expect(login).not.toHaveBeenCalled();
+  });
+
+  it('„Verlassen“ als Zuschauer: Token vergessen, dann abmelden (sonst meldet der Token gleich wieder an)', async () => {
+    cloud.user = { isLoggedIn: true, userId: VIEWER, email: VIEWER };
+    open();
+    const trip = await seedTrip('Ostsee');
+    await moveTripToRealm(db, trip.id, `rlm~${trip.id}`, { name: 'Ostsee', represents: 'einen Törn' });
+    let tokenAtLogout: string | null = 'unset';
+    vi.mocked(logout).mockImplementationOnce(async () => {
+      tokenAtLogout = localStorage.getItem('logbook.daheim');
+    });
+    renderApp();
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Verlassen' }));
+    await waitFor(() => expect(logout).toHaveBeenCalledWith(db));
+    expect(tokenAtLogout).toBeNull();
     expect(login).not.toHaveBeenCalled();
   });
 });

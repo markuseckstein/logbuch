@@ -23,6 +23,7 @@ Stand: 2026-10-12 (UX-Umsetzung lokal committet, noch nicht gepusht). Alles ist 
 - **Daheim-Link** (Zuschauer ohne Anmeldung, live, mit Fotos):
   - Läuft über ein Dexie-Demo-Konto `daheim-<token>@demo.local` mit Rolle viewer.
   - **Jeder neue oder erneuerte Link muss einmal freigeschaltet werden:** `npm run viewer:create -- <Link|E-Mail|Token>` im Repo-Root. Das geht nur dort, wo `dexie-cloud.key` liegt, also auf dem Laptop des Nutzers.
+  - Wer als Crew den Link aus Versehen öffnet, kommt über „Zur Crew-Anmeldung“ (unten in der Daheim-Ansicht) zurück.
 - **Foto-Vollbild-Viewer** in der Crew-App und in der Daheim-Ansicht: wischen, zoomen, teilen.
 - **Absicherung gegen stille Sync-Ablehnungen:** `syncRescue` mit Banner „Erneut senden/Verwerfen“.
 
@@ -42,7 +43,7 @@ Stand: 2026-10-12 (UX-Umsetzung lokal committet, noch nicht gepusht). Alles ist 
   3. In https://manager.dexie.cloud (mit der Admin-E-Mail anmelden) den Admin und alle Crew-Mitglieder auf *Production* setzen.
   - Daheim-Konten (`daheim-…@demo.local`) sind Demo-Konten: kein Hochstufen nötig, belegen keinen Platz.
   - Optional später: Skript, das per REST-API alle Mitglieder eines Törns hochstuft. Quelle: https://dexie.org/cloud/pricing (FAQ).
-- **Eigene Test-DB für die Cloud-E2E anlegen** und die Demo-Konten alice–dave aus der echten DB löschen.
+- **Eigene Test-DB für die Cloud-E2E anlegen** und die Demo-Konten alice–dave aus der echten DB löschen. Stand 2026-10-14: alice ist schon gelöscht, deshalb scheitert `npm run e2e:cloud` beim Demo-Login, bis die Test-DB steht.
 - **Daheim-Link vor Abfahrt erstellen und freischalten**, weil an Bord kein Laptop zur Hand ist.
 - **Ungeklärte Kleinigkeiten:**
   - Die Rolle `member` allein wurde vom Server zeitweise nicht ausgewertet. Die App setzt deshalb die Rechte zusätzlich direkt am Mitglied.

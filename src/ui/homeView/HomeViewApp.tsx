@@ -7,6 +7,7 @@ import { isHomeViewToken, isSharedRealm, isViewerEmail, viewerEmail, viewerToken
 import { useCloudUser, useInvites, useSyncState, useUserInteraction } from '../cloudHooks';
 import { useSettings, useTheme } from '../hooks';
 import { CloudLoginHost } from '../cloud/LoginHost';
+import { useToast } from '../toast';
 import { HomeViewScreen } from './HomeViewScreen';
 import { clearHomeViewToken, useHomeViewToken } from './state';
 
@@ -71,8 +72,25 @@ function OtherAccount({ email, onOpen }: { email: string; onOpen: () => void }) 
   );
 }
 
+/**
+ * Daheim-Ansicht verlassen (Crew hat den Link geöffnet): erst den Token vergessen, dann abmelden – sonst meldet der
+ * noch gemerkte Token sofort wieder als Zuschauer an. Danach zeigt die App die normale Anmeldung.
+ */
+function useLeave(): () => Promise<void> {
+  const toast = useToast();
+  return async () => {
+    clearHomeViewToken();
+    try {
+      await logout(db);
+    } catch {
+      toast('Abmelden hat nicht geklappt – bitte erneut versuchen');
+    }
+  };
+}
+
 /** Zuschauer angemeldet: Einladung automatisch annehmen, Törn anzeigen bzw. „nicht mehr gültig“. */
 function Viewer() {
+  const leave = useLeave();
   const invites = useInvites();
   const sync = useSyncState();
   const handled = useRef(new Set<string>());
@@ -107,7 +125,7 @@ function Viewer() {
     };
   }, [idle]);
 
-  if (trip) return <HomeViewScreen trip={trip} />;
+  if (trip) return <HomeViewScreen trip={trip} onLeave={() => void leave()} />;
   return settled ? <Invalid /> : <Loading />;
 }
 

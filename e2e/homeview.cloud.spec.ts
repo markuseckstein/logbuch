@@ -5,7 +5,8 @@ import { onboard } from './helpers';
 /**
  * Daheim-Link gegen die echte Dexie-Cloud (nur `npm run e2e:cloud`): Alice (Admin) erstellt den Link, das
  * Demo-Konto wird per `scripts/create-viewer.mjs` freigeschaltet (wie es der Admin einmalig tut), ein frisches
- * Gerät öffnet ihn ohne Anmeldung, sieht den Törn live; nach „Link erneuern“ ist der alte Link ungültig.
+ * Gerät öffnet ihn ohne Anmeldung, sieht den Törn live; nach „Link erneuern“ ist der alte Link ungültig; „Zur
+ * Crew-Anmeldung“ führt zurück in die normale App.
  * Aufräumen: Törn für alle löschen, die hier angelegten Zuschauer-Konten wieder löschen (nur diese).
  */
 test.skip(!process.env['E2E_CLOUD_URL'], 'Keine Dexie-Cloud-URL konfiguriert (VITE_DEXIE_CLOUD_URL)');
@@ -148,6 +149,14 @@ test('Cloud: Daheim-Link – Zuschauer ohne Anmeldung sieht den Törn live, erne
     await oma2.goto(link2);
     await expect(oma2.getByRole('heading', { name: trip, level: 1 })).toBeVisible(SYNC);
     await expect(oma2.getByText(`Live aus der Förde ${run}`)).toBeVisible(SYNC);
+
+    // --- Crew hat den Link aus Versehen geöffnet: Ausgang zur normalen Anmeldung, bleibt auch nach Neuladen draußen
+    await oma2.getByRole('button', { name: 'Zur Crew-Anmeldung' }).click();
+    await oma2.getByRole('dialog', { name: 'Daheim-Ansicht verlassen?' }).getByRole('button', { name: 'Verlassen' }).click();
+    await expect(oma2.getByText('Eingeladen oder schon dabei?')).toBeVisible(SYNC);
+    await oma2.reload();
+    await expect(oma2.getByText('Eingeladen oder schon dabei?')).toBeVisible(SYNC);
+    await expect(oma2.getByRole('heading', { name: trip, level: 1 })).toHaveCount(0);
     failed = false;
   } finally {
     if (process.env['E2E_KEEP'] && failed) {
